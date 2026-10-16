@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Masuk — Script VO Agent</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --paper:#F7F4EA; --ink:#111111;
+  --nb-shadow:6px 6px 0 #111111;
+}
+body{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:var(--paper);
+  background-image:radial-gradient(#11111114 1.5px, transparent 1.5px);
+  background-size:22px 22px;
+  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink);
+  padding:20px;
+}
+.card{
+  background:#fff;border:4px solid #000;border-radius:24px;
+  box-shadow:var(--nb-shadow);padding:36px 32px;width:100%;max-width:380px;
+  text-align:center;
+}
+.badge{
+  display:inline-block;font-weight:900;font-size:12px;padding:6px 14px;border-radius:99px;
+  background:#FFC72C;border:3px solid #000;box-shadow:3px 3px 0 #000;
+  text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px;
+}
+h1{font-size:32px;font-weight:900;letter-spacing:-.02em;margin-bottom:6px}
+p.sub{color:#444;font-weight:600;font-size:14px;margin-bottom:24px}
+label{display:block;text-align:left;font-weight:900;font-size:13px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+input{
+  width:100%;padding:13px 14px;font-size:16px;font-weight:600;
+  border:3px solid #000;border-radius:14px;background:#F7F4EA;color:var(--ink);
+  box-shadow:3px 3px 0 #000;margin-bottom:18px;outline:none;
+}
+input:focus{background:#fff;box-shadow:5px 5px 0 #000;transform:translate(-1px,-1px)}
+button{
+  width:100%;padding:13px;font-size:17px;font-weight:900;cursor:pointer;
+  background:#8AC926;color:#000;border:3px solid #000;border-radius:14px;
+  box-shadow:4px 4px 0 #000;transition:transform .08s,box-shadow .08s;
+}
+button:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 #000}
+button:active{transform:translate(3px,3px);box-shadow:1px 1px 0 #000}
+button:disabled{opacity:.6;cursor:wait;transform:none}
+.err{
+  display:none;margin-top:16px;padding:10px 14px;font-weight:800;font-size:14px;
+  background:#FF595E;color:#fff;border:3px solid #000;border-radius:12px;
+  box-shadow:3px 3px 0 #000;
+}
+.err.show{display:block}
+.foot{margin-top:22px;font-size:12px;color:#777;font-weight:600}
+</style>
+</head>
+<body>
+<div class="card">
+  <span class="badge">🔒 Area Privat</span>
+  <h1>Script VO Agent</h1>
+  <p class="sub">Masukin nama akun + password dashboard buat lanjut.</p>
+  <div style="display:flex;gap:8px;margin-bottom:18px">
+    <button type="button" id="tabIn" style="flex:1;padding:10px;font-size:14px;background:#8AC926">Masuk</button>
+    <button type="button" id="tabUp" style="flex:1;padding:10px;font-size:14px;background:#fff">Daftar baru</button>
+  </div>
+  <form id="f" autocomplete="off">
+    <label for="user">Nama Akun</label>
+    <input type="text" id="user" placeholder="Tambahkan nama buat login" autocomplete="username" autocapitalize="off" spellcheck="false">
+    <label for="pw">Password</label>
+    <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password" autofocus>
+    <div id="regFields" hidden>
+      <label for="pw2">Ulangi Password</label>
+      <input type="password" id="pw2" placeholder="••••••••" autocomplete="new-password">
+      <label for="em">Email (opsional, untuk pemulihan akun)</label>
+      <input type="email" id="em" placeholder="kamu@email.com" autocomplete="email">
+    </div>
+    <button type="submit" id="btn">Masuk →</button>
+  </form>
+  <div style="margin-top:14px"><a href="#" id="forgotLink" style="font-size:13px;font-weight:800;color:#111">Lupa password?</a></div>
+  <div id="forgotBox" hidden style="margin-top:14px;padding:14px;border:3px solid #000;border-radius:14px;background:#F7F4EA;text-align:left">
+    <label for="femail">Email</label>
+    <input type="email" id="femail" placeholder="Email yang terdaftar" autocomplete="email" style="margin-bottom:10px">
+    <button type="button" id="forgotBtn" style="padding:10px;font-size:14px">Kirim link reset</button>
+    <div id="forgotMsg" style="margin-top:10px;font-size:13px;font-weight:700"></div>
+  </div>
+  <div class="err" id="err">Password salah, coba lagi.</div>
+  <div class="foot">Sesi tersimpan 30 hari di browser ini.</div>
+</div>
+<script>
+const f=document.getElementById('f'),pw=document.getElementById('pw'),pw2=document.getElementById('pw2'),
+      user=document.getElementById('user'),em=document.getElementById('em'),
+      btn=document.getElementById('btn'),err=document.getElementById('err'),
+      tabIn=document.getElementById('tabIn'),tabUp=document.getElementById('tabUp'),regFields=document.getElementById('regFields');
+let mode='login';
+const setMode=m=>{mode=m;regFields.hidden=m!=='register';
+  tabIn.style.background=m==='login'?'#8AC926':'#fff';tabUp.style.background=m==='register'?'#8AC926':'#fff';
+  btn.textContent=m==='register'?'Buat akun →':'Masuk →';
+  pw.autocomplete=m==='register'?'new-password':'current-password';err.classList.remove('show')};
+tabIn.addEventListener('click',()=>setMode('login'));
+tabUp.addEventListener('click',()=>setMode('register'));
+f.addEventListener('submit',async e=>{
+  e.preventDefault();
+  err.classList.remove('show');btn.disabled=true;btn.textContent='Mengecek…';
+  try{
+    if(mode==='register'&&pw.value!==pw2.value)throw new Error('Ulangi password tidak sama.');
+    const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({password:pw.value, user:user.value, mode, email:em.value})});
+    if(r.ok){location.href='/';return;}
+    const j=await r.json().catch(()=>({}));
+    err.textContent=j.error||'Password salah, coba lagi.';err.classList.add('show');pw.value='';pw.focus();
+  }catch(er){err.textContent=er.message||'Server tidak terjangkau.';err.classList.add('show');}
+  btn.disabled=false;btn.textContent=mode==='register'?'Buat akun →':'Masuk →';
+});
+/* Lupa password: minta link reset ke email pemulihan (via Resend) */
+const forgotLink=document.getElementById('forgotLink'),forgotBox=document.getElementById('forgotBox'),
+      femail=document.getElementById('femail'),forgotBtn=document.getElementById('forgotBtn'),
+      forgotMsg=document.getElementById('forgotMsg');
+forgotLink.addEventListener('click',e=>{e.preventDefault();forgotBox.hidden=!forgotBox.hidden;if(!forgotBox.hidden)femail.focus();});
+forgotBtn.addEventListener('click',async()=>{
+  forgotMsg.textContent='Mengirim…';forgotBtn.disabled=true;
+  try{
+    const r=await fetch('/api/forgot',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:femail.value})});
+    const j=await r.json().catch(()=>({}));
+    forgotMsg.textContent=j.message||j.error||'Link reset sudah dikirim ke email.';
+  }catch(e){forgotMsg.textContent='Server tidak terjangkau.'}
+  forgotBtn.disabled=false;
+});
+</script>
+</body>
+</html>

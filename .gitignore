@@ -1,0 +1,26 @@
+# Secrets — JANGAN pernah push
+.env
+.env.*
+users.json
+*.key
+*.pem
+*.p12
+
+# State per-akun + data runtime (dibuat server, bukan source)
+state-*.json
+job.json
+*.log
+
+# Folder kerja Clipper (video sumber + render, besar)
+clipper-work/
+uploads/
+tmp/
+
+# Node
+node_modules/
+
+# Build artifacts lokal (bukan source)
+*.tar.gz
+whisper.cpp/
+build/
+build-cross/
