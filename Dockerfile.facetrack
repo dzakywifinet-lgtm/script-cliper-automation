@@ -1,0 +1,34 @@
+# Dockerfile.facetrack — Face tracking (OpenCV YuNet) untuk Auto Clipper.
+#
+# KENAPA DOCKER (bukan pip di Pi):
+# - Pi pakai OpenWrt (musl libc) — wheel pre-built OpenCV di PyPI cuma buat glibc
+#   (manylinux), jadi `pip install opencv-python-headless` di Pi maksa build dari
+#   source (gagal di CMake). `opkg` juga tidak punya paket python3-opencv.
+# - Image ini berbasis Debian (glibc) → `pip install opencv-python-headless`
+#   langsung dapat wheel pre-built, tanpa build.
+#
+# PORTABLE (Pi + PC, tanpa ubah kode):
+# - Dockerfile ini SAMA untuk Pi (ARM64) dan PC (x86_64) — Docker otomatis
+#   ambil varian arsitektur yang benar. Di PC, tinggal `docker build` ulang
+#   (perintah yang sama), server.js + face_track.py tidak berubah.
+# - Di PC, kalau mau pakai Python native (tanpa Docker), hapus baris
+#   FACE_TRACK_IMAGE dari .env lalu `pip install opencv-python-headless` —
+#   server otomatis pakai Python native (FACE_TRACK_PYTHON / python3).
+#
+# BUILD (Pi / PC):
+#   docker build -t facetrack -f Dockerfile.facetrack .
+# .ENV (server):
+#   FACE_TRACK_IMAGE=facetrack
+# CARA KERJA: server menjalankan
+#   docker run --rm -v <jobDir>:<jobDir> -v <sourceDir>:<sourceDir> facetrack \
+#     --input <source> --start <s> --end <e> --out <track.json> --fps 2 --ema 0.35
+# (path di-mount apa adanya, jadi path di dalam container = path di host).
+FROM docker.m.daocloud.io/library/python:3.11-slim
+# ffmpeg + ffprobe (face_track.py pakai keduanya: ekstrak frame + volumedetect + probe).
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir opencv-python-headless numpy
+COPY face_track.py /app/face_track.py
+COPY face_detection_yunet_2023mar.onnx /app/face_detection_yunet_2023mar.onnx
+WORKDIR /app
+ENTRYPOINT ["python3", "/app/face_track.py"]

@@ -43,6 +43,36 @@ def parse_ts(s):
         return 0.0
     return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3)) + int(m.group(4)) / 1000.0
 
+def tok_ts(tok):
+    # Timestamp token: offsets (centidetik) > timestamps ("HH:MM:SS,mmm").
+    off = tok.get('offsets') or {}
+    if 'from' in off and 'to' in off:
+        return off['from'] / 1000.0, off['to'] / 1000.0
+    ts = tok.get('timestamps') or {}
+    return parse_ts(ts.get('from')), parse_ts(ts.get('to'))
+
+def merge_tokens(tokens):
+    # BPE token -> kata. Token berawalan spasi (" Saya") = kata baru;
+    # tanpa spasi ("mem", "per") = lanjutan kata sebelumnya. Token tanpa
+    # teks/timestamp (tanda baca kosong, dst.) di-skip. Tanda baca yang
+    # nempel di token (misal "cepat.") ikut ke kata itu.
+    words = []
+    for tok in tokens or []:
+        if not isinstance(tok, dict):
+            continue
+        txt = tok.get('text') or ''
+        if not txt.strip():
+            continue
+        s, e = tok_ts(tok)
+        if not (e > s):
+            continue
+        if txt.startswith(' ') or not words:
+            words.append({'text': txt.strip(), 'start': round(float(s), 2), 'end': round(float(e), 2)})
+        else:
+            words[-1]['text'] += txt
+            words[-1]['end'] = round(float(e), 2)
+    return [w for w in words if w['text']]
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('input')
@@ -61,7 +91,7 @@ def main():
                         '-i', args.input, '-vn', '-ac', '1', '-ar', '16000', '-f', 'wav', wav],
                        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_prefix = os.path.join(td, 'out')
-        cmd = [cli, '-m', model, '-f', wav, '-l', lang, '-oj', '-of', out_prefix]
+        cmd = [cli, '-m', model, '-f', wav, '-l', lang, '-t', '4', '-oj', '-of', out_prefix]
         p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if p.returncode != 0:
             print('whisper-cli gagal: ' + (p.stderr or '').strip()[-500:], file=sys.stderr)
@@ -83,7 +113,12 @@ def main():
                 start, end = parse_ts(ts.get('from')), parse_ts(ts.get('to'))
             text = (it.get('text') or '').strip()
             if text:
-                segments.append({'start': round(float(start), 2), 'end': round(float(end), 2), 'text': text})
+                # Kata per kata (buat subtitle karaoke gaya Klipaja: kata yang
+                # lagi diucapin disorot hijau). whisper-cli JSON menyertakan
+                # "tokens" (BPE: " Saya", "mem", "per") — gabung jadi kata:
+                # token berawalan spasi = kata baru, sisanya lanjutan kata.
+                words = merge_tokens(it.get('tokens') or [])
+                segments.append({'start': round(float(start), 2), 'end': round(float(end), 2), 'text': text, 'words': words})
     print(json.dumps({'language': lang_out, 'segments': segments}, ensure_ascii=False))
     return 0
 

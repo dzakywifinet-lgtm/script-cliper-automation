@@ -214,6 +214,16 @@ module.exports = function ({ E, R, rh, send }) {
   const wavOf = (pcm, rate) => { const h = Buffer.alloc(44); h.write('RIFF', 0); h.writeUInt32LE(36 + pcm.length, 4); h.write('WAVE', 8); h.write('fmt ', 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(pcm.length, 40); return Buffer.concat([h, pcm]); };
   let ff = null;
   const hasFfmpeg = () => { if (E.TTS_FFMPEG === '0') return false; if (ff === null) { try { ff = spawnSync('ffmpeg', ['-version'], { timeout: 5000 }).status === 0; } catch { ff = false; } } return ff; };
+  // Volume (0-200%, default 100): diterapkan via ffmpeg setelah audio jadi — universal semua engine.
+  // 0% = senyap, 100% = normal, 200% = 2x lebih keras (hati-hati clipping).
+  const applyVolume = (buf, format, vol) => new Promise((res, rej) => {
+    if (!vol || vol === 100 || !hasFfmpeg()) return res(buf);
+    const gain = (vol / 100).toFixed(2);
+    const p = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-af', 'volume=' + gain, '-f', format === 'wav' ? 'wav' : 'mp3', '-b:a', '128k', 'pipe:1']), out = [];
+    p.stdout.on('data', d => out.push(d)); p.on('error', rej); p.stdin.on('error', () => {});
+    p.on('close', c => c === 0 && out.length ? res(Buffer.concat(out)) : rej(new Error('ffmpeg volume gagal')));
+    p.stdin.end(buf);
+  });
   const toMp3 = (pcm, rate) => new Promise((res, rej) => {
     const p = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 's16le', '-ar', String(rate), '-ac', '1', '-i', 'pipe:0', '-f', 'mp3', '-b:a', '128k', 'pipe:1']), out = [];
     p.stdout.on('data', d => out.push(d)); p.on('error', rej); p.stdin.on('error', () => {});
@@ -234,7 +244,7 @@ module.exports = function ({ E, R, rh, send }) {
     if (text.length > MAX_CHARS) throw err('Teks terlalu panjang (maksimal ' + MAX_CHARS + ' karakter)', '', 413);
     if (!b.voice) throw err('Voice belum dipilih', '', 400);
     if ([...jobs.values()].some(j => j.status === 'running')) throw err('Masih ada proses suara yang berjalan', '', 409);
-    const o = { voice: String(b.voice), speed: clamp(b.speed, 0.5, 2), pitch: +b.pitch || 0, style: String(b.style || '').trim().slice(0, 200) };
+    const o = { voice: String(b.voice), speed: clamp(b.speed, 0.5, 2), pitch: +b.pitch || 0, style: String(b.style || '').trim().slice(0, 200), volume: Math.min(200, Math.max(0, +b.volume || 100)) };
     const chunks = chunkText(text, limitOf(b.engine), b.engine === 'google');
     if (chunks.length > MAX_CHUNKS) throw err('Teks terlalu panjang untuk diproses sekaligus', '', 413);
     const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -258,6 +268,7 @@ module.exports = function ({ E, R, rh, send }) {
         const pcm = Buffer.concat(parts); format = 'wav'; buf = wavOf(pcm, rate);
         if (hasFfmpeg()) { try { buf = await toMp3(pcm, rate); format = 'mp3'; } catch { job.note = 'ffmpeg gagal, hasil dalam WAV'; } }
       } else buf = Buffer.concat(parts);
+      if (o.volume !== 100) { try { buf = await applyVolume(buf, format, o.volume); } catch { job.note = 'Volume tidak diterapkan (ffmpeg gagal)'; } }
       audios.set(id, { buf, ts: Date.now(), format });
       while (audios.size > 4) audios.delete(audios.keys().next().value);
       job.status = 'done'; job.bytes = buf.length; job.format = format;
