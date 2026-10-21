@@ -10,16 +10,26 @@ try {
   });
 } catch {}
 const E = process.env, PORT = E.PORT || 3000, MAXT = +E.MAX_TOKENS || 8000, LIMIT = 10 * 60 * 1000;
-const M = { gemini: E.GEMINI_MODEL || 'gemini-2.5-flash', claude: E.CLAUDE_MODEL || 'claude-sonnet-4-6', openai: E.OPENAI_MODEL || 'gpt-4o' };
+// gemini-2.5-flash DIPENSIUNKAN Google utk user baru ("This model
+// models/gemini-2.5-flash is no longer available to new users") — semua
+// panggilan Direct Gemini gagal walau key valid. Default + pin lama di
+// .env dipetakan ke penerusnya gemini-3.8-flash (saran error Google).
+const GEMINI_MODEL = !E.GEMINI_MODEL || E.GEMINI_MODEL === 'gemini-2.5-flash' ? 'gemini-3.8-flash' : E.GEMINI_MODEL;
+const M = { gemini: GEMINI_MODEL, claude: E.CLAUDE_MODEL || 'claude-sonnet-4-6', openai: E.OPENAI_MODEL || 'gpt-4o' };
 const KEY = { gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' };
 const R = (E.ROUTER_URL || '').replace(/\/+$/, '').replace(/\/v1$/, '');
 const rh = () => { const h = {}; if (E.ROUTER_API_KEY) h.authorization = 'Bearer ' + E.ROUTER_API_KEY; if (E.CF_ACCESS_CLIENT_ID) { h['CF-Access-Client-Id'] = E.CF_ACCESS_CLIENT_ID; h['CF-Access-Client-Secret'] = E.CF_ACCESS_CLIENT_SECRET || ''; } return h; };
 // 9router KEDUA (PC, di mesin yang sama dengan dashboard): ROUTER_URL_PC
 // (misal http://127.0.0.1:20128). Portnya sama dengan Pi (20128) tidak
 // masalah — mesinnya beda (Pi = 100.108.196.121:20128, PC = 127.0.0.1:20128).
-// Bila tidak di-set, PC tidak tersedia. Key: ROUTER_API_KEY_PC, bila kosong
-// pakai ROUTER_API_KEY yang sama (PC yang key-nya sama tidak perlu env tambahan).
-const RPC = (E.ROUTER_URL_PC || '').replace(/\/+$/, '').replace(/\/v1$/, '');
+// DEFAULT http://127.0.0.1:20128 bila env kosong (fix brief Dzaky 21 Okt):
+// 9router PC memang jalan di mesin yang sama dengan dashboard, jadi jalur
+// PC tidak boleh mati hanya karena variabelnya belum ditulis di .env.
+// Nilai .env tetap menang. Normalisasi: slash + "/v1" di ujung dibuang,
+// "localhost" diganti 127.0.0.1 (9router PC hanya dengar di IPv4 —
+// "localhost" bisa resolve ke ::1 dan gagal). Key: ROUTER_API_KEY_PC,
+// bila kosong pakai ROUTER_API_KEY yang sama.
+const RPC = ((E.ROUTER_URL_PC || '').trim() || 'http://127.0.0.1:20128').replace(/\/+$/, '').replace(/\/v1$/, '').replace(/:\/\/localhost(?=[:/]|$)/i, '://127.0.0.1');
 const rhPc = () => { const h = {}; const key = E.ROUTER_API_KEY_PC || E.ROUTER_API_KEY; if (key) h.authorization = 'Bearer ' + key; if (E.CF_ACCESS_CLIENT_ID) { h['CF-Access-Client-Id'] = E.CF_ACCESS_CLIENT_ID; h['CF-Access-Client-Secret'] = E.CF_ACCESS_CLIENT_SECRET || ''; } return h; };
 // Key API benar-benar terisi (bukan kosong / hanya spasi / sampah terlalu
 // pendek). Health lama pakai `!!E[KEY]` -> key berisi spasi / placeholder
@@ -50,7 +60,8 @@ async function probeRouter(which) {
     return { ok: true, host, url: base };
   } catch (e) {
     const reason = /abort|timeout/i.test((e && e.name || '') + ' ' + (e && e.message || '')) ? 'timeout' : 'unreachable';
-    return { ok: false, reason, host, url: base };
+    const code = (e && e.cause && e.cause.code) || (e && e.code) || '';
+    return { ok: false, reason: code ? reason + ':' + code : reason, host, url: base };
   }
 }
 /* Sesi login via cookie (pengganti HTTP Basic agar bisa pakai halaman login custom).
@@ -172,14 +183,15 @@ const NORMAL = /^(?:finish_reason_)?(stop|end_turn|stop_sequence|eos|completed?|
 const abortErr = (e, job) => e.name === 'AbortError' ? (job.stopped ? fail('Dihentikan oleh pengguna', 'stopped') : fail('Waktu habis menunggu AI (10 menit)', 'timeout')) : null;
 // Mode 9router: streaming, hasil sebagian disimpan di job.partial.
 // `which`: 'pi' (default) atau 'pc' — router yang dipakai (dipilih manual).
-async function viaRouter(model, msgs, job, which) {
-  const base = routerBase(routerWhich(which));
-  const hdrs = routerHeaders(routerWhich(which));
+async function viaRouterOnce(model, msgs, job, which) {
+  const w = routerWhich(which), lbl = w === 'pc' ? '9router PC' : '9router Pi';
+  const base = routerBase(w);
+  const hdrs = routerHeaders(w);
   let r;
   try {
     r = await fetch(base + '/v1/chat/completions', { method: 'POST', headers: { 'content-type': 'application/json', ...hdrs }, signal: job.ctrl.signal,
       body: JSON.stringify({ model, max_tokens: MAXT, stream: true, messages: msgs }) });
-  } catch (e) { throw abortErr(e, job) || fail('Tidak bisa menjangkau 9router: ' + (e.cause?.code || e.cause?.message || e.message), 'network'); }
+  } catch (e) { throw abortErr(e, job) || fail('Tidak bisa menjangkau ' + lbl + ': ' + (e.cause?.code || e.cause?.message || e.message), 'network'); }
   const ct = r.headers.get('content-type') || '';
   const snip = t => t.replace(/\s+/g, ' ').slice(0, 200);
   if (!r.ok) { const t = await r.text(); let j = {}; try { j = JSON.parse(t); } catch {} throw fail(j.error?.message || j.error || 'HTTP ' + r.status + ': ' + snip(t), '', r.status); }
@@ -212,12 +224,29 @@ async function viaRouter(model, msgs, job, which) {
   } catch (e) {
     const a = abortErr(e, job); if (a) throw a;
     if (e.kind !== undefined) throw e;
-    throw fail('Koneksi ke 9router terputus saat menulis: ' + (e.cause?.code || e.message), 'cut');
+    throw fail('Koneksi ke ' + lbl + ' terputus saat menulis: ' + (e.cause?.code || e.message), 'cut');
   }
   if (!out.trim()) throw fail('Model membalas kosong', 'empty');
   // selesai normal hanya jika ada alasan berhenti normal, atau [DONE] tanpa alasan apa pun; stream putus mendadak = terpotong
   job.truncated = job.finish ? !NORMAL.test(job.finish) : !job.sawDone;
   return cleanThink(out);
+}
+// Pembungkus viaRouterOnce: SATU kali percobaan ulang otomatis untuk
+// koneksi basi 9router (brief Dzaky 21 Okt). Respons 9router memakai
+// Keep-Alive timeout=5 detik; di Node 18 socket yang sudah ditutup server
+// bisa dipakai ulang -> ECONNRESET / UND_ERR_SOCKET / "other side closed"
+// / EPIPE acak, padahal routernya sehat. Ulangi dari koneksi segar HANYA
+// bila: errornya cocok pola basi, job belum diabort user, dan belum ada
+// hasil sebagian (job.partial kosong) — perilaku "lanjutkan yang
+// terpotong" tidak berubah.
+async function viaRouter(model, msgs, job, which) {
+  const staleErr = e => /ECONNRESET|UND_ERR_SOCKET|EPIPE|other side closed/i.test(String((e && e.message) || e || '') + ' ' + String((e && e.cause && e.cause.code) || (e && e.code) || ''));
+  for (let att = 0; ; att++) {
+    try { return await viaRouterOnce(model, msgs, job, which); }
+    catch (e) {
+      if (att > 0 || job.ctrl.signal.aborted || (job.partial || '').trim() || !staleErr(e)) throw e;
+    }
+  }
 }
 // Pekerjaan berjalan di latar; browser polling (aman dari batas 100 detik Cloudflare)
 const jobs = new Map();
@@ -1520,6 +1549,30 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
     // padahal masih tampil di daftar model — sudah terbukti jalan sebelumnya.
     const CLIP_FALLBACK_MODEL = 'gemini/gemini-3.8-flash';
     let aiModel = model;
+    // Rotasi jalur AI (permintaan Dzaky 21 Okt): jalur pilihan gagal (balas
+    // kosong, error, putus) -> pindah otomatis: model cadangan di router yang
+    // sama -> router satunya (PC <-> Pi) -> Direct yang ada key-nya. Jalur yang
+    // berhasil dipakai terus untuk sisa segmen (clipAiState.idx), supaya
+    // kegagalan yang sama tidak berulang di tiap segmen.
+    const clipAttempts = [];
+    const attRouter = (which, mdl) => clipAttempts.push({ kind: 'router', which, model: mdl, label: '9router ' + (which === 'pc' ? 'PC' : 'Pi') + ' · ' + mdl });
+    const attDirect = p => { if (call[p] && E[KEY[p]]) clipAttempts.push({ kind: 'direct', provider: p, label: 'Direct ' + p.replace('custom:', '') }); };
+    const DIRECT_ROT = ['custom:ollama', 'openai', 'gemini', 'custom:deepsek', 'claude'];
+    if (useRouter) {
+      attRouter(rWhich, aiModel);
+      if (aiModel !== CLIP_FALLBACK_MODEL) attRouter(rWhich, CLIP_FALLBACK_MODEL);
+      const other = rWhich === 'pc' ? 'pi' : 'pc';
+      if (routerBase(other)) attRouter(other, CLIP_FALLBACK_MODEL);
+      for (const p of DIRECT_ROT) attDirect(p);
+      for (const p of Object.keys(call)) if (p.startsWith('custom:') && !DIRECT_ROT.includes(p)) attDirect(p);
+    } else {
+      clipAttempts.push({ kind: 'direct', provider, label: 'Direct ' + String(provider).replace('custom:', '') });
+      if (routerBase('pi')) attRouter('pi', CLIP_FALLBACK_MODEL);
+      if (routerBase('pc')) attRouter('pc', CLIP_FALLBACK_MODEL);
+      for (const p of DIRECT_ROT) if (p !== provider) attDirect(p);
+      for (const p of Object.keys(call)) if (p.startsWith('custom:') && !DIRECT_ROT.includes(p) && p !== provider) attDirect(p);
+    }
+    const clipAiState = { idx: 0 };
     // Instruksi AI per proyek (dari Pengaturan Proyek, opsional): disisipkan ke
     // SEMUA prompt analisis (segmen + metadata) — misal "fokus ke momen lucu".
     const aiNoteTxt = clipAiNoteText(job.aiNote);
@@ -1550,28 +1603,34 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
         + 'Aturan: start/end angka detik dalam 0 s/d ' + Math.round(job.duration) + ', end-start ' + targetDur + ' detik (boleh 10 s/d ' + (targetDur + 30) + '), jangan tumpang tindih berat.' });
     }
     for (const j of jobs) {
-      const aiJob = { ctrl: new AbortController(), chars: 0, partial: '', finish: '', truncated: false };
-      job.aiCtrl = aiJob.ctrl;
-      const timer = setTimeout(() => aiJob.ctrl.abort(), 10 * 60 * 1000);
+      const msgs = [{ role: 'user', content: j.prompt }];
       let out = '';
-      try {
-        out = useRouter ? await viaRouter(aiModel, [{ role: 'user', content: j.prompt }], aiJob, rWhich)
-          : await call[provider]([{ role: 'user', content: j.prompt }], aiJob);
-      } catch (e) {
-        // Model 9router bisa EOL (410 Gone) padahal masih tampil di daftar model.
-        // Coba sekali lagi pakai model cadangan, jangan langsung gagal — dan pakai
-        // model cadangan untuk sisa segmen di analisis ini (biar nggak 410 berulang).
-        const gone = useRouter && aiModel !== CLIP_FALLBACK_MODEL && (e.status === 410 || /410|end of life|gone/i.test(e.message || ''));
-        if (!gone) {
-          // Biar jelas sumber gagalnya: error via 9router diawali "9router: "
-          // (bukan kode Clipper). Kalau pakai Direct, pesannya dari provider itu.
-          if (useRouter && e && e.message && !/^9router:/.test(e.message)) e.message = '9router: ' + e.message;
-          throw e;
-        }
-        clipLog(job, 'Model ' + aiModel + ' sudah tidak tersedia (410), mencoba model cadangan ' + CLIP_FALLBACK_MODEL + '…');
-        aiModel = CLIP_FALLBACK_MODEL;
-        out = await viaRouter(aiModel, [{ role: 'user', content: j.prompt }], aiJob, rWhich);
-      } finally { clearTimeout(timer); job.aiCtrl = null; }
+      let lastErr = null, lastAtt = null;
+      for (let k = clipAiState.idx; k < clipAttempts.length; k++) {
+        if (job.cancelled) return;
+        const att = clipAttempts[k];
+        const aiJob = { ctrl: new AbortController(), chars: 0, partial: '', finish: '', truncated: false };
+        job.aiCtrl = aiJob.ctrl;
+        const timer = setTimeout(() => aiJob.ctrl.abort(), 10 * 60 * 1000);
+        try {
+          out = att.kind === 'router' ? await viaRouter(att.model, msgs, aiJob, att.which)
+            : await call[att.provider](msgs, aiJob);
+          if (!String(out || '').trim()) throw fail('Model membalas kosong', 'empty');
+          clipAiState.idx = k;
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e; lastAtt = att;
+          const nxt = clipAttempts[k + 1];
+          if (nxt && !job.cancelled) clipLog(job, 'Jalur ' + att.label + ' gagal (' + (e.message || e) + ') — pindah ke ' + nxt.label + '…');
+        } finally { clearTimeout(timer); job.aiCtrl = null; }
+      }
+      if (lastErr) {
+        // Biar jelas sumber gagalnya: error via 9router diawali "9router: "
+        // (bukan kode Clipper). Kalau pakai Direct, pesannya dari provider itu.
+        if (lastAtt && lastAtt.kind === 'router' && lastErr.message && !/^9router:/.test(lastErr.message)) lastErr.message = '9router: ' + lastErr.message;
+        throw lastErr;
+      }
       if (job.cancelled) return;
       clipLog(job, 'AI selesai: ' + j.tag + '.');
       const cleaned = String(out || '').replace(/```(?:json)?/gi, '').trim();

@@ -102,6 +102,8 @@ label.chk input{margin:0}
 .brief-head h3{margin:0;font-size:15px}
 .brief-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;align-items:end}
 .brief-grid .wide{grid-column:span 2}
+.brief-grid .wide-j{grid-column:span 2}
+.brief-grid .wide-t{grid-column:1/span 2}
 .brief-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
 .brief-actions .bar{flex:1;min-width:120px;margin:0}
 
@@ -451,6 +453,8 @@ yang lain = jeda (IntersectionObserver). */
 .modal-body th,.modal-body td{border:1px solid var(--line);padding:7px 9px;text-align:left}
 .modal-body pre{background:#0a1122;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12px}
 .modal-body code{background:#0a1122;padding:2px 5px;border-radius:5px;font-size:12px}
+.modal.wide .modal-box{width:min(98vw,1100px)}
+.modal-body .tx{background:#0a1122;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:62vh;overflow:auto;font-size:13px;line-height:1.65;white-space:pre-wrap;margin:8px 0 16px}
 .dlg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:none;align-items:center;justify-content:center;padding:16px}
 .dlg-box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:440px;width:100%}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000;color:#fff;padding:10px 20px;border-radius:99px;font-weight:800;opacity:0;pointer-events:none;transition:opacity .2s;max-width:92vw;text-align:center;border:1px solid var(--line);z-index:200}
@@ -471,6 +475,7 @@ yang lain = jeda (IntersectionObserver). */
   .clip-layout{grid-template-columns:1fr}
   .brief-grid{grid-template-columns:1fr}
   .brief-grid .wide{grid-column:span 1}
+  .brief-grid .wide-j,.brief-grid .wide-t{grid-column:span 1}
   .stat-grid{grid-template-columns:repeat(2,1fr)}
   .vp-row{grid-template-columns:1fr}
   .wrap{padding:14px 12px 32px}
@@ -531,7 +536,8 @@ yang lain = jeda (IntersectionObserver). */
     <div class="brief-head"><h3>Brief video</h3><button class="btn ghost" id="briefToggle" style="padding:4px 8px" title="Sembunyikan / tampilkan Brief">◀</button></div>
     <div id="briefBody">
       <div class="brief-grid">
-        <div class="wide"><label for="topik">Topik dan link referensi (opsional)</label><textarea id="topik" style="min-height:90px" placeholder="Contoh: Sejarah &amp; Evolusi Honda CBR, https://youtu.be/xxxx, https://situs.com/artikel"></textarea><div id="refs"></div></div>
+        <div class="wide wide-j"><label for="judul">Judul proyek (nama folder hasil di Dashboard)</label><input id="judul" placeholder="mis. Yamaha XMAX — Fenomena Motor Gembrot"><p class="hint" style="margin-top:4px">Hasil tiap tahap otomatis tersimpan ke folder judul ini di Dashboard.</p></div>
+        <div class="wide wide-t"><label for="topik">Topik dan link referensi (opsional)</label><textarea id="topik" style="min-height:90px" placeholder="Contoh: Sejarah &amp; Evolusi Honda CBR, https://youtu.be/xxxx, https://situs.com/artikel"></textarea><div id="refs"></div></div>
         <div><label for="gaya">Gaya bahasa</label><input id="gaya" value="Cinematic Dokumenter"><div class="chips" id="gchips" style="margin-top:8px"><button class="chip" data-gaya="Channel otomotif / YouTuber review">Otomotif / review</button><button class="chip" data-gaya="Cinematic Dokumenter">Cinematic</button><button class="chip" data-gaya="Santai / Kasual">Santai</button><button class="chip" data-gaya="Edukatif">Edukatif</button></div></div>
         <div><label for="audien">Target audien</label><input id="audien" value="Pecinta otomotif, umum"><label for="dur">Durasi target (menit)</label><input id="dur" type="number" min="5" max="30" value="10"><label for="jsh">Jumlah Shorts</label><input id="jsh" type="number" min="1" max="5" value="1"></div>
         <div><div class="stats"><div class="stat"><b id="sWords">0</b><span>kata naskah</span></div><div class="stat"><b id="sMin">0</b><span>menit baca</span></div><div class="stat"><b id="sTarget">0</b><span>target kata</span></div></div></div>
@@ -750,7 +756,14 @@ yang lain = jeda (IntersectionObserver). */
   <div class="modal-box">
     <div class="modal-head"><div><h2 id="stageModalTitle">Hasil Tahap</h2><p class="hint" id="stageModalSub" style="margin:2px 0 0"></p></div><button class="x" id="stageModalClose">✕</button></div>
     <div class="modal-body" id="stageModalBody"></div>
-    <div class="row" style="margin-top:16px"><button class="btn" id="stageModalEdit">✏️ Buka editor tahap ini</button><button class="btn ghost" id="stageModalCopy">📋 Salin hasil</button></div>
+    <div class="row" style="margin-top:16px"><button class="btn" id="stageModalEdit">✏️ Buka editor tahap ini</button><button class="btn ghost" id="stageModalSim" style="display:none">🔎 Cek kemiripan</button><button class="btn ghost" id="stageModalCopy">📋 Salin hasil</button></div>
+  </div>
+</div>
+<!-- Popup Edit tahap: edit teks + revisi lewat chat + prompt (dipindah dari kartu) -->
+<div id="editModal" class="modal">
+  <div class="modal-box">
+    <div class="modal-head"><div><h2 id="editModalTitle">✏ Edit Tahap</h2></div><button class="x" id="editModalClose">✕</button></div>
+    <div class="modal-body" id="editModalBody"></div>
   </div>
 </div>
 
@@ -775,7 +788,7 @@ const isRouter=r=>r==='router-pi'||r==='router-pc';
 try{S=JSON.parse(localStorage.getItem('hvo2')||'{}')}catch(e){}
 KEYS.forEach(k=>S[k]=S[k]||{});S.err={};
 [0,1,2,3,4].forEach(n=>{if(S.st[n]==='Berjalan')S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):'Menunggu'});
-const IDS=['topik','gaya','audien','dur','jsh']; // Bank Ide dihapus — ideaNiche/ideaCount tidak lagi disimpanIDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
+const IDS=['judul','topik','gaya','audien','dur','jsh']; // Bank Ide dihapus — ideaNiche/ideaCount tidak lagi disimpanIDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
 let stateReady=false,saveTimer=null,serverTs=0;
 // Guard anti-hilang (client): kalau S kosong tapi server pernah punya data (serverTs>0),
 // JANGAN kirim — cegah state kosong menimpa state berisi (kasus 17 Okt 2026: semua naskah hilang pas deploy).
@@ -999,15 +1012,19 @@ function actions(n){
   if(busyN===n)return `<button class="btn danger" data-stop>Stop</button>`;
   if(n===0){const urls=refUrls(),pend=urls.some(u=>!S.refs[u]||S.refs[u].status==='fail');
     if(!urls.length)return `<button class="btn" data-skip${dis}>Lewati ke Agent Riset</button>`;
-    return (pend?`<button class="btn ghost" data-getrefs${dis||refBusy?' disabled':''}>Ambil ulang yang gagal</button>`:'')+`<button class="btn" data-sendriset${dis}>Kirim ke Agent Riset</button><button class="btn ghost" data-skip${dis}>Lewati</button>`}
-  if(n===4&&!has){const needScript=(S.out[2]||'').trim()?'':' disabled';return `<button class="btn" data-go="4:baru"${dis}>Jalankan (dari Topik)</button><button class="btn" data-go="4:fromScript"${dis}${needScript} title="${(S.out[2]||'').trim()?'Ambil hook & ide dari naskah Agent Script agar penonton penasaran dan lanjut ke video panjang':'Butuh naskah Agent Script dulu'}>Ambil dari Agent Script</button>`}
-  if(n===4&&has){return `<button class="btn" data-go="4:baru"${dis}>Jalankan (dari Topik)</button><button class="btn" data-go="4:fromScript"${dis}>Ambil dari Agent Script</button><button class="btn ghost" data-go="4:baru"${dis}>Mulai dari awal</button>`}
-  if(has&&S.part[n])return `<button class="btn" data-go="${n}:lanjut"${dis}>Lanjutkan yang terpotong</button><button class="btn ghost" data-go="${n}:baru"${dis}>Mulai dari awal</button>`;
-  if(!has)return `<button class="btn" data-go="${n}:baru"${dis}>Jalankan</button>`;
+    return (pend?`<button class="btn ghost" data-getrefs${dis||refBusy?' disabled':''}>Ambil ulang yang gagal</button>`:'')+`<button class="btn" data-sendriset${dis}>Lanjut ke Agent Riset</button><button class="btn ghost" data-skip${dis}>Lewati</button>`}
+  // Kartu kompak (redesign Dzaky 21 Okt): tombol inti saja — Jalankan /
+  // Lanjutkan (terpotong) / Lanjut ke tahap berikutnya (otomatis jalan) /
+  // Mulai dari awal / Edit (pop-up). Hasil dibaca lewat pop-up, bukan inline.
   let h='';
-  if(n===1)h+=`<button class="btn" data-send="2"${dis}>Setujui dan kirim ke Agent Script</button>`;
-  if(n===2)h+=`<button class="btn" data-send="3"${dis}>Setujui dan kirim ke Agent SEO</button>`;
-  return h+`<button class="btn ghost" data-go="${n}:baru"${dis}>Mulai dari awal</button>`;
+  if(has&&S.part[n])h+=`<button class="btn" data-go="${n}:lanjut"${dis}>Lanjutkan</button><button class="btn ghost" data-ok="${n}">Anggap lengkap</button>`;
+  else if(!has)h+=`<button class="btn" data-go="${n}:baru"${dis}>${n===1&&S.st[0]==='Dilewati'?'Jalankan dari Topik':'Jalankan'}</button>`;
+  else if(n===1)h+=`<button class="btn" data-send="2"${dis}>Lanjut ke Agent Script ▶</button>`;
+  else if(n===2)h+=`<button class="btn" data-send="3"${dis}>Lanjut ke Agent SEO ▶</button>`;
+  if(n===4)h+=`<button class="${has&&!S.part[n]?'btn ghost':'btn'}" data-go="4:fromScript"${dis}${(S.out[2]||'').trim()?'':' disabled'}>Jalankan dari Agent Script</button>`;
+  if(has)h+=`<button class="btn ghost" data-go="${n}:baru"${dis}>Mulai dari awal</button>`;
+  h+=`<button class="btn ghost" data-editpop="${n}"${dis}>✏ Edit</button>`;
+  return h;
 }
 const CH=['Tambahkan: ','Hilangkan: ','Fokuskan: '];
 function chatHtml(n){
@@ -1061,7 +1078,8 @@ function simSentences(t){return (t||'').replace(/\r/g,'').split(/(?<=[.!?…])\s
 function jaccard(a,b){const wa=new Set(a.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(w=>w.length>2));const wb=new Set(b.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(w=>w.length>2));if(!wa.size||!wb.size)return 0;let inter=0;wa.forEach(w=>{if(wb.has(w))inter++});return inter/Math.max(wa.size,wb.size)}
 function checkSimilarity(){
   const naskah=S.out[2]||'';const refs=usableRefs();
-  const outEl=document.getElementById('simOut');
+  openSimModal();
+  const outEl=$('stageModalBody');
   if(!outEl)return;
   if(!naskah.trim()){outEl.innerHTML='<div class="warn"><b>Belum ada naskah.</b><p>Jalankan Agent Script dulu.</p></div>';return}
   if(!refs.length){outEl.innerHTML='<div class="warn"><b>Tidak ada transkrip pembanding.</b><p>Tempel link referensi di panel kiri dan ambil transkrip dulu (Tahap 0).</p></div>';return}
@@ -1079,37 +1097,30 @@ function checkSimilarity(){
   outEl.innerHTML=`<div class="nb-wrap"><b>Hasil cek kemiripan</b><p class="hint">${marked} dari ${nSents.length} kalimat (${pct}%) ditandai terlalu mirip (skor &gt; 0.5). Skor dihitung dari kesamaan kata (Jaccard). Pertimbangkan untuk menulis ulang bagian yang ditandai.</p>`
     + rows.map(r=>`<p style="margin:8px 0;padding:8px;border:2px solid #000;border-radius:10px;background:${r.isSim?'#FF595E33':'#8AC92622'}">${r.isSim?'<span class="sim-mark">MIRIP '+Math.round(r.best*100)+'%</span> ':'<span class="sim-ok">'+Math.round(r.best*100)+'%</span> '}${esc(r.s)}${r.isSim&&r.bestRef?`<br><small style="color:#555">Mirip dengan transkrip "${esc((r.bestRef.title||'').slice(0,60))}": "${esc(r.bestRef.s.slice(0,120))}..."</small>`:''}</p>`).join('')
     + `<div class="row"><button class="btn ghost" data-simclose> Tutup hasil </button></div></div>`;
-  outEl.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 function stage0Html(){
   const urls=refUrls();
-  if(!urls.length)return `<div class="md" style="color:var(--mute)">Belum ada link referensi. Tempel link YouTube atau artikel di kolom Topik (panel kiri). Transkrip lengkap tiap link muncul di sini, jadi Anda bisa membandingkannya dengan naskah Agent Script untuk memastikan tidak menjiplak. Tanpa link, klik "Lewati ke Agent Riset".</div>`;
-  return `<p class="hint">Transkrip lengkap dari ${urls.length} link. ${usableRefs().length} siap dipakai. AI hanya membaca maksimal ${fmt(AIW)} kata pertama tiap link dan hanya mengambil poinnya. Kirim ke Agent Riset kalau sudah sesuai.</p>`+urls.map((u,i)=>{
-    const r=S.refs[u],lab=(r&&r.title)||u.replace(/^https?:\/\/(www\.)?/,''),st=`<small class="${r&&r.status==='ok'?'ok':r&&r.status==='fail'?'bad':''}">${esc(REFTXT(r))}</small>`;
-    let body='';
-    if(r&&r.status==='ok')body=`<details class="tx-d"><summary>Baca transkrip lengkap (${fmt(r.words)} kata)</summary><div class="tx">${esc(r.text)}</div><div class="row"><button class="btn ghost" data-cptx="${i}" style="padding:3px 10px">Salin transkrip</button><button class="btn ghost" data-dltx="${i}" style="padding:3px 10px">Unduh .txt</button></div></details>`;
-    else if(r&&r.status==='fail')body=`<div class="row" style="margin-top:6px"><button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip manual</button></div>${r.manualOpen?`<textarea data-mtext="${esc(u)}" style="min-height:120px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button>`:''}`;
-    return `<div class="refc"><b>${i+1}. ${esc(lab.slice(0,100))}</b> ${st}${body}</div>`}).join('');
+  if(!urls.length)return `<div class="md" style="color:var(--mute)">Belum ada link referensi. Tempel link YouTube atau artikel di kolom Topik (panel kiri). Tanpa link, klik "Lewati ke Agent Riset".</div>`;
+  const fail=urls.filter(u=>!S.refs[u]||S.refs[u].status==='fail').length;
+  return `<p class="hint" style="margin:0">${usableRefs().length} dari ${urls.length} transkrip siap dipakai — klik kartu ini untuk membaca transkripnya di pop-up.${fail?' <b style="color:#e88">'+fail+' link gagal</b> — klik kartu untuk tempel transkrip manual di pop-up.':''}</p>`;
 }
 function bodyHtml(n){
   if(n===0)return stage0Html()+`<div class="row">${actions(0)}</div>`;
   const o=S.out[n]||'',w=words(o);
-  const simBtn=n===2&&o.trim()?`<button class="btn ghost" data-sim="2" style="padding:6px 12px">Cek kemiripan</button>`:'';
-  const editBtn=(n===2||n===4)&&o.trim()?(S.view[n]==='edit'
-    ?`<button class="btn" data-v="${n}:rapi" style="padding:6px 12px">✓ Selesai edit</button>`
-    :`<button class="btn ghost" data-v="${n}:edit" style="padding:6px 12px">✏ Edit naskah</button>`):'';  const simOut=n===2?`<div id="simOut" style="margin-top:10px"></div>`:'';
-  const routeNote=n>0?`<p class="hint" style="margin-top:8px">Jalur AI: <b>${isRouter(getRoute(n))?'9router SSE Stream ('+(getRoute(n)==='router-pc'?'PC':'Pi')+')':'Direct Official API Key ('+ST[n].p+')'}</b> — ganti via dropdown di header tahap. Direct memakai ${KEY_LABEL[ST[n].p]||ST[n].p} dari .env (isi key lalu restart agar langsung aktif).</p>`:'';
-  const closeBtn=`<div style="margin-top:14px;text-align:right"><button class="btn ghost" data-closecard="${n}" style="padding:6px 14px">▲ Tutup Tahap ${n}</button></div>`;
-  return `${seg(n)}${view(n,o)}<div class="meta"><span id="w${n}">${w} kata</span>${n===2&&o?`<span>Target ${fmt(tgt())} kata${w>=tgt()?': tercapai':', kurang '+fmt(tgt()-w)}</span>`:''}${o?`<button class="btn ghost" data-cp="${n}" style="padding:3px 10px">Salin</button>`:''}${o&&n>0?`<button class="btn ghost" data-dl="${n}" style="padding:3px 10px">Unduh .txt</button>`:''}${o&&n>0?`<button class="btn ghost" data-savelib="${n}" style="padding:3px 10px">💾 Simpan ke Hasil</button>`:''}${editBtn}${simBtn}</div>${simOut}${alertHtml(n)}${infoHtml(n)}${n===1?refNote():''}${routeNote}<div class="row">${actions(n)}</div>${n===3?titleGenHtml():''}${n===1||n===2?chatHtml(n):''}${povHtml(n)}${closeBtn}`;
+  // Kartu selalu ringkas, TANPA dropdown (revisi Dzaky 21 Okt sore): hasil
+  // dibaca lewat pop-up (klik sembarang tempat di kartu). Di kartu cuma
+  // angka kata + tombol inti. Salin/Unduh/Simpan manual dibuang: hasil
+  // otomatis tersimpan ke folder judul di Dashboard (auto Library di go());
+  // Unduh/Salin/Hapus ada di pop-up detail folder. Edit lewat pop-up Edit.
+  return `<div class="row" style="align-items:center;gap:8px"><span id="w${n}">${o?w+' kata':'Belum ada hasil'}</span>${n===2&&o?`<span class="hint">Target ${fmt(tgt())} kata${w>=tgt()?': tercapai':', kurang '+fmt(tgt()-w)}</span>`:''}${S.part[n]&&S.fin[n]?`<span class="hint">Terpotong: ${esc(S.fin[n])}</span>`:''}</div>${n===1?refNote():''}<div class="row">${actions(n)}</div>`;
 }
 const KEY_LABEL={gemini:'GEMINI_API_KEY',claude:'ANTHROPIC_API_KEY',openai:'OPENAI_API_KEY'};
-const badgeText=n=>{if(n===0&&!S.st[0]){const u=refUrls();return u.length?`${usableRefs().length}/${u.length} transkrip`:'Menunggu'}return S.st[n]||'Menunggu'};
+const badgeText=n=>{if(n===0&&!S.st[0]){const u=refUrls();return u.length?(usableRefs().length===u.length?'Selesai mentranskrip':`${usableRefs().length}/${u.length} transkrip`):'Menunggu'}return S.st[n]||'Menunggu'};
 const curStage=()=>{for(const n of [0,1,2,3,4])if(!['Selesai','Dilewati'].includes(S.st[n]))return n;return 4};
 function render(){
-  const cur=curStage();
-  $('pipe').innerHTML=ST.map(s=>{const n=s.n,show=S.open[n]===undefined?n===cur:S.open[n];const bt=badgeText(n);
-    return `<section class="stage" data-k="${s.k}" data-n="${String(n).padStart(2,'0')}"><div class="sh" data-tg="${n}"><div class="sh-top"><span class="stage-num">${n}</span><span class="stage-icon">${["📄","🔍","📝","📈","🎬"][n]||"📄"}</span></div><div class="t"><h2>Tahap ${n}: ${s.t}</h2><small>${s.sub}${n===0?'':' · Jalur: '+(isRouter(getRoute(n))?'9router':'Direct')}</small></div><span class="badge" data-badge="${n}" data-s="${bt}">${bt}</span>${n>0?routeSel(n):''}${n>0&&getRoute(n)==='direct'?directChip(n):''}${n>0&&isRouter(getRoute(n))?modelSel(n):''}<span class="chev">${show?'▾':'▸'}</span></div>${show?`<div class="body">${bodyHtml(n)}</div>`:''}</section>`}).join('');
+  $('pipe').innerHTML=ST.map(s=>{const n=s.n;const bt=badgeText(n);
+    return `<section class="stage" data-k="${s.k}" data-n="${String(n).padStart(2,'0')}"><div class="sh" data-tg="${n}" style="cursor:pointer" title="Klik untuk melihat hasil tahap ini di pop-up"><div class="sh-top"><span class="stage-num">${n}</span><span class="stage-icon">${["📄","🔍","📝","📈","🎬"][n]||"📄"}</span></div><div class="t"><h2>Tahap ${n}: ${s.t}</h2><small>${s.sub}${n===0?'':' · Jalur: '+(isRouter(getRoute(n))?'9router':'Direct')}</small></div><span class="badge" data-badge="${n}" data-s="${bt}">${bt}</span>${n>0?routeSel(n):''}${n>0&&getRoute(n)==='direct'?directChip(n):''}${n>0&&isRouter(getRoute(n))?modelSel(n):''}</div><div class="body">${bodyHtml(n)}</div></section>`}).join('');
   attachVoice();
   const w=words(S.out[2]);$('sWords').textContent=w;$('sMin').textContent=(w/140).toFixed(1);$('sTarget').textContent=tgt();
   $('pb').style.width=[1,2,3,4].filter(n=>S.st[n]==='Selesai').length/4*100+'%';
@@ -1141,9 +1152,10 @@ async function runJob(msgs,provider,model,n,label,route){
     if(j.error&&!j.status)throw new Error(j.error);
     if(j.status!=='running')break;
     const bd=document.querySelector('[data-badge="'+n+'"]');if(bd)bd.textContent=(label||'Berjalan')+' · '+(j.chars||0)+' karakter';
-    // Live preview: tampilkan teks yang sedang ditulis, thinking block dibuang
-    if(j.partial&&S.view[n]!=='edit'){
-      const box=document.querySelector('section.stage[data-n="'+String(n).padStart(2,'0')+'"] .md');
+    // Live preview: tampilkan teks yang sedang ditulis di pop-up hasil kalau
+    // sedang dibuka untuk tahap ini (kartu kompak tidak lagi punya area .md).
+    if(j.partial){
+      const box=(typeof stageModalN!=='undefined'&&stageModalN===n&&typeof stageModalMode!=='undefined'&&stageModalMode==='hasil'&&$('stageModal').classList.contains('open'))?$('stageModalBody'):null;
       if(box)box.innerHTML=md(cleanThink(j.partial))+'<span class="typing" aria-hidden="true">▌</span>';
     }
   }
@@ -1159,7 +1171,7 @@ function refsHtml(){
   const urls=refUrls();if(!urls.length)return'';
   const pend=urls.some(u=>!S.refs[u]||S.refs[u].status==='fail');
   return `<p class="hint" style="margin:8px 0 0">${usableRefs().length} dari ${urls.length} link siap dipakai</p>`+urls.map(u=>{const r=S.refs[u],label=(r&&r.title)||u.replace(/^https?:\/\/(www\.)?/,'');
-    return `<div class="ref"><b>${esc(label.slice(0,90))}</b><small class="${r&&r.status==='ok'?'ok':r&&r.status==='fail'?'bad':''}">${esc(REFTXT(r))}</small><div class="row" style="margin-top:6px"><button class="btn ghost" data-rmref="${esc(u)}" style="padding:3px 10px">Hapus</button>${r&&r.status==='fail'?`<button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip</button>`:''}</div>${r&&r.manualOpen?`<textarea data-mtext="${esc(u)}" style="min-height:90px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button>`:''}</div>`}).join('')
+    return `<div class="ref" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(label)}">${esc(label.slice(0,90))}</b><small class="${r&&r.status==='ok'?'ok':r&&r.status==='fail'?'bad':''}">${esc(REFTXT(r))}</small><button class="btn ghost" data-rmref="${esc(u)}" style="padding:3px 10px">Hapus</button>${r&&r.status==='fail'?`<button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip</button>`:''}${r&&r.manualOpen?`<div style="flex-basis:100%"><textarea data-mtext="${esc(u)}" style="min-height:90px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button></div>`:''}</div>`}).join('')
    +(pend?`<button class="btn ghost full" data-getrefs ${refBusy?'disabled':''}>Ambil referensi</button>`:'')
    +`<label class="chk"><input type="checkbox" id="useRefs"${S.useRefs!==false?' checked':''}> Pakai referensi di Agent Riset</label><select id="refMode" aria-label="Cara pakai referensi" style="margin-top:6px"><option value="catatan"${S.refMode!=='penuh'?' selected':''}>Ringkas jadi catatan fakta (hemat token)</option><option value="penuh"${S.refMode==='penuh'?' selected':''}>Kirim transkrip lengkap (lebih boros token)</option></select><p class="hint" style="margin-top:6px">Hanya teks yang diambil. Agent Riset membuat peta perbedaan dan angle baru dari sumber ini. Saat revisi atau lanjutkan, transkrip lengkap tidak dikirim ulang.</p>`;
 }
@@ -1215,10 +1227,10 @@ async function go(n,mode,ins){
     const m=mode==='fromScript'
       ? ((S.out[2]||'').trim()?'':'Naskah Agent Script belum ada. Jalankan Tahap 2 dulu.')
       : need(n);
-    if(m){busyN=null;S.err[n]={message:m,kind:'input'};if(!has)S.st[n]='Gagal';return render()}
+    if(m){busyN=null;S.err[n]={message:m,kind:'input'};if(!has)S.st[n]='Gagal';errPop(n);return render()}
   }
-  if(isRouter(route)&&!S.model[n]){busyN=null;S.err[n]={message:'Pilih model atau combo untuk tahap ini (jalur 9router).',kind:'input'};return render()}
-  if(route==='direct'){const lbl=KEY_LABEL[s.p]||s.p;const ok=DIRECT_INFO[s.p]&&DIRECT_INFO[s.p].ok;if(!ok){busyN=null;S.err[n]={message:lbl+' belum diisi di .env — isi lalu restart server agar jalur Direct langsung aktif.',kind:'input'};return render()}}
+  if(isRouter(route)&&!S.model[n]){busyN=null;S.err[n]={message:'Pilih model atau combo untuk tahap ini (jalur 9router).',kind:'input'};errPop(n);return render()}
+  if(route==='direct'){const lbl=KEY_LABEL[s.p]||s.p;const ok=DIRECT_INFO[s.p]&&DIRECT_INFO[s.p].ok;if(!ok){busyN=null;S.err[n]={message:lbl+' belum diisi di .env — isi lalu restart server agar jalur Direct langsung aktif.',kind:'input'};errPop(n);return render()}}
   S.st[n]='Berjalan';save();render();
   let clean='';
   try{
@@ -1245,10 +1257,12 @@ async function go(n,mode,ins){
     const miss=n>0&&mode!=='revisi'?looksCut(n,S.out[n]):'';
     S.fin[n]=j.truncated?(j.finish?'alasan dari model: '+j.finish:'koneksi berhenti sebelum selesai'):miss;
     S.part[n]=(!!j.truncated||!!miss)&&n>0;S.st[n]=S.part[n]?'Terpotong':'Selesai';
-    // Auto Library (Script VO): tahap selesai -> masuk Library otomatis (1 entry per tahap+topik, re-run update yang sama).
+    // Auto Library (Script VO): tahap selesai -> masuk Library otomatis
+    // (1 entry per tahap+folder, re-run update yang sama). Folder = Judul
+    // proyek dari Brief (kalau kosong, pakai topik).
     if (n >= 1 && (S.out[n] || '').trim()) {
       const types = { 1: 'riset', 2: 'long', 3: 'seo', 4: 'short' }, names = { 1: 'Riset', 2: 'Script Long', 3: 'SEO', 4: 'Script Short' };
-      const topic = (B().topik || '').trim() || 'Tanpa topik';
+      const topic = ((($('judul') && $('judul').value) || S.judul || B().topik || '') + '').trim() || 'Tanpa topik';
       let h = 0; for (let i = 0; i < topic.length; i++) h = ((h << 5) - h + topic.charCodeAt(i)) | 0;
       fetch('/api/library', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: types[n] || 'long', title: topic.slice(0, 120) + ' — ' + names[n], topic, content: S.out[n], words: words(S.out[n]), replaceKey: 'vo-' + n + '-' + h }) }).catch(() => {});
     }
@@ -1259,6 +1273,7 @@ async function go(n,mode,ins){
     S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):(stopped?'Menunggu':'Gagal');
   }
   busyN=null;jobId=null;save();render();
+  if(S.err[n])errPop(n);
 }
 async function stop(){if(busyN===null||!jobId)return;toast('Menghentikan...');try{await fetch('/api/stop?id='+jobId,{method:'POST'})}catch(e){}}
 function startGo(n,mode){
@@ -1541,13 +1556,18 @@ function dlAll(){const p=[1,2,3,4].filter(n=>(S.out[n]||'').trim()).map(n=>'='.r
 /* ===== Event ===== */
 document.addEventListener('click',e=>{
   const tg=e.target.closest('[data-tg]');
-  if(tg&&!e.target.closest('select,button,a')){
+  if(tg&&!e.target.closest('select,button,a,input,textarea')){
     const n=+tg.dataset.tg;
-    // Klik chevron = lipat/buka inline. Klik header card TERBUKA = tutup (biar gampang nutup di HP).
-    // Klik header card TERTUTUP (Tahap 1-4) = popup hasil besar. Tahap 0: selalu toggle.
-    const shown=S.open[n]===undefined?n===curStage():S.open[n];
-    if(e.target.closest('.chev')||n===0||shown){S.open[n]=!shown;save();render();return}
+    // Tanpa dropdown (revisi Dzaky 21 Okt sore): klik header kartu =
+    // pop-up hasil. Tahap 0 -> pop-up transkrip.
+    if(n===0){openTxModal();return}
     openStageModal(n);return;
+  }
+  const sec=e.target.closest('section.stage');
+  if(sec&&!e.target.closest('select,button,a,input,textarea,[data-tg]')){
+    const n=+sec.dataset.n;
+    if(n===0)openTxModal();else openStageModal(n);
+    return;
   }
   const cb=e.target.closest('[data-closecard]');if(cb){const n=+cb.dataset.closecard;S.open[n]=false;save();render();setTimeout(()=>{const el=document.querySelector('section.stage[data-n="'+String(n).padStart(2,'0')+'"]');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},60);return}
   const cp=e.target.closest('[data-cliplib]');if(cp){(async()=>{const [jid,ridx]=cp.dataset.cliplib.split(':');const jobIdDec=decodeURIComponent(jid||'');const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'clipper',title:cp.dataset.libtitle||'Klip',topic:cp.dataset.libtitle||'',jobId:jobIdDec,renderIdx:+ridx||0,duration:+cp.dataset.clipdur||0,thumb:'/api/clipper/thumb?id='+encodeURIComponent(jobIdDec)+'&clip='+(+ridx||0)})});const j=await r.json().catch(()=>({}));if(r.ok)toast('Video tersimpan ke Hasil.');else toast(j.error||'Gagal menyimpan');})();return}
@@ -1562,7 +1582,7 @@ document.addEventListener('click',e=>{
   else if(d.cptx!==undefined){const r=S.refs[refUrls()[+d.cptx]];if(r)navigator.clipboard.writeText(r.text).then(()=>toast('Transkrip tersalin'))}
   else if(d.dltx!==undefined){const u=refUrls()[+d.dltx],r=S.refs[u];if(r)saveFile(slug(r.title)+'-transkrip.txt',r.title+'\n'+u+'\n\n'+r.text)}
   else if(d.povreset!==undefined){delete S.pov[d.povreset];povOpen[d.povreset]=true;save();render()}
-  else if(d.rev)revise(+d.rev);
+  else if(d.rev){if(editModalN!==null)closeEditModal();revise(+d.rev)}
   else if(d.pre){const[n,i]=d.pre.split(':'),pv=(S.chat[n]||'').trim();S.chat[n]=(pv?pv+'\n':'')+CH[i];save();render();setTimeout(()=>{const t=document.querySelector('[data-chat="'+n+'"]');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length)}},0)}
   else if(d.undo){const n=d.undo,c=S.out[n];S.out[n]=S.prev[n];S.prev[n]=c;save();render()}
   else if(d.v){const[n,v]=d.v.split(':');S.view[n]=v;save();render()}
@@ -1571,12 +1591,14 @@ document.addEventListener('click',e=>{
   else if(d.gaya!==undefined){$('gaya').value=d.gaya;save();render()}
   else if(d.getrefs!==undefined)fetchRefs(true);
   else if(d.rmref){$('topik').value=tidyTopic($('topik').value.split(d.rmref).join(' '));save();updateRefsUI();render()}
-  else if(d.manual){const r=S.refs[d.manual];if(r){r.manualOpen=!r.manualOpen;updateRefsUI();render()}}
-  else if(d.msave){const r=S.refs[d.msave],t=((r&&r.mdraft)||'').trim();if(words(t)<30)return toast('Teks terlalu pendek untuk dijadikan referensi');S.refs[d.msave]={status:'ok',manual:true,title:'Teks manual',text:t.split(/\s+/).slice(0,20000).join(' '),words:Math.min(words(t),20000),kind:'manual'};save();updateRefsUI();render()}
+  else if(d.manual){const r=S.refs[d.manual];if(r){r.manualOpen=!r.manualOpen;updateRefsUI();render();if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal()}}
+  else if(d.msave){const r=S.refs[d.msave],t=((r&&r.mdraft)||'').trim();if(words(t)<30)return toast('Teks terlalu pendek untuk dijadikan referensi');S.refs[d.msave]={status:'ok',manual:true,title:'Teks manual',text:t.split(/\s+/).slice(0,20000).join(' '),words:Math.min(words(t),20000),kind:'manual'};save();updateRefsUI();render();if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal()}
   else if(b.id==='go0')startFlow();
   else if(b.id==='dlall')dlAll();
   else if(d.sim!==undefined){checkSimilarity()}
-  else if(d.simclose!==undefined){const so=document.getElementById('simOut');if(so)so.innerHTML=''}
+  else if(d.simclose!==undefined)closeStageModal();
+  else if(d.txall!==undefined)openTxModal();
+  else if(d.editpop!==undefined)openEditModal(+d.editpop);
   else if(b.id==='reset'&&confirm('Hapus semua hasil proyek ini?')){S={};KEYS.forEach(k=>S[k]={});try{localStorage.removeItem('hvo2')}catch(x){}render()}
 });
 document.addEventListener('change',e=>{if(e.target.dataset.directp!==undefined){const n=+e.target.dataset.directp;ST[n].p=e.target.value;save();render();return}
@@ -1697,7 +1719,7 @@ $('keyRestart').addEventListener('click',async()=>{
   for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,2000));try{await fetch('/api/health');location.reload();return}catch(e){}}
   $('keyRestartMsg').textContent='Server belum kembali. Coba refresh manual.';
 });
-/* ===== Bank Ide (point 1) & Generator Judul+Hook (point 2) — fitur baru, tidak mengubah tahap lama =====
+/* ===== Bank Ide (point 1) — fitur baru, tidak mengubah tahap lama =====
    Jalur AI ikut pengaturan tahap Riset (provider/model/route). Runner sendiri, tidak menyentuh status tahap. */
 let ideaBusy=false;
 async function runIdea(msgs){
@@ -1718,19 +1740,6 @@ const parseIdeas=t=>(t||'').split('\n').map(l=>l.trim()).filter(l=>/^\d+[.)]\s/.
   const parts=l.replace(/^\d+[.)]\s*/,'').split('||').map(x=>x.trim());
   return {t:parts[0]||'',a:parts[1]||'',r:parts[2]||''};
 }).filter(x=>x.t);
-const parseTitles=t=>{
-  const out=[];
-  (t||'').replace(/JUDUL\s*:/i,'').split('\n').forEach(l=>{const m=l.trim().match(/^\d+[.)]\s*(.+)$/);if(m)out.push(m[1].trim())});
-  return out;
-};
-/* Generator Judul di dalam kotak Agent SEO (tahap 3) — hook tidak dibuat, sudah ada di prompt naskah.
-   Card bisa dilipat/dibuka, statusnya tersimpan (S.titleGenOpen). */
-function titleGenHtml(){
-  const p=parseTitles(S.titleOut||'');
-  const topic=esc(S.titleTopic||S.topik||'');
-  const open=S.titleGenOpen!==false;
-  return `<div style="margin-top:14px;padding:12px;border:3px solid #000;border-radius:14px;background:#fff;box-shadow:3px 3px 0 #000"><div data-titlegentoggle style="display:flex;justify-content:space-between;align-items:center;cursor:pointer"><h3 style="margin:0">🎯 Generator Judul</h3><span>${open?'▾':'▸'}</span></div><div ${open?'':'hidden'}><div style="margin:12px 0 8px"><label for="titleTopic">Topik video</label><input id="titleTopic" value="${topic}" placeholder="mis. PCX 2027 facelift"></div><button class="btn" data-titlegen style="padding:8px 16px">✨ Bikin Judul</button><span class="hint" id="titleMsg" style="margin-left:8px"></span><div style="margin-top:10px">${p.map((t,i)=>`<div style="margin:6px 0;padding:8px;border:2px solid #000;border-radius:10px;background:#FFFEF7"><b>${esc(t)}</b><div class="row" style="margin-top:6px"><button class="btn ghost" data-titleuse="${i}" style="padding:3px 10px">▶ Pakai → Brief</button><button class="btn ghost" data-titlecopy="${i}" style="padding:3px 10px">📋 Salin</button></div></div>`).join('')}</div></div></div>`;
-}
 const useTopic=(t,src)=>{if(!t)return;$('topik').value=t;S.topik=t;save();toast('Topik diisi dari '+(src||'Bank Ide'));$('topik').scrollIntoView({behavior:'smooth',block:'center'});$('topik').focus()};
 const ideaCard=(it,i,saved)=>`<div style="margin:8px 0;padding:10px;border:2px solid #000;border-radius:12px;background:#FFFEF7"><b>${esc(it.t)}</b>${it.a?`<br><span class="hint">Angle: ${esc(it.a)}</span>`:''}${it.r?`<br><span class="hint">Kenapa: ${esc(it.r)}</span>`:''}<div class="row" style="margin-top:8px"><button class="btn ghost" data-ideause="${i}" data-saved="${saved?1:0}" style="padding:4px 12px">▶ Pakai → Brief</button>${saved?`<button class="btn ghost" data-ideadel="${i}" style="padding:4px 12px">🗑 Hapus</button>`:`<button class="btn" data-ideasave="${i}" style="padding:4px 12px">💾 Simpan</button>`}</div></div>`;
 function renderIdeas(){
@@ -1759,35 +1768,13 @@ if($('ideaSection'))$('ideaSection').addEventListener('click',async e=>{
   else if(d.ideadel!==undefined){saved.splice(+d.ideadel,1);S.ideas=saved;save();renderIdeas();}
   else if(d.ideause!==undefined){const it=d.saved==='1'?saved[+d.ideause]:fresh[+d.ideause];useTopic(it&&it.t)}
 });
-/* Delegasi tombol Generator Judul (di dalam kotak tahap 3, di-render ulang tiap render()) */
-$('pipe').addEventListener('click',async e=>{
-  const tg=e.target.closest('[data-titlegentoggle]');
-  if(tg){S.titleGenOpen=S.titleGenOpen===false;save();render();return}
-  const d=e.target.dataset;if(!d)return;
-  if(d.titlegen!==undefined){
-    const inp=document.getElementById('titleTopic');
-    const topic=((inp&&inp.value)||'').trim()||S.topik||'';
-    const msg=document.getElementById('titleMsg');
-    if(!topic){if(msg)msg.textContent='Isi topik dulu.';return}
-    if(ideaBusy)return;ideaBusy=true;
-    S.titleTopic=topic;save();
-    if(msg)msg.textContent='Membuat judul…';
-    try{
-      const txt=await runIdea([{role:'user',content:`Kamu adalah copywriter judul YouTube untuk channel faceless niche otomotif.\nTopik video: "${topic}".\nGaya channel: ${S.gaya||'Channel otomotif / YouTuber review'}.\nBuatkan 10 variasi judul YouTube yang bikin penasaran.\nFormat WAJIB:\nJUDUL:\n1. ...\nJangan beri pembuka, penutup, atau penjelasan lain.`}]);
-      S.titleOut=txt;save();render();
-    }catch(er){const m2=document.getElementById('titleMsg');if(m2)m2.textContent='Gagal: '+(er.message||er)}
-    ideaBusy=false;
-  }
-  else if(d.titleuse!==undefined){useTopic(parseTitles(S.titleOut||'')[+d.titleuse],'Generator Judul')}
-  else if(d.titlecopy!==undefined){try{await navigator.clipboard.writeText(parseTitles(S.titleOut||'')[+d.titlecopy]||'');toast('Judul disalin')}catch(_){}}
-});
 document.addEventListener('paste',e=>{if(e.target.id==='topik')setTimeout(()=>{save();updateRefsUI();fetchRefs()},80)});
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&e.target.dataset&&e.target.dataset.chat!==undefined&&busyN===null)revise(+e.target.dataset.chat)});
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.chat!==undefined){S.chat[t.dataset.chat]=t.value;save()}
   else if(t.dataset.pov!==undefined){const n=+t.dataset.pov;if(t.value===promptTemplate(n))delete S.pov[n];else S.pov[n]=t.value;povOpen[n]=true;save()}
-  else if(t.dataset.o!==undefined){const n=t.dataset.o;S.out[n]=t.value;if(S.part[n]&&!t.value.trim())S.part[n]=false;save();$('w'+n).textContent=words(t.value)+' kata'}
+  else if(t.dataset.o!==undefined){const n=t.dataset.o;S.out[n]=t.value;if(S.part[n]&&!t.value.trim())S.part[n]=false;save();const wn=$('w'+n);if(wn)wn.textContent=words(t.value)+' kata'}
   else if(t.dataset.mtext!==undefined){const r=S.refs[t.dataset.mtext];if(r)r.mdraft=t.value}
   else if(IDS.includes(t.id)){save();if(t.id==='dur'){$('sTarget').textContent=tgt()}if(t.id==='topik')updateRefsUI()}
 });
@@ -1894,21 +1881,65 @@ fetch('/api/health').then(r=>r.json()).then(async h=>{
 })();
 
 /* ===== Popup besar hasil tahap (klik header card Tahap 1-4) ===== */
-let stageModalN=null;
+let stageModalN=null,stageModalMode='hasil';
+function stageModalFoot(edit,copy){$('stageModalEdit').style.display=edit?'':'none';$('stageModalCopy').style.display=copy?'':'none';const sim=$('stageModalSim');if(sim)sim.style.display=(stageModalMode==='hasil'&&stageModalN===2&&(S.out[2]||'').trim())?'':'none'}
 function openStageModal(n){
-  const st=ST[n];if(!st)return;stageModalN=n;
+  const st=ST[n];if(!st)return;stageModalN=n;stageModalMode='hasil';
   const o=(S.out[n]||'').trim();
   $('stageModalTitle').textContent='Hasil Tahap '+n+': '+st.t;
   $('stageModalSub').textContent=(S.st[n]||'Menunggu')+' · '+words(o)+' kata';
   $('stageModalBody').innerHTML=o?md(o):'<p class="hint">Belum ada hasil. Jalankan tahap ini dulu.</p>';
+  $('stageModal').classList.remove('wide');stageModalFoot(true,true);
   $('stageModal').classList.add('open');
 }
-function closeStageModal(){$('stageModal').classList.remove('open');stageModalN=null}
+/* Pop-up transkrip Tahap 0: semua transkrip link dalam satu pop-up lebar —
+   kartu Tahap 0 tidak lagi memajang teks penuh (redesign Dzaky 21 Okt). */
+function openTxModal(){
+  stageModalN=0;stageModalMode='tx';const urls=refUrls();
+  $('stageModalTitle').textContent='📄 Transkrip Referensi';
+  $('stageModalSub').textContent=urls.length+' link · '+usableRefs().length+' siap dipakai';
+  $('stageModalBody').innerHTML=urls.length?urls.map((u,i)=>{const r=S.refs[u];if(!r||r.status!=='ok')return `<h4>${i+1}. ${esc((r&&r.title)||u)}</h4><p class="hint">${esc(REFTXT(r))}</p>${r&&r.status==='fail'?`<div class="row"><button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip manual</button></div>${r.manualOpen?`<textarea data-mtext="${esc(u)}" style="min-height:120px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button>`:''}`:''}`;return `<h4>${i+1}. ${esc(r.title||u)}</h4><p class="hint">${fmt(r.words)} kata · ${esc(u)}</p><div class="tx">${esc(r.text)}</div>`}).join(''):'<p class="hint">Belum ada transkrip.</p>';
+  $('stageModal').classList.add('wide');stageModalFoot(false,false);
+  $('stageModal').classList.add('open');
+}
+function openSimModal(){
+  stageModalN=2;stageModalMode='sim';
+  $('stageModalTitle').textContent='🔎 Cek Kemiripan — Agent Script vs Transkrip';
+  $('stageModalSub').textContent='Dibandingkan dengan transkrip Tahap 0';
+  $('stageModalBody').innerHTML='<p class="hint">Menghitung…</p>';
+  $('stageModal').classList.remove('wide');stageModalFoot(false,false);
+  $('stageModal').classList.add('open');
+}
+/* Pop-up error AI (redesign Dzaky 21 Okt): error tahap tampil sebagai
+   pop-up penjelasan, bukan cuma teks menumpuk di kartu. */
+function errPop(n){
+  const x=S.err[n];if(!x)return;const c=classify(x,n);
+  stageModalN=n;stageModalMode='err';
+  $('stageModalTitle').textContent='⚠ Tahap '+n+': '+c.t;
+  $('stageModalSub').textContent='AI bermasalah di tahap ini';
+  $('stageModalBody').innerHTML=`<p><b>Kenapa:</b> ${esc(c.why)}</p><p><b>Solusi:</b></p><ol>${c.fix.map(f=>`<li>${esc(f)}</li>`).join('')}</ol>${S.part[n]?'<p>Bagian yang sudah ditulis tersimpan. Klik "Lanjutkan" di kartu untuk meneruskan.</p>':''}<details><summary>Detail teknis</summary><pre>${esc(x.message||'')}${x.code?' (kode '+esc(String(x.code))+')':''}</pre></details>`;
+  $('stageModal').classList.remove('wide');stageModalFoot(true,false);
+  $('stageModal').classList.add('open');
+}
+function closeStageModal(){$('stageModal').classList.remove('open');$('stageModal').classList.remove('wide');stageModalN=null;stageModalMode='hasil'}
 $('stageModalClose').addEventListener('click',closeStageModal);
 $('stageModal').addEventListener('click',e=>{if(e.target.id==='stageModal')closeStageModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStageModal()});
-$('stageModalEdit').addEventListener('click',()=>{const n=stageModalN;closeStageModal();if(n===null||n===undefined)return;S.open[n]=true;save();render();setTimeout(()=>{const el=document.querySelector('section.stage[data-n="'+String(n).padStart(2,'0')+'"]');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},60)});
-$('stageModalCopy').addEventListener('click',()=>{const n=stageModalN;if(n===null||n===undefined)return;navigator.clipboard.writeText(S.out[n]||'').then(()=>toast('Hasil disalin'))});
+$('stageModalEdit').addEventListener('click',()=>{const n=stageModalN;closeStageModal();if(n===null||n===undefined||n===0)return;openEditModal(n)});
+$('stageModalCopy').addEventListener('click',()=>{const n=stageModalN;if(n===null||n===undefined||stageModalMode!=='hasil')return;navigator.clipboard.writeText(S.out[n]||'').then(()=>toast('Hasil disalin'))});
+$('stageModalSim').addEventListener('click',()=>{checkSimilarity()});
+/* ===== Pop-up Edit tahap: edit teks + revisi chat + prompt ===== */
+let editModalN=null;
+function openEditModal(n){
+  const st=ST[n];if(!st)return;editModalN=n;const o=S.out[n]||'';
+  $('editModalTitle').textContent='✏ Edit Tahap '+n+': '+st.t;
+  $('editModalBody').innerHTML=(o?`<label>Hasil tahap ini — edit teks (tersimpan otomatis)</label><textarea data-o="${n}" style="min-height:180px">${esc(o)}</textarea>`:'<p class="hint">Belum ada hasil di tahap ini. Prompt tetap bisa diatur di bawah.</p>')+(chatHtml(n)||'')+povHtml(n);
+  $('editModal').classList.add('open');
+}
+function closeEditModal(){$('editModal').classList.remove('open');editModalN=null}
+$('editModalClose').addEventListener('click',closeEditModal);
+$('editModal').addEventListener('click',e=>{if(e.target.id==='editModal')closeEditModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
 </script>
 
 <script>
@@ -4411,7 +4442,7 @@ $('stageModalCopy').addEventListener('click',()=>{const n=stageModalN;if(n===nul
         : '/api/clipper/download?id=' + encodeURIComponent(it.jobId || '') + '&clip=' + (it.renderIdx || 0);
       const poster=libPoster(it);      box.innerHTML=`<div class="clip-modal-inner" style="max-width:520px">${head}<video preload="metadata" playsinline data-libmodalvideo${poster} src="${vid}" style="display:block;width:100%;aspect-ratio:9/16;object-fit:cover;background:#000;border-radius:8px;margin-top:10px"></video><div style="display:flex;gap:6px;align-items:center;margin-top:10px"><button class="btn ghost" data-libmodalplay style="flex:none;width:32px;height:28px;padding:0;font-size:13px" title="Putar/Jeda">▶</button><input type="range" data-libmodalseek min="0" max="${Math.max(0.1, +it.duration || 0)}" step="0.1" value="0" style="flex:1;min-width:0"><span data-libmodaltime style="font-size:11px;color:#ccc">0:00</span></div><div style="margin-top:10px"><a class="btn" href="${vid}" download style="display:block;width:100%;padding:10px 4px;font-size:14px;text-align:center;text-decoration:none;background:#22c55e;color:#fff;font-weight:800">📥 Download Final</a></div></div>`;
     }else{
-      box.innerHTML=`<div class="clip-modal-inner">${head}${it.topic?`<p class="hint" style="margin:8px 0 0">${esc(it.topic)}</p>`:''}<pre style="white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;margin:10px 0">${esc(it.content||'')}</pre><div><button class="btn ghost" data-libdl="${it.id}" style="width:100%;padding:10px 4px;font-size:14px">⬇ Download .txt</button></div></div>`;
+      box.innerHTML=`<div class="clip-modal-inner">${head}${it.topic?`<p class="hint" style="margin:8px 0 0">${esc(it.topic)}</p>`:''}<div class="md" style="max-height:60vh;overflow:auto;margin:10px 0">${md(it.content||'')}</div><div style="display:flex;gap:6px"><button class="btn ghost" data-libdl="${it.id}" style="flex:1;padding:10px 4px;font-size:14px">⬇ Download .txt</button><button class="btn ghost" data-libcopy="${it.id}" style="flex:1;padding:10px 4px;font-size:14px">📋 Salin</button><button class="btn danger" data-libdel="${it.id}" style="padding:10px 12px;font-size:14px">🗑 Hapus</button></div></div>`;
     }
     box.hidden=false;box.classList.add('clip-modal');
     // Kontrol video modal Hasil (klik video / tombol ▶/⏸ / seek) —
@@ -4430,15 +4461,18 @@ $('stageModalCopy').addEventListener('click',()=>{const n=stageModalN;if(n===nul
     if(!scriptList||!renderList)return;
     if(libDetailId&&!items.some(x=>x.id===libDetailId))closeLibModal();
     const byType={};items.forEach(it=>{(byType[it.type]=byType[it.type]||[]).push(it)});
-    // ---- Hasil Script: long/short/riset/seo = CARD (grid), klik -> modal full script
-    const scriptTypes=Object.entries(LIB_LABEL).filter(([t])=>t!=='clipper');
-    const scriptHtml=scriptTypes.map(([t,l])=>{const arr=byType[t]||[];if(!arr.length)return'';
-      return `<h4 style="margin:12px 0 8px">${l} (${arr.length})</h4><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">`+arr.map(it=>{
-        const dt=new Date(it.createdAt||0);const ds=isNaN(dt)?'':dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-        const meta=it.words?fmt(it.words)+' kata':'';
-        const ex=String(it.content||'').replace(/\s+/g,' ').slice(0,140);
-        return `<div class="aicard" data-libview="${it.id}" style="padding:10px;cursor:pointer"><b style="display:block;line-height:1.3;word-break:break-word">${esc(it.title||'Tanpa judul')}</b><small class="hint" style="display:block;margin-top:2px">${esc(it.topic||'')} · ${ds}${meta?' · '+meta:''}</small><p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:#ccc">${esc(ex)}${ex.length>=140?'…':''}</p><div style="display:flex;gap:6px;margin-top:8px"><button class="btn ghost" data-libview="${it.id}" style="flex:1;padding:6px 4px;font-size:12px">👁 Lihat</button><button class="btn danger" data-libdel="${it.id}" style="padding:6px 8px;font-size:12px">🗑</button></div></div>`;}).join('')+'</div>';}).join('');
-    scriptList.innerHTML=scriptHtml||'<div class="empty-page"><b>Hasil Script masih kosong</b>Simpan hasil dari Script VO (tombol 💾 Simpan ke Hasil di tiap tahap).</div>';
+    // ---- Hasil Script: FOLDER per judul proyek (redesign Dzaky 21 Okt).
+    // Isi folder = chip Riset/Skrip/SEO/Short berjejer kesamping; klik chip
+    // membuka pop-up detail (render rapi, storyboard SEO jadi tabel). Item
+    // lama tanpa topik dikelompokkan dari judulnya.
+    const folderOf=it=>(it.topic||'').trim()||String(it.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/,'')||'Tanpa judul';
+    const folders={};items.filter(it=>it.type!=='clipper').forEach(it=>{const f=folderOf(it);(folders[f]=folders[f]||[]).push(it)});
+    const typeOrder=['riset','long','seo','short'];
+    const folderHtml=Object.entries(folders).sort((a,b)=>Math.max(...b[1].map(x=>x.createdAt||0))-Math.max(...a[1].map(x=>x.createdAt||0))).map(([f,arr])=>{
+      const chips=typeOrder.filter(t=>arr.some(x=>x.type===t)).map(t=>{const it=arr.filter(x=>x.type===t).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];return `<button class="btn ghost" data-libview="${it.id}" style="padding:8px 12px;font-size:13px">${LIB_LABEL[t]||t}${it.words?' · '+fmt(it.words)+' kata':''}</button>`}).join('');
+      const dt=new Date(Math.max(...arr.map(x=>x.createdAt||0)));const ds=isNaN(dt)?'':dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+      return `<div class="aicard" style="padding:12px 14px;margin-bottom:10px"><div style="display:flex;align-items:flex-start;gap:8px;border-bottom:1px solid var(--line);padding-bottom:8px"><b style="flex:1;font-size:15px;line-height:1.35;word-break:break-word">📁 ${esc(f)}</b><button class="btn ghost" data-librename="${encodeURIComponent(f)}" style="padding:4px 10px;font-size:12px" title="Ganti nama folder — isi sama persis dengan nama folder lain untuk menggabungkan">✏ Ganti nama</button></div><small class="hint" style="display:block;margin:6px 0 8px">${arr.length} hasil${ds?' · terakhir '+ds:''}</small><div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div></div>`;}).join('');
+    scriptList.innerHTML=folderHtml||'<div class="empty-page"><b>Belum ada folder hasil</b>Isi Judul proyek di Brief Script VO lalu jalankan tahapnya — hasil otomatis tersimpan ke folder judul di sini.</div>';
     // ---- Hasil Akhir Render: clipper = GRID CARD (Final): video 9:16 +
     // thumbnail kustom (poster) + judul + Lihat / Download Final (di modal).
     const arr=byType.clipper||[];
@@ -4460,6 +4494,7 @@ $('stageModalCopy').addEventListener('click',()=>{const n=stageModalN;if(n===nul
     // Urutan: HAPUS / COPY / DOWNLOAD dulu (tombol di dalam card / pop up),
     // baru VIEW (klik card). Listener VIEW di bawah juga punya guard yang
     // sama, biar klik tombol tidak ikut buka pop up.
+    const rn=e.target.closest('[data-librename]');if(rn){(async()=>{const fname=decodeURIComponent(rn.dataset.librename||'');const nn=(prompt('Nama folder baru untuk "'+fname+'":\n(Isi sama persis dengan nama folder lain untuk MENGGABUNGKAN kedua folder.)',fname)||'').trim();if(!nn||nn===fname)return;const d=await fetchLibrary();const fo=x=>(x.topic||'').trim()||String(x.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/,'')||'Tanpa judul';const its=(d.items||[]).filter(x=>x.type!=='clipper'&&fo(x)===fname);if(!its.length)return toast('Folder tidak ditemukan');const stNum={riset:1,long:2,seo:3,short:4};let h=0;for(let i=0;i<nn.length;i++)h=((h<<5)-h+nn.charCodeAt(i))|0;let okN=0;for(const it of its){const del=await fetch('/api/library?id='+encodeURIComponent(it.id),{method:'DELETE'});if(!del.ok)continue;const suf=String(it.title||'').match(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/);const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:it.type,title:suf?nn+suf[0]:it.title,topic:nn,content:it.content,words:it.words,replaceKey:stNum[it.type]?'vo-'+stNum[it.type]+'-'+h:undefined})});if(r.ok)okN++}toast(okN+' hasil dipindah ke folder "'+nn+'"');renderHasil()})();return}
     const dl=e.target.closest('[data-libdel]');if(dl){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===dl.dataset.libdel);if(!it)return;const delFile=it.type==='clipper'&&confirm('Hapus juga file video render-nya dari server (hemat ruang)?\nOK = hapus file video juga.\nBatal = hapus entri Hasil saja (video tetap ada).');if(!confirm('Hapus "'+(it.title||'')+'" dari Hasil?'))return;const r=await fetch('/api/library?id='+encodeURIComponent(it.id)+(delFile?'&deleteFile=1':''),{method:'DELETE'});if(r.ok){toast('Dihapus dari Hasil.');closeLibModal();renderHasil()}else toast('Gagal menghapus');})();return}
     const cp=e.target.closest('[data-libcopy]');if(cp){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===cp.dataset.libcopy);if(!it||!it.content)return toast('Tidak ada teks');try{await navigator.clipboard.writeText(it.content);toast('Script tersalin.')}catch{toast('Gagal salin — blokir browser.');}})();return}
     const dw=e.target.closest('[data-libdl]');if(dw){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===dw.dataset.libdl);if(!it||!it.content)return toast('Tidak ada teks');const blob=new Blob([it.content],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(String(it.title||'script').replace(/[^a-zA-Z0-9-_ ]/g,'').trim()||'script')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast('Script di-download (.txt).');})();return}
