@@ -5,11 +5,16 @@ users.json
 *.key
 *.pem
 *.p12
+.sess-secret
+cookies.txt
 
 # State per-akun + data runtime (dibuat server, bukan source)
 state-*.json
+state/
 job.json
 *.log
+custom-providers.json
+library/
 
 # Folder kerja Clipper (video sumber + render, besar)
 clipper-work/

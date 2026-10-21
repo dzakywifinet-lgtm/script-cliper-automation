@@ -3,9 +3,13 @@
 face_track.py — Active Speaker Detection & Auto-Framing (praktis, ringan).
 
 Cara kerja (versi praktis dari spek MediaPipe / PyAnnote / TalkNet / YOLOv8):
-  1. Deteksi wajah per frame (OpenCV YuNet DNN — akurat, ringan, jalan di Pi + PC).
-     Model face_detection_yunet_2023mar.onnx dibundel (232KB). Kalau MediaPipe
-     terinstall, bisa pakai --method mediapipe (alternatif, PC).
+  1. Deteksi wajah per frame — BLAZEFACE (default, model ringan buat HP,
+     jalan cepat di CPU PC; via paket `mediapipe` yang membundel model
+     Blazeface short-range — MediaPipe FaceDetection MEMAKAI Blazeface).
+     FALLBACK berantai (tracking tidak pernah putus):
+     Blazeface (mediapipe) -> YuNet (OpenCV DNN, model ONNX dibundel 232KB)
+     -> Haar cascade (cv2.data.haarcascades, tanpa model tambahan).
+     Model face_detection_yunet_2023mar.onnx dibundel (232KB).
      FALLBACK BADAN: kalau YuNet tidak menemukan wajah (muka tidak hadap kamera /
      membelakangi), pakai MOTION (frame differencing) -> crop ngikutin daerah
      yang bergerak (orangnya), bukan ke tengah. Tanpa model (HOG / YOLO dihapus:
@@ -14,8 +18,18 @@ Cara kerja (versi praktis dari spek MediaPipe / PyAnnote / TalkNet / YOLOv8):
   2. Deteksi SIAPA yang ngomong: gerak mulut (frame differencing di daerah mulut
      tiap wajah) + energi audio (ffmpeg volumedetect). Wajah yang mulutnya paling
      gerak = yang ngomong (pengganti TalkNet / lip-sync yang butuh model berat).
-  3. Smooth cropping: Exponential Moving Average (EMA) — kamera pindah halus,
-     tidak patah-patah (pengganti Kalman Filter yang lebih berat).
+  3. Smooth cropping: Exponential Moving Average (EMA) + deadzone —
+     gerakan kecil tidak menggerakkan crop (anti-jitter). PINDAH PEMBICARA
+     = SNAP (hard cut, model Klipaja): kunci SpeakerLock pindah -> crop
+     langsung ke framing pembicara baru, tanpa transit EMA.
+  3b. SEGMENTASI (model Klipaja): tiap titik diganti MEDIAN segmen
+     pembicaranya (batas = SpeakerLock pindah pembicara + drift jauh).
+     Hasil render: crop STATIS per segmen (kepala bergerak DI DALAM frame,
+     latar tetap) + HARD CUT antar segmen — tanpa glide / interpolasi.
+     Wajah hilang sesaat -> posisi ditahan (hold, None), tidak loncat ke
+     0/tengah. (Post-pass binomial TIDAK dipakai di pipeline ini: ia
+     meratakan hard cut dan mengkontaminasi median segmen pendek.
+     Fungsi smooth_track() tetap ada + diuji, tapi tidak dipanggil.)
   4. Output JSON: posisi crop X per detik (koordinat SUMBER), dipakai Clipper
      untuk membangun crop time-varying (seperti speaker-switch, tapi OTOMATIS).
 
@@ -31,8 +45,9 @@ Penggunaan:
   python3 face_track.py --input video.mp4 --start 0 --end 30 --out track.json --fps 2 --ema 0.5
 
 Dependensi: opencv-python-headless (atau opencv-python), numpy.
+  Blazeface: pip install mediapipe (membundel model Blazeface).
   Pi:  pip install opencv-python-headless (di venv / /opt/docker biar root nggak penuh)
-  PC:  pip install opencv-python
+  PC:  pip install opencv-python mediapipe
 """
 import argparse
 import json
@@ -43,6 +58,27 @@ import sys
 
 import cv2
 import numpy as np
+
+
+# --- Konstanta smoothing (bisa diatur; CLI --ema/--deadzone menimpa 2 pertama) ---
+# server.js memanggil dengan --ema 0.3 --deadzone 30 -> nilai default di sini
+# disamakan agar perilaku sama bila dipanggil tanpa argumen.
+SMOOTH_ALPHA = 0.3     # EMA alpha (0-1): makin kecil makin halus, makin gede makin responsif.
+                       # 0.3 pada fps 2 = lag ~1,5 detik mengikuti gerakan wajah
+                       # (trade-off: gerakan sangat cepat tertinggal sedikit).
+SMOOTH_DEADZONE = 30.0  # Deadzone anti-jitter (px): gerakan < deadzone tidak menggerakkan crop.
+SMOOTH_PASSES = 1      # Pass binomial zero-phase pada track akhir (1 = lembut,
+                       # 2 = lebih lembut; tanpa lag karena simetris).
+SEGMENT_JUMP_FRAC = 0.12  # Ambang pecah segmen (fraksi lebar frame): bila posisi
+                       # crop menyimpang > ambang ini dari median segmen berjalan
+                       # selama SEGMENT_STREAK sampel berturut-turut -> segmen
+                       # baru (hard cut). Gerak kepala biasa (< ~100px pada
+                       # sumber 1280) tidak memecah segmen; pindah pembicara /
+                       # jalan jauh (> ~150px) memecah segmen. Model Klipaja:
+                       # crop STATIS per segmen, hard cut antar segmen.
+SEGMENT_STREAK = 2     # Sampel berturut-turut menyimpang sebelum segmen dipecah
+                       # (cerminan SpeakerLock SWITCH_STREAK: 1 frame berisik
+                       # tidak bikin cut).
 
 
 def probe_wh(path):
@@ -101,6 +137,24 @@ def detect_faces_mediapipe(frame_rgb, detector):
     return out
 
 
+def detect_faces_blazeface(frame_rgb, detector):
+    """Blazeface via MediaPipe FaceDetection — MediaPipe FaceDetection
+    MEMAKAI model Blazeface (face_detection_short_range.tflite), bukan
+    detektor lain. Return list (x, y, w, h)."""
+    return detect_faces_mediapipe(frame_rgb, detector)
+
+
+def detect_faces_haar(gray, cascade, min_size=60):
+    """Haar cascade — fallback TERAKHIR (bila Blazeface + YuNet tidak
+    tersedia). Tanpa model tambahan (pakai cv2.data.haarcascades).
+    Return list (x, y, w, h)."""
+    if cascade is None:
+        return []
+    rects = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5,
+                                     minSize=(int(min_size), int(min_size)))
+    return [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in rects]
+
+
 def mouth_score(gray_prev, gray_cur, face, prev_face=None):
     """Gerak mulut: selisih piksel daerah mulut (1/3 bawah wajah) antar frame.
     prev_face = kotak wajah di frame SEBELUMNYA (aligned) — biar gerak kepala
@@ -125,6 +179,313 @@ def mouth_score(gray_prev, gray_cur, face, prev_face=None):
     return float(cv2.absdiff(prev, cur).mean())
 
 
+def ema_deadzone(smooth, target, ema, deadzone):
+    """EMA + deadzone: gerakan kecil (< deadzone) tidak menggerakkan crop.
+
+    smooth=None -> snap ke target (tanpa lag warm-up). Dipakai jalur wajah
+    (SpeakerLock), jalur badan (motion), dan tiap panel mode Split.
+    Fungsi murni -> bisa diuji tanpa OpenCV / video.
+    """
+    if smooth is None:
+        return target
+    if abs(target - smooth) < deadzone:
+        return smooth
+    return ema * target + (1.0 - ema) * smooth
+
+
+def _binomial_pass(vals):
+    """Satu pass filter binomial [1,2,1]/4 (edge replication).
+
+    Membulatkan sudut trayektori; simetris -> zero-phase (tanpa lag).
+    """
+    n = len(vals)
+    if n < 3:
+        return list(vals)
+    out = []
+    for i in range(n):
+        a = vals[max(0, i - 1)]
+        b = vals[i]
+        c = vals[min(n - 1, i + 1)]
+        out.append((a + 2.0 * b + c) / 4.0)
+    return out
+
+
+def smooth_track_values(values, passes=SMOOTH_PASSES):
+    """Zero-phase smoothing pada seri posisi (satu sumbu).
+
+    values = list float|None. None = wajah belum ada / hilang sesaat ->
+    forward-fill (hold posisi terakhir) untuk perhitungan, lalu posisi
+    None dikembalikan (tidak mengarang nilai, tidak loncat ke 0/tengah).
+    Lompatan mentah (mis. 0 -> 500 -> 0 -> 500) diubah jadi perubahan
+    bertahap (max step menyusut jauh). Fungsi murni -> bisa diuji tanpa
+    OpenCV / video.
+    """
+    vals = list(values)
+    if not vals:
+        return vals
+    filled = []
+    last = None
+    for v in vals:
+        if v is None:
+            filled.append(last if last is not None else 0.0)
+        else:
+            last = float(v)
+            filled.append(float(v))
+    none_idx = {i for i, v in enumerate(vals) if v is None}
+    for _ in range(max(0, int(passes))):
+        filled = _binomial_pass(filled)
+    return [None if i in none_idx else round(filled[i], 1)
+            for i in range(len(vals))]
+
+
+def smooth_track(track, passes=SMOOTH_PASSES, split=False, lo=0.0, hi=None):
+    """Haluskan track akhir (post-pass zero-phase) sebelum ditulis ke JSON.
+
+    Normal: seri 'x' (kiri crop). Split: seri 'leftX'/'rightX' (pusat wajah)
+    + 'x' disinkronkan ke leftX yang sudah dihaluskan. Hasil di-clamp ke
+    [lo, hi] (crop tidak keluar frame). Field lain (t, speaking, faces,
+    body) tidak disentuh, schema output tidak berubah. Fungsi murni.
+    """
+    if not track:
+        return track
+    if split:
+        for key in ("leftX", "rightX"):
+            sm = smooth_track_values([p.get(key) for p in track], passes)
+            for p, v in zip(track, sm):
+                if v is not None:
+                    p[key] = v if hi is None else max(lo, min(hi, v))
+        for p in track:
+            p["x"] = p.get("leftX")
+    else:
+        sm = smooth_track_values([p.get("x") for p in track], passes)
+        for p, v in zip(track, sm):
+            if v is not None:
+                p["x"] = v if hi is None else max(lo, min(hi, v))
+    return track
+
+
+def _median(vals):
+    """Median list angka (None sudah dibuang pemanggil). Return None bila kosong."""
+    s = sorted(vals)
+    n = len(s)
+    if n == 0:
+        return None
+    return s[n // 2] if n % 2 == 1 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+
+def detect_drift_bounds(values, jump, streak=SEGMENT_STREAK):
+    """Deteksi batas segmen dari penyimpangan (drift) posisi crop.
+
+    values: list float|None (posisi crop per sampel). Batas baru (True) bila
+    nilai menyimpang > jump dari median segmen berjalan selama `streak`
+    sampel berturut-turut; batas ditaruh di sampel MENYIMPANG PERTAMA.
+    None (gap wajah hilang) tidak memutus segmen dan tidak dihitung.
+    Fungsi murni -> bisa diuji tanpa OpenCV / video.
+    """
+    n = len(values)
+    bounds = [False] * n
+    seg_start = 0
+    over = 0
+    for i, v in enumerate(values):
+        if v is None:
+            continue
+        seg_vals = [x for x in values[seg_start:i] if x is not None]
+        if not seg_vals:
+            continue
+        if abs(v - _median(seg_vals)) > jump:
+            over += 1
+            if over >= max(1, int(streak)):
+                b = i - max(1, int(streak)) + 1
+                bounds[b] = True
+                seg_start = b
+                over = 0
+        else:
+            over = 0
+    return bounds
+
+
+def segmentize_values(values, bounds=None, jump=None, streak=SEGMENT_STREAK,
+                      lo=None, hi=None):
+    """Ganti tiap nilai dengan MEDIAN segmennya (model Klipaja: crop STATIS
+    per segmen, hard cut antar segmen — tanpa glide / interpolasi).
+
+    values: list float|None (posisi crop per sampel, sudah EMA + deadzone +
+    post-pass). bounds: list bool sejajar values, True = segmen baru mulai
+    di indeks ini (dari SpeakerLock: pindah pembicara). Bila jump diberikan,
+    drift di dalam segmen juga memecah segmen (penyimpangan > jump selama
+    `streak` sampel berturut-turut — mitigasi pembicara yang jalan jauh
+    dalam satu segmen: tanpa pecah, crop statis bisa membuat wajah keluar
+    frame). None dipertahankan (gap wajah hilang -> hold di render, tidak
+    mengarang nilai, tidak loncat ke 0/tengah). Median di-clamp ke [lo, hi]
+    bila diberikan. Urutan/timestamp tidak diubah, panjang sama.
+    Fungsi murni -> bisa diuji tanpa OpenCV / video.
+    """
+    n = len(values)
+    if n == 0:
+        return list(values)
+    final = list(bounds) if bounds and len(bounds) == n else [False] * n
+    final[0] = False  # segmen pertama selalu mulai di indeks 0
+    if jump is not None:
+        # Drift dideteksi PER segmen eksplisit (bukan melintasi batas
+        # SpeakerLock) agar nilai transisi di batas tidak memicu cut ganda.
+        starts = [0] + [i for i in range(n) if final[i]]
+        starts.append(n)
+        for a, b in zip(starts, starts[1:]):
+            sub = detect_drift_bounds(values[a:b], jump, streak)
+            for j, flag in enumerate(sub):
+                if flag:
+                    final[a + j] = True
+    out = list(values)
+    seg_start = 0
+    for i in range(n + 1):
+        if i == n or final[i]:
+            seg_vals = [x for x in values[seg_start:i] if x is not None]
+            med = _median(seg_vals) if seg_vals else None
+            if med is not None:
+                if lo is not None:
+                    med = max(lo, med)
+                if hi is not None:
+                    med = min(hi, med)
+                for j in range(seg_start, i):
+                    if out[j] is not None:
+                        out[j] = round(med, 1)
+            seg_start = i
+    return out
+
+
+def split_panel_centers(faces):
+    """Pusat wajah panel kiri + kanan dari list wajah [(x, y, w, h)].
+
+    2+ wajah -> paling kiri + paling kanan (terurut x); 1 wajah -> duplikat
+    wajah itu untuk kedua panel; 0 wajah -> (None, None). Fungsi murni.
+    """
+    if not faces:
+        return (None, None)
+    ordered = sorted(faces, key=lambda f: f[0])
+    left = ordered[0]
+    right = ordered[-1]
+    return (left[0] + left[2] / 2.0, right[0] + right[2] / 2.0)
+
+
+class SpeakerLock:
+    """Hysteresis pembicara: kunci pembicara saat ini agar crop tidak
+    flip-flop A<->B tiap frame.
+
+    Tanpa ini, tiap frame (fps 2) kode memilih wajah dengan gerak mulut
+    TERBESAR; bila kedua pembicara aktif (satu ngomong, satu ketawa/reaksi),
+    max bisa flip A->B->A tiap frame -> crop goyang patah-patah.
+
+    Aturan (pick):
+    - Belum ada kunci -> kunci langsung ke wajah terbaik (snap, tanpa lag).
+    - Wajah terbaik adalah pembicara TERKUNCI (jarak cx <= 15% lebar frame
+      dari kunci) -> streak reset, kunci ikut posisi wajah (gerak pelan).
+    - Wajah terbaik adalah pembicara LAIN (jarak cx > 15% lebar) -> streak
+      +1; baru PINDAH kunci bila streak >= 2 frame (>=1 detik pada fps 2);
+      bila belum, tetap di pembicara terkunci (kembalikan wajah terdekat
+      kunci bila masih terdeteksi, bila tidak: None = crop diam).
+    - Tidak ada wajah dengan mouth > threshold (2.0) -> kunci tetap
+      (tidak pindah, tidak reset streak), return None.
+    Fungsi murni terhadap state internal (locked_cx, streak) -> bisa diuji
+    tanpa OpenCV / video.
+    """
+
+    MOUTH_THRESHOLD = 2.0
+    SWITCH_DIST_FRAC = 0.15  # 15% lebar frame
+    SWITCH_STREAK = 2        # frame berturut-turut pembicara lain mendominasi
+
+    def __init__(self):
+        self.locked_cx = None
+        self.streak = 0
+        # switched: True bila pick() TERAKHIR PINDAH kunci ke pembicara lain
+        # (batas segmen baru, model Klipaja: hard cut di sini). Di-reset
+        # False di awal setiap pick(). Kunci pertama / tahan kunci / tidak
+        # ada yang dominan -> False (bukan pindah pembicara).
+        self.switched = False
+
+    @staticmethod
+    def _cx(face):
+        return face["x"] + face["w"] / 2.0
+
+    def pick(self, scored, frame_w):
+        """Pilih wajah target dari scored ([{x,y,w,h,mouth}]).
+
+        Return wajah dict target, atau None bila crop harus diam
+        (tidak ada yang dominan / kunci dipertahankan tapi wajah terkunci
+        tidak terdeteksi di frame ini).
+        """
+        self.switched = False
+        if not scored:
+            return None
+        best = max(scored, key=lambda s: s["mouth"])
+        if best["mouth"] <= self.MOUTH_THRESHOLD:
+            return None  # tidak ada yang dominan -> kunci tetap
+        best_cx = self._cx(best)
+        if self.locked_cx is None:
+            self.locked_cx = best_cx
+            self.streak = 0
+            return best
+        if abs(best_cx - self.locked_cx) <= self.SWITCH_DIST_FRAC * frame_w:
+            # Pembicara terkunci kembali mendominasi -> streak reset.
+            self.streak = 0
+            self.locked_cx = best_cx  # ikut gerak pelan wajah terkunci
+            return best
+        # Pembicara lain mendominasi.
+        self.streak += 1
+        if self.streak >= self.SWITCH_STREAK:
+            self.locked_cx = best_cx
+            self.streak = 0
+            self.switched = True  # PINDAH kunci -> batas segmen baru
+            return best
+        # Tahan: tetap di pembicara terkunci.
+        near = min(scored, key=lambda s: abs(self._cx(s) - self.locked_cx))
+        if abs(self._cx(near) - self.locked_cx) <= self.SWITCH_DIST_FRAC * frame_w:
+            return near
+        return None
+
+
+def select_detector(method, cascade_path=None):
+    """Pilih detektor wajah (Blazeface -> YuNet -> Haar, fallback berantai).
+    Return (method_aktual, detector, haar_cascade). `method_aktual` = method
+    yang BENAR-BENAR dipakai (untuk field `method` di output JSON).
+    Tracking tidak pernah putus karena detektor tidak tersedia."""
+    detector = None
+    haar_cascade = None
+    if method in ("blazeface", "mediapipe"):
+        try:
+            import mediapipe as mp
+            detector = mp.solutions.face_detection.FaceDetection(
+                model_selection=0, min_detection_confidence=0.5)
+            method = "blazeface"
+        except Exception as e:
+            print("MediaPipe/Blazeface tidak tersedia, fallback ke YuNet: " + str(e),
+                  file=sys.stderr)
+            method = "yunet"
+    if method == "yunet":
+        model_path = cascade_path
+        if not model_path:
+            cand = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "face_detection_yunet_2023mar.onnx")
+            if os.path.exists(cand):
+                model_path = cand
+        if not model_path or not os.path.exists(model_path):
+            # YuNet tidak ada -> fallback terakhir: Haar cascade.
+            print("Model YuNet tidak ditemukan, fallback ke Haar cascade.",
+                  file=sys.stderr)
+            method = "haar"
+        else:
+            detector = cv2.FaceDetectorYN_create(model_path, "", (320, 320), 0.7)
+    if method == "haar":
+        cascade_xml = os.path.join(cv2.data.haarcascades,
+                                   "haarcascade_frontalface_default.xml")
+        if not os.path.exists(cascade_xml):
+            raise RuntimeError(
+                "Tidak ada detektor wajah yang tersedia (Blazeface/MediaPipe "
+                "tidak terinstall, model YuNet tidak ditemukan, Haar cascade "
+                "tidak ada). Install: pip install mediapipe")
+        haar_cascade = cv2.CascadeClassifier(cascade_xml)
+    return method, detector, haar_cascade
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
@@ -134,7 +495,22 @@ def main():
     ap.add_argument("--fps", type=float, default=2.0)
     ap.add_argument("--ema", type=float, default=0.5,
                     help="EMA alpha (0-1): makin kecil makin halus, makin gede makin responsif")
-    ap.add_argument("--method", default="yunet", choices=["yunet", "mediapipe"])
+    ap.add_argument("--deadzone", type=float, default=SMOOTH_DEADZONE,
+                    help="Deadzone anti-jitter (px): gerakan < deadzone tidak menggerakkan crop")
+    ap.add_argument("--smooth-passes", type=int, default=SMOOTH_PASSES,
+                    help="Pass binomial zero-phase pada track akhir (0 = tanpa post-pass; "
+                         "1 = lembut, tanpa lag; 2 = lebih lembut). TIDAK DIPAKAI pipeline "
+                         "Klipaja (post-pass meratakan hard cut) — dipertahankan untuk "
+                         "kompatibilitas CLI.")
+    ap.add_argument("--split", action="store_true",
+                    help="Mode Split: keluarkan 2 pusat wajah (kiri + kanan) per titik, "
+                         "tanpa SpeakerLock (kedua panel selalu tampil). "
+                         "Output track: {t, leftX, rightX} (pusat wajah, koordinat sumber).")
+    ap.add_argument("--method", default="blazeface",
+                    choices=["blazeface", "yunet", "mediapipe"],
+                    help="Detektor wajah: blazeface (default, MediaPipe = "
+                         "model Blazeface, fallback YuNet -> Haar), yunet "
+                         "(OpenCV DNN), mediapipe (alias blazeface).")
     ap.add_argument("--cascade", default=None,
                     help="Path face_detection_yunet_2023mar.onnx (default: sebelah script)")
     ap.add_argument("--min-face", type=int, default=60)
@@ -150,30 +526,9 @@ def main():
     mean_db = audio_mean_db(args.input, args.start, dur)
     has_audio = mean_db > -60.0
 
-    # --- Detektor wajah (YuNet default, MediaPipe opsional). ---
-    detector = None
-    if args.method == "mediapipe":
-        try:
-            import mediapipe as mp
-            detector = mp.solutions.face_detection.FaceDetection(
-                model_selection=0, min_detection_confidence=0.5)
-        except Exception as e:
-            print("MediaPipe tidak tersedia, fallback ke YuNet: " + str(e),
-                  file=sys.stderr)
-            args.method = "yunet"
-    if args.method == "yunet":
-        model_path = args.cascade
-        if not model_path:
-            cand = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                "face_detection_yunet_2023mar.onnx")
-            if os.path.exists(cand):
-                model_path = cand
-        if not model_path or not os.path.exists(model_path):
-            raise RuntimeError(
-                "Model face_detection_yunet_2023mar.onnx tidak ditemukan. "
-                "Download dari https://github.com/opencv/opencv_zoo/raw/main/"
-                "models/face_detection_yunet/face_detection_yunet_2023mar.onnx")
-        detector = cv2.FaceDetectorYN_create(model_path, "", (320, 320), 0.7)
+    # --- Detektor wajah: Blazeface (default) -> YuNet -> Haar (fallback
+    # berantai, tracking tidak pernah putus karena detektor tidak tersedia).
+    args.method, detector, haar_cascade = select_detector(args.method, args.cascade)
 
     # --- Ekstrak frame (pipe raw BGR). ---
     cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error",
@@ -183,6 +538,10 @@ def main():
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     frame_bytes = W * H * 3
     track = []
+    # switch_flags: sejajar track — True = SpeakerLock PINDAH pembicara di
+    # sampel ini (batas segmen baru, model Klipaja: hard cut di sini).
+    # Split: selalu False (tanpa SpeakerLock, batas dari deteksi drift).
+    switch_flags = []
     prev_gray = None
     prev_faces = []
     # Motion fallback (badan): posisi orang terakhir dari gerak (frame diff).
@@ -190,6 +549,9 @@ def main():
     last_motion_t = -10.0
     last_person = None  # (x, y, w, h) kotak daerah bergerak terakhir
     smooth_x = None  # None = belum ada wajah yang ngomong (pakai tengah sampai ada)
+    smoothL = None  # pusat wajah panel kiri (mode Split)
+    smoothR = None  # pusat wajah panel kanan (mode Split)
+    speaker_lock = SpeakerLock()  # hysteresis: kunci pembicara, cegah flip-flop
     t = 0.0
     dt = 1.0 / args.fps
     while True:
@@ -198,9 +560,11 @@ def main():
             break
         frame = np.frombuffer(raw, dtype=np.uint8).reshape(H, W, 3)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        if args.method == "mediapipe":
-            faces = detect_faces_mediapipe(
+        if args.method == "blazeface":
+            faces = detect_faces_blazeface(
                 cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), detector)
+        elif args.method == "haar":
+            faces = detect_faces_haar(gray, haar_cascade, args.min_face)
         else:
             faces = detect_faces_yunet(frame, detector, args.min_face)
         # Skor mulut per wajah → siapa yang ngomong.
@@ -212,6 +576,25 @@ def main():
                 pf = min(prev_faces, key=lambda p: (p[0] + p[2] / 2 - (f[0] + f[2] / 2)) ** 2 + (p[1] + p[3] / 2 - (f[1] + f[3] / 2)) ** 2)
             scored.append({"x": f[0], "y": f[1], "w": f[2], "h": f[3],
                            "mouth": round(mouth_score(prev_gray, gray, f, pf), 2)})
+        # --- MODE SPLIT: 2 panel (kiri + kanan), tanpa SpeakerLock ---
+        # Kedua panel SELALU tampil (tidak ada "yang ngomong" yang dipilih).
+        # Tiap panel di-smoothing mandiri (EMA + deadzone). 1 wajah -> duplikat
+        # untuk kedua panel; 0 wajah -> panel diam di posisi terakhir.
+        if args.split:
+            lc, rc = split_panel_centers(faces)
+            if lc is not None:
+                smoothL = ema_deadzone(smoothL, lc, args.ema, args.deadzone)
+                smoothR = ema_deadzone(smoothR, rc, args.ema, args.deadzone)
+            track.append({"t": round(t, 2),
+                          "x": round(smoothL, 1) if smoothL is not None else None,
+                          "leftX": round(smoothL, 1) if smoothL is not None else None,
+                          "rightX": round(smoothR, 1) if smoothR is not None else None,
+                          "speaking": bool(faces) and has_audio, "faces": scored})
+            switch_flags.append(False)  # Split tanpa SpeakerLock
+            prev_gray = gray
+            prev_faces = faces
+            t += dt
+            continue
         # FALLBACK BADAN: tidak ada wajah -> cari daerah bergerak (orangnya).
         # Frame diff vs frame sebelumnya -> threshold -> kontur terbesar = orang.
         # Crop ngikutin pusat kontur (badan), bukan ke tengah.
@@ -239,26 +622,32 @@ def main():
             body = {"x": round(px), "y": round(py), "w": round(pw), "h": round(ph), "body": True}
             target_x = body_cx - crop_w / 2.0
             target_x = max(0.0, min(W - crop_w, target_x))
-            if smooth_x is None:
-                smooth_x = target_x
-            else:
-                smooth_x = args.ema * target_x + (1.0 - args.ema) * smooth_x
+            # EMA + deadzone (gerakan kecil tidak menggerakkan crop).
+            smooth_x = ema_deadzone(smooth_x, target_x, args.ema, args.deadzone)
         speaking = False
+        sw = False  # SpeakerLock pindah pembicara di frame ini?
         if scored and has_audio:
-            # Wajah dengan gerak mulut terbesar = yang ngomong (threshold kecil
-            # biar kedip / gerak kepala tidak dianggap ngomong).
-            best = max(scored, key=lambda s: s["mouth"])
-            if best["mouth"] > 2.0:
+            # Siapa yang ngomong = SpeakerLock (hysteresis): wajah dengan
+            # gerak mulut terbesar, TAPI kunci tidak langsung pindah ke
+            # pembicara lain — butuh 2 frame berturut-turut mendominasi
+            # (biar ketawa/reaksi lawan bicara tidak bikin crop goyang).
+            target_face = speaker_lock.pick(scored, W)
+            sw = bool(getattr(speaker_lock, "switched", False))
+            if target_face is not None:
                 speaking = True
-                face_cx = best["x"] + best["w"] / 2.0
+                face_cx = target_face["x"] + target_face["w"] / 2.0
                 target_x = face_cx - crop_w / 2.0
                 target_x = max(0.0, min(W - crop_w, target_x))
-                # EMA: kamera pindah halus (tidak patah-patah). Wajah ngomong
-                # PERTAMA langsung SNAP (tanpa lag warm-up dari tengah).
-                if smooth_x is None:
-                    smooth_x = target_x
-                else:
-                    smooth_x = args.ema * target_x + (1.0 - args.ema) * smooth_x
+                # PINDAH PEMBICARA = SNAP (model Klipaja: hard cut ke framing
+                # pembicara baru, tanpa transit EMA ~1,5 dtk). Tanpa snap,
+                # median segmen baru ketarik ke posisi pembicara lama dan
+                # crop segmen pendek jadi meleset.
+                if sw:
+                    smooth_x = None
+                # EMA + deadzone: gerakan kecil (< deadzone) tidak
+                # menggerakkan crop. Wajah ngomong PERTAMA langsung SNAP
+                # (tanpa lag warm-up dari tengah).
+                smooth_x = ema_deadzone(smooth_x, target_x, args.ema, args.deadzone)
         out_x = smooth_x if smooth_x is not None else (W - crop_w) / 2.0
         # speaking = wajah ngomong ATAU badan terdeteksi (ada suara + ada orang).
         if body is not None and has_audio:
@@ -266,10 +655,49 @@ def main():
         track.append({"t": round(t, 2), "x": round(out_x, 1),
                       "speaking": speaking, "faces": scored,
                       **({"body": body} if body is not None else {})})
+        switch_flags.append(sw)
         prev_gray = gray
         prev_faces = faces
         t += dt
     proc.wait()
+
+    # TIDAK ADA post-pass binomial di sini (sengaja): pass binomial
+    # [1,2,1]/4 MERATAKAN hard cut (nilai di batas segmen jadi 260/585 dari
+    # 97.5/747.5) sehingga median segmen PENDEK (1-2 sampel) terkontaminasi
+    # sampai ~160px dan wajah bisa keluar frame. EMA + deadzone di loop +
+    # median segmen sudah memberi stabilitas; fungsi smooth_track() tetap
+    # ada (diuji di test_face_smooth.py) tapi tidak dipakai di pipeline ini.
+
+    # Segmentasi Klipaja: crop STATIS per segmen pembicara + HARD CUT antar
+    # segmen (bukan glide / interpolasi). Batas segmen = SpeakerLock pindah
+    # pembicara (switch_flags) + drift (wajah bergerak jauh dalam satu
+    # segmen — mitigasi pembicara yang jalan jauh: tanpa pecah, crop statis
+    # bisa membuat wajah keluar frame). Tiap titik diganti MEDIAN segmennya
+    # (posisi representatif); None (gap wajah hilang) dipertahankan.
+    # Gagal segmentasi -> track hasil EMA tetap ditulis (jangan gagalkan
+    # tracking). Schema output tidak berubah (jumlah titik sama).
+    try:
+        jump = SEGMENT_JUMP_FRAC * float(W)
+        if args.split:
+            lv = segmentize_values([p.get("leftX") for p in track], None,
+                                    jump=jump, lo=0.0, hi=float(W))
+            rv = segmentize_values([p.get("rightX") for p in track], None,
+                                    jump=jump, lo=0.0, hi=float(W))
+            for p, a, b in zip(track, lv, rv):
+                if a is not None:
+                    p["leftX"] = a
+                if b is not None:
+                    p["rightX"] = b
+                p["x"] = p.get("leftX")
+        else:
+            sv = segmentize_values([p.get("x") for p in track], switch_flags,
+                                    jump=jump, lo=0.0,
+                                    hi=max(0.0, W - crop_w))
+            for p, v in zip(track, sv):
+                if v is not None:
+                    p["x"] = v
+    except Exception:
+        pass
 
     result = {"fps": args.fps, "width": W, "height": H, "cropW": round(crop_w, 1),
               "method": args.method, "hasAudio": has_audio, "meanDb": mean_db,
