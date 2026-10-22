@@ -141,7 +141,8 @@ function dedupeTranscriptCues(cues, lang) {
 
 // Format detik -> "HH:MM:SS,mmm" untuk SRT.
 function fmtSrt(sec) {
-  const total = Math.max(0, +sec || 0);
+  // Sama seperti fmtAss: Infinity jangan bocor ke teks (lihat fmtAss).
+  const total = Number.isFinite(+sec) ? Math.max(0, +sec) : 0;
   const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
   const s = Math.floor(total % 60), ms = Math.floor((total - Math.floor(total)) * 1000);
   const p = (n, w) => String(n).padStart(w, '0');
@@ -155,8 +156,11 @@ function buildSrt(cues, start, end) {
   let n = 1;
   for (const c of cues || []) {
     if (c.end <= start || c.start >= end) continue;
-    const s = hookTotal + Math.max(0, c.start - start);
-    const e = hookTotal + Math.max(0.2, Math.min(c.end - start, end - start));
+    // (Dulu ada "hookTotal +" di sini — variabel lokal buildAss yang
+    // kecopy-paste; buildSrt CRASH ReferenceError tiap dipanggil. Sesuai
+    // doc di atas: waktu SRT relatif ke awal klip, tanpa offset judul.)
+    const s = Math.max(0, c.start - start);
+    const e = Math.max(0.2, Math.min(c.end - start, end - start));
     if (e <= s) continue;
     out.push(String(n++) + '\n' + fmtSrt(s) + ' --> ' + fmtSrt(e) + '\n' + c.text + '\n');
   }
@@ -165,7 +169,10 @@ function buildSrt(cues, start, end) {
 
 // Format waktu ASS: H:MM:SS.CC (centidetik, 2 digit).
 function fmtAss(t) {
-  t = Math.max(0, +t || 0);
+  // Nilai tak-hingga (Infinity dari cue rusak) TIDAK boleh bocor ke teks
+  // .ass ("Infinity:NaN:NaN.NaN" -> ffmpeg Invalid argument). NaN sudah
+  // jadi 0 via || 0; Infinity lolos karena truthy — saring eksplisit.
+  t = Number.isFinite(+t) ? Math.max(0, +t) : 0;
   const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = Math.floor(t % 60), cs = Math.floor((t % 1) * 100);
   return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + '.' + String(cs).padStart(2, '0');
 }
@@ -210,24 +217,22 @@ const clipFontOk = (f) => CLIP_FONT_FAMILIES.includes(f) ? f : null;
 // underline = garis bawah aksen (Pantul: pink-merah).
 // anim: 'pop' = membesar 80->100%; 'bounce' = 70->115->100%; 'fade' = fade
 // in/out; 'rotate' = miring settle; 'slidepop' = geser+pop.
-const SUB_PRESETS = {
-  karaoke: { label: 'Karaoke', emoji: '🎤', font: 'Montserrat', size: 65, color: '#FFFFFF', activeColor: '#FFFF00', bold: true, karaoke: true, anim: 'pop', box: true, boxColor: '#000000', caps: true },
-  casual: { label: 'Casual', emoji: '💬', font: 'Montserrat', size: 52, color: '#FFFFFF', activeColor: '#22C55E', bold: true, anim: 'pop', caps: true },
-  pill: { label: 'Pill', emoji: '💊', font: 'Montserrat', size: 48, color: '#FFFFFF', activeColor: '#FFFFFF', bold: true, anim: 'pop110', pill: true, pillColor: '#2563EB', caps: false },
-  kinetik: { label: 'Kinetik', emoji: '⚡', font: 'Montserrat', size: 71, color: '#FFFFFF', activeColor: '#FFFF00', bold: true, anim: 'flyin', singleWord: true, caps: true },
-  kertas: { label: 'Kertas', emoji: '📄', font: 'Montserrat', size: 48, color: '#1A1A1A', activeColor: '#1A1A1A', bold: true, box: true, boxColor: '#FFF8DC', anim: 'fadeslide', highlight: '#FFFF00', caps: false },
-  kombo: { label: 'Kombo', emoji: '🎨', font: 'Montserrat', size: 65, color: '#FFFFFF', activeColor: '#FFFF00', bold: true, box: true, boxColor: '#FF0000', anim: 'popcolor', slant: true, italic: true, maxWords: 2, caps: false },
-  puisi: { label: 'Puisi', emoji: '🌙', font: 'Liberation Sans', size: 48, color: '#FFFFFF', bold: false, italic: true, anim: 'fade', vertical: true, caps: false },
-  chat: { label: 'Chat', emoji: '🗨️', font: 'Montserrat', size: 48, color: '#1A1A1A', bold: true, box: true, boxColor: '#FFE600', anim: 'slidepop', bubble: true, caps: false },
+// SUMBER TUNGGAL PRESET (brief Dzaky 22 Okt): data preset hidup di
+// presets.json di folder yang sama (server + preview JASSUB membaca file
+// yang sama). Blok darurat di bawah HANYA dipakai bila presets.json hilang/
+// rusak — isinya subset kecil agar render tidak pernah mati total.
+const _PRESET_JSON = (() => {
+  try {
+    const fs = require('fs'), path = require('path');
+    const j = JSON.parse(fs.readFileSync(path.join(__dirname, 'presets.json'), 'utf8'));
+    if (j && j.subtitles && j.hooks) return j;
+  } catch (e) {}
+  return null;
+})();
+const SUB_PRESETS = _PRESET_JSON ? _PRESET_JSON.subtitles : {
+  karaoke: { label: 'Karaoke', emoji: '🎤', font: 'Montserrat', size: 65, color: '#FFFFFF', activeColor: '#FFCA28', bold: true, karaoke: true, anim: 'pop', box: true, boxColor: '#000000', caps: true, glow: { bord: 8, blur: 8 }, popFrom: 115, popTo: 106 },
+  default: { label: 'Default', emoji: '📝', font: 'Montserrat', size: 78, color: '#FFFFFF', activeColor: '#22C55E', bold: true, karaoke: true, anim: 'pop', caps: true },
   simpel: { label: 'Simpel', emoji: '✨', font: 'Montserrat', size: 48, color: '#FFFFFF', bold: true, anim: 'fade', caps: false },
-  pantul: { label: 'Pantul', emoji: '🏀', font: 'Montserrat', size: 65, color: '#FFFFFF', activeColor: '#FFFF00', bold: true, anim: 'bounce', singleWord: true, underline: '#FF69B4', caps: false },
-  bebas: { label: 'Bebas', emoji: '🕊️', font: 'Montserrat', size: 48, color: '#FFFFFF', activeColor: '#FFFF00', bold: true, anim: 'rotate', freeKinetic: true, caps: false },
-  polos: { label: 'Polos', emoji: '⬜', font: 'Montserrat', size: 65, color: '#FFFFFF', bold: true, anim: 'fade', caps: true },
-  pop: { label: 'Pop', emoji: '💥', font: 'Montserrat', size: 65, color: '#FFFFFF', activeColor: '#FFFF00', bold: true, karaoke: true, anim: 'pop110', maxWords: 2, caps: true, bestEffort: true },
-  default: { label: 'Default', emoji: '📝', font: 'Montserrat', size: 78, color: '#FFFFFF', activeColor: '#00FF00', bold: true, karaoke: true, anim: 'pop', caps: true },
-  // Classic (gaya Flufclip: "Classic movie subtitle") — subtitle film klasik:
-  // putih tebal, tanpa kotak, karaoke neon lime. Chunking tetap maks 4 kata.
-  classic: { label: 'Classic', emoji: '🎬', font: 'Montserrat', size: 52, color: '#FFFFFF', activeColor: '#00FF00', bold: true, karaoke: true, anim: 'pop', caps: true },
 };
 // Font subtitle: SEMUA preset pakai family "Montserrat" + Bold=1, KECUALI Puisi
 // (Liberation Sans italic) dan Simpel ("Montserrat" + Bold=0, ringan plain).
@@ -255,25 +260,9 @@ const SUB_PRESETS = {
 // (Berita). highlight = sorotan stabilo di baris ke-2 (Stabilo: pink).
 // tape = strip selotip di atas (Catatan). wavy = garis bawah merah
 // bergelombang (Catatan). alignLeft = teks rata kiri (Berita).
-const HOOK_PRESETS = {
-  tanpa: { label: 'Tanpa', emoji: '➖' },
+const HOOK_PRESETS = _PRESET_JSON ? _PRESET_JSON.hooks : {
   kartu: { label: 'Kartu', emoji: '🃏', font: 'Montserrat', size: 54, color1: '#000000', box: true, boxColor: '#FFFFFF', bold: true, anim: '' },
   sinema: { label: 'Sinema', emoji: '🎬', font: 'Montserrat', size: 60, color1: '#FFFFFF', bold: true, align: 2, y: 100, anim: '', gradient: true, holdSub: true },
-  keramat: { label: 'Keramat', emoji: '🌙', font: 'Liberation Sans', size: 56, color1: '#FFD93D', bold: true, italic: true, spacing: 2, anim: 'flicker', bestEffort: true },
-  notifchat: { label: 'Notif Chat', emoji: '💬', font: 'Montserrat', size: 32, color1: '#000000', box: true, boxColor: '#FFFFFF', bold: true, anim: 'slideuppop', bestEffort: true },
-  glitch: { label: 'Glitch', emoji: '📺', font: 'Anton', size: 64, color1: '#FFFFFF', bold: true, anim: 'glitch', bestEffort: true },
-  ketik: { label: 'Ketik', emoji: '⌨️', font: 'Liberation Sans', size: 48, color1: '#FFFFFF', bold: false, anim: 'type', bestEffort: true },
-  boom: { label: 'Boom', emoji: '💥', font: 'Anton', size: 64, color1: '#FFE600', color2: '#FFFFFF', bold: true, anim: 'boom', bestEffort: true },
-  kutipan: { label: 'Kutipan Terang', emoji: '💡', font: 'Liberation Sans', size: 48, color1: '#000000', box: true, boxColor: '#FFFFFF', bold: true, anim: 'zoomfade95', quote: true },
-  slide: { label: 'Slide Dinamis', emoji: '🎞️', font: 'Anton', size: 56, color1: '#FFFFFF', bold: true, anim: 'slidelines', bars: true, barColors: ['#FFFF00', '#000000', '#FFFF00'], barTextColors: ['#000000', '#FFFFFF', '#000000'] },
-  gulung: { label: 'Gulung', emoji: '🧻', font: 'Montserrat', size: 54, color1: '#000000', box: true, boxColor: '#FFFFFF', border: true, bold: true, anim: 'unroll' },
-  stiker: { label: 'Stiker', emoji: '🏷️', font: 'Anton', size: 56, color1: '#000000', box: true, boxColor: '#FFFFFF', border: true, rotate: -4, bold: true, anim: '' },
-  layar: { label: 'Layar Lebar', emoji: '🎥', font: 'Liberation Sans', size: 48, color1: '#FFFFFF', bold: false, italic: true, spacing: 2, anim: '', letterbox: true, holdSub: true, underline: '#FFD700' },
-  berita: { label: 'Berita', emoji: '📰', font: 'Anton', size: 48, color1: '#000000', box: true, boxColor: '#FFFFFF', bold: true, anim: '', alignLeft: true, badge: '#CC0000', underline: '#1E3A8A' },
-  stabilo: { label: 'Stabilo', emoji: '🖍️', font: 'Montserrat', size: 54, color1: '#000000', box: true, boxColor: '#FFF8DC', bold: true, anim: '', highlight: '#FF69B4' },
-  catatan: { label: 'Catatan', emoji: '📝', font: 'Liberation Sans', size: 44, color1: '#1A1A1A', box: true, boxColor: '#FFF9C4', bold: true, italic: true, anim: '', tape: true, wavy: '#FF0000', rotate: 2 },
-  // Classic (gaya Flufclip) — judul film klasik: putih tebal, tanpa kotak.
-  classic: { label: 'Classic', emoji: '🎬', font: 'Montserrat', size: 54, color1: '#FFFFFF', bold: true, anim: 'fade' },
 };
 function animTag(a) {
   if (a === 'pop') return '{\\fscx80\\fscy80\\t(0,200,\\fscx100\\fscy100)}';
@@ -304,7 +293,9 @@ function animTag(a) {
 // Return: isi dalam kurung kurawal setelah \c (tanpa { }).
 function subWordAnimInner(sp) {
   const a = (sp && sp.anim) || '';
-  const pop = '\\t(0,150,\\fscx115\\fscy115)\\t(150,300,\\fscx100\\fscy100)';
+  const pop = (sp && Number.isFinite(+sp.popFrom) && Number.isFinite(+sp.popTo))
+    ? '\\t(0,150,\\fscx' + Math.round(+sp.popFrom) + '\\fscy' + Math.round(+sp.popFrom) + ')\\t(150,300,\\fscx' + Math.round(+sp.popTo) + '\\fscy' + Math.round(+sp.popTo) + ')'
+    : '\\t(0,150,\\fscx115\\fscy115)\\t(150,300,\\fscx100\\fscy100)';
   if (a === 'pop110') return '\\fscx110\\fscy110' + pop; // Pill: pop + scale 110% -> 100%
   if (a === 'flyin') return '\\fscx80\\fscy80' + pop; // Kinetik: fly-in = mulai kecil 80% + pop
   if (a === 'fadeslide') return pop; // Kertas: pop kata aktif (tag persis seperti lama — test_boxrect mengunci itu); fade-nya ada di kotak subtitle (subAnimTag \fad via animTag 'fadeslide' -> fadOf di boxRectEvent)
@@ -597,11 +588,13 @@ function chunkSubtitleWords(words, maxLineChars, stripPunct, maxWords) {
 function buildAss(cues, start, end, subStyle, overlay) {
   const ss = subStyle || {};
   const ov = overlay || {};
-  // Resolusi output: ov.outW/outH (default 720x1280). Semua koordinat/ukuran
-  // .ass diskala dari faktor S (1 = 720p, 1,5 = 1080p) — posisi % tetap sama,
-  // ukuran font/kotak/offset px diskala. 720p = nilai lama persis (S=1).
-  const OUT_W = (Number.isFinite(+ov.outW) && +ov.outW > 0) ? Math.round(+ov.outW) : 720;
-  const OUT_H = (Number.isFinite(+ov.outH) && +ov.outH > 0) ? Math.round(+ov.outH) : 1280;
+  // PlayRes ASS dikunci 1080x1920 (brief satu-sumber 22 Okt): ASS selalu
+  // ditulis pada resolusi acuan yang sama untuk preview (JASSUB) dan render,
+  // berapa pun resolusi output video — libass menskala ASS ke frame video,
+  // jadi geometri relatif identik di 720p maupun 1080p. ov.outW/outH TIDAK
+  // lagi mengubah PlayRes. S = 1,5 tetap (semua ukuran preset berbasis 720).
+  const OUT_W = (_PRESET_JSON && _PRESET_JSON.playRes && +_PRESET_JSON.playRes.x) || 1080;
+  const OUT_H = (_PRESET_JSON && _PRESET_JSON.playRes && +_PRESET_JSON.playRes.y) || 1920;
   const S = OUT_W / 720;
   const CX = OUT_W / 2;
   // Preset dari Detail (ov.subPreset / ov.hookPreset) — override nilai manual.
@@ -611,18 +604,10 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // sp/hp DISALIN (bukan mutasi SUB_PRESETS/HOOK_PRESETS — objek bersama).
   const sp = { ...(SUB_PRESETS[ov.subPreset] || {}) };
   const hp = { ...((ov.hookPreset === undefined || ov.hookPreset === null) ? (HOOK_PRESETS.kartu || {}) : (HOOK_PRESETS[ov.hookPreset] || {})) };
-  // Override warna per-preset (Edit, tab Subtitle): Pill warna pill,
-  // Kinetik warna teks + kata besar, Kertas 3 warna (teks/kertas/stabilo).
-  if (ov.subPreset === 'pill' && /^#[0-9a-fA-F]{6}$/.test(String(ov.pillColor || ''))) sp.pillColor = ov.pillColor;
-  if (ov.subPreset === 'kinetik') {
-    if (/^#[0-9a-fA-F]{6}$/.test(String(ov.kinetikTextColor || ''))) sp.color = ov.kinetikTextColor;
-    if (/^#[0-9a-fA-F]{6}$/.test(String(ov.kinetikBigColor || ''))) sp.activeColor = ov.kinetikBigColor;
-  }
-  if (ov.subPreset === 'kertas') {
-    if (/^#[0-9a-fA-F]{6}$/.test(String(ov.kertasTextColor || ''))) sp.color = ov.kertasTextColor;
-    if (/^#[0-9a-fA-F]{6}$/.test(String(ov.kertasPaperColor || ''))) sp.boxColor = ov.kertasPaperColor;
-    if (/^#[0-9a-fA-F]{6}$/.test(String(ov.kertasHighlightColor || ''))) sp.highlight = ov.kertasHighlightColor;
-  }
+  // Warna subtitle = FULL dari preset gaya (keputusan Dzaky 21 Okt:
+  // pemilih warna manual dihapus — "warna full dari preset"). Override
+  // warna per-preset yang dulu ada di Edit (Pill/Kinetik/Kertas) dicabut;
+  // field lama di kandidat lama diabaikan.
   // Toggle Animasi judul (Edit, tab Judul): false = judul STATIS (tanpa
   // animasi masuk) — hp.anim dikosongkan, titleAnimTag ikut kosong, dan
   // cabang animasi di event teks tidak kepilih (tag = '').
@@ -691,14 +676,13 @@ function buildAss(cues, start, end, subStyle, overlay) {
   const tItalic = (hp.italic || ov.titleItalic) ? -1 : 0;
   // Font judul: pilihan per-klip (Edit, ov.titleFontPick) > preset > global.
   const tFont = clipFontOk(ov.titleFontPick) || clipFontOk(hp.font || ov.titleFont) || 'DejaVu Sans';
-  const tC1 = /^#[0-9a-fA-F]{6}$/.test(String(ov.titleColor1 || hp.color1 || '')) ? (ov.titleColor1 || hp.color1) : '#FFFFFF';
-  const tC2 = /^#[0-9a-fA-F]{6}$/.test(String(ov.titleColor2 || hp.color2 || '')) ? (ov.titleColor2 || hp.color2) : '#FFFF00';
+  const tC1 = /^#[0-9a-fA-F]{6}$/.test(String(hp.color1 || ov.titleColor1 || '')) ? (hp.color1 || ov.titleColor1) : '#FFFFFF';
+  const tC2 = /^#[0-9a-fA-F]{6}$/.test(String(hp.color2 || ov.titleColor2 || '')) ? (hp.color2 || ov.titleColor2) : '#FFFF00';
   const tSpacing = Math.round((+hp.spacing || 0) * S);
-  // Warna kotak judul: override Detail/Edit (ov.titleCardColor) > preset
-  // (Kartu/Kutipan = putih, Berita = merah, Stabilo = kuning,
-  // Catatan = kuning pucat). Sebelumnya preset menang (picker tidak
-  // berpengaruh) — dibalik biar picker Warna kartu kepake.
-  const tBoxColor = /^#[0-9a-fA-F]{6}$/.test(String(ov.titleCardColor || hp.boxColor || '')) ? (ov.titleCardColor || hp.boxColor) : null;
+  // Warna kotak judul: PRESET menang (Kartu/Kutipan = putih, Berita =
+  // merah, Stabilo = kuning, Catatan = kuning pucat) — override manual
+  // dicabut 21 Okt (pemilih warna dihapus, warna full dari preset gaya).
+  const tBoxColor = /^#[0-9a-fA-F]{6}$/.test(String(hp.boxColor || ov.titleCardColor || '')) ? (hp.boxColor || ov.titleCardColor) : null;
   const titleBorder = hp.box ? 3 : 1, titleOutline = hp.box ? 0 : Math.round(2 * S);
   const titleBack = hp.box ? '&H00' + (tBoxColor || '#000000').slice(5, 7) + (tBoxColor || '#000000').slice(3, 5) + (tBoxColor || '#000000').slice(1, 3) : '&H00000000';
   const tAlign = hp.align === 2 ? 2 : 8;
@@ -795,12 +779,17 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // setelah hook, bukan selama hook). Teks hook + flash putih di-render di sini.
   const hookItems = (Array.isArray(ov.hook) ? ov.hook : []).filter(h => h && Number.isFinite(h.start) && Number.isFinite(h.end) && h.end > h.start).slice(0, 3);
   let hookTotal = 0;
-  const hookTimeline = hookItems.map(h => { const pos = hookTotal; hookTotal += (h.end - h.start); return { pos, dur: h.end - h.start, text: String(h.text || '').trim() }; });
+  const hookTimeline = hookItems.map(h => { const pos = hookTotal; hookTotal += (h.end - h.start); return { pos, dur: h.end - h.start, srcStart: h.start, text: String(h.text || '').trim() }; });
   // Teks hook (Anton gede, center, bayangan). Tanpa flash putih (hard cut):
   // flash .ass {\p1} merusak Dialogue sesudahnya, filter fade out->in
   // bikin video putih semua. Lihat catatan di buildFfmpegArgs.
+  // hookAtSource (khusus trek pratinjau hook di editor): event hook ditaruh
+  // di waktu SUMBER-nya (tiap teks di atas potongannya sendiri), bukan di
+  // garis waktu gabungan — pemutar pratinjau melompat antar-potongan.
   for (const ht of hookTimeline) {
-    if (ht.text) out.push('Dialogue: 0,' + fmtAss(ht.pos) + ',' + fmtAss(ht.pos + ht.dur) + ',Hook,,0,0,0,,' + escapeAssText(ht.text) + '\n');
+    if (!ht.text) continue;
+    const hs = ov.hookAtSource ? ht.srcStart : ht.pos, he = ov.hookAtSource ? (ht.srcStart + ht.dur) : (ht.pos + ht.dur);
+    out.push('Dialogue: 0,' + fmtAss(hs) + ',' + fmtAss(he) + ',Hook,,0,0,0,,' + escapeAssText(ht.text) + '\n');
   }
   // --- Judul + CTA: tampil sepanjang KLIP UTAMA (hookTotal → hookTotal + clipDur).
   // (bagian 1 = warna 1, bagian 2+ = warna 2), tiap baris jadi Dialogue sendiri
@@ -825,19 +814,26 @@ function buildAss(cues, start, end, subStyle, overlay) {
     }
     if (hp.letterbox) {
       const barH = Math.round(140 * S);
-      const barTag = '{\\an7\\p1\\1c&H000000&}m 0 0 l ' + OUT_W + ' 0 l ' + OUT_W + ' ' + barH + ' l 0 ' + barH + '{\\p0}';
+      const barTag = '{\\an7\\p1\\bord0\\shad0\\1c&H000000&}m 0 0 l ' + OUT_W + ' 0 l ' + OUT_W + ' ' + barH + ' l 0 ' + barH + '{\\p0}';
       out.push('Dialogue: 2,' + fmtAss(hookTotal) + ',' + fmtAss(hookTotal + titleDurSec) + ',Title1,,0,0,0,,' + '{\\pos(0,0)}' + barTag + '\n');
       out.push('Dialogue: 2,' + fmtAss(hookTotal) + ',' + fmtAss(hookTotal + titleDurSec) + ',Title1,,0,0,0,,' + '{\\pos(0,' + (OUT_H - barH) + ')}' + barTag + '\n');
     }
-    // Sinema: gradasi gelap bawah (3 pita alpha menebal ke bawah — aproksimasi
-    // gradasi, libass tidak punya fill gradasi). Teks Sinema duduk di atasnya.
-    // bands = [awalFrac, alpha, akhirFrac] (fraksi dari tinggi gradasi).
+    // Sinema: gradasi gelap bawah (12 pita, opacity menebal ke bawah —
+    // aproksimasi gradasi, libass tidak punya fill gradasi). Teks Sinema
+    // duduk di atasnya. HATI-HATI: \1a di ASS = TRANSPARANSI (FF = tembus
+    // pandang), jadi hex = (1 - opacity) * 255. Versi lama menulis opacity
+    // langsung sebagai alpha -> gradasi KEBALIK (paling gelap di atas) +
+    // berasa 3 tangga keras di video hasil download (keluhan Dzaky 22 Okt).
     if (hp.gradient) {
-      const gY0 = Math.round(OUT_H * 0.55), gH = OUT_H - gY0, bands = [[0, 0.25, 0.33], [0.33, 0.45, 0.66], [0.66, 0.65, 1]];
-      for (const [a, al, b] of bands) {
-        const by = Math.round(gY0 + gH * a), bh = Math.round(gH * (b - a)) + 1;
-        const alphaHex = Math.round(al * 255).toString(16).toUpperCase().padStart(2, '0');
-        out.push('Dialogue: 2,' + fmtAss(hookTotal) + ',' + fmtAss(hookTotal + titleDurSec) + ',Title1,,0,0,0,,' + '{\\pos(0,' + by + ')\\an7\\p1\\1a&H' + alphaHex + '&\\1c&H000000&}m 0 0 l ' + OUT_W + ' 0 l ' + OUT_W + ' ' + bh + ' l 0 ' + bh + '{\\p0}\n');
+      const gY0 = Math.round(OUT_H * 0.55), gH = OUT_H - gY0, STEPS = 12;
+      for (let i = 0; i < STEPS; i++) {
+        const opacity = 0.18 + (0.70 - 0.18) * ((i + 0.5) / STEPS);
+        // Batas KUMULATIF (pita i mulai persis di akhir pita i-1): tinggi +1
+        // bikin 1 baris tumpang tindih -> komposit dobel = garis hitam di
+        // tiap batas pita pada hasil render (keluhan Dzaky 22 Okt).
+        const by = Math.round(gY0 + gH * (i / STEPS)), bh = Math.round(gY0 + gH * ((i + 1) / STEPS)) - by;
+        const alphaHex = Math.round((1 - opacity) * 255).toString(16).toUpperCase().padStart(2, '0');
+        out.push('Dialogue: 2,' + fmtAss(hookTotal) + ',' + fmtAss(hookTotal + titleDurSec) + ',Title1,,0,0,0,,' + '{\\pos(0,' + by + ')\\an7\\p1\\bord0\\shad0\\1a&H' + alphaHex + '&\\1c&H000000&}m 0 0 l ' + OUT_W + ' 0 l ' + OUT_W + ' ' + bh + ' l 0 ' + bh + '{\\p0}\n');
       }
     }
     // Geometri kotak judul (dipakai kotak + dekorasi + clip unroll). Dihitung
@@ -1032,14 +1028,17 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // mulai diucapin, jadi pop sinkron dengan kata. Reset \fscx100 setelah
   // kata aktif adalah jaring pengaman.
   const wordAnimInner = subWordAnimInner(sp);
+  // Glow kata aktif (spek spreadsheet via brief 22 Okt): HANYA preset
+  // yang mendeklarasikan glow di presets.json (saat ini Karaoke) — outline
+  // sewarna kata aktif + \bord8\blur8. Preset lain tetap polos (keputusan
+  // Dzaky 21 Okt: tanpa glow) karena glowOpen/glowReset mereka kosong.
+  // (Glow TIDAK lagi berupa tag span — lihat event glow terpisah di emitter chunk.)
   const normalColor = '&H00' + color.slice(5, 7) + color.slice(3, 5) + color.slice(1, 3);
-  // NEON GLOW karaoke (hijau lime, Default): kata aktif MENYALA — outline
-  // warna aktif + bord lebih tebal + blur (halo neon). Reset setelah kata
-  // (outline kembali transparan gaya, bord kembali default gaya, blur 0)
-  // biar kata sesudahnya tidak ikut glow. Warna glow = activeColor preset
-  // (Default = lime #00FF00; Karaoke = kuning; Casual = hijau).
-  const glowBord = subOutline + Math.round(2 * S);
-  const glowBlur = Math.round(6 * S);
+  // Karaoke TANPA glow (keputusan Dzaky 21 Okt): kata aktif cukup ganti
+  // WARNA POLOS (activeColor preset) + animasi pop — TANPA outline warna,
+  // TANPA blur/neon. (Dulu di sini ada "NEON GLOW": outline warna aktif +
+  // bord tebal + blur — dicabut karena Dzaky: "kalo hijau ya ijo, kalo
+  // kuning ya kuning, jangan glow".)
   // Gabung cue yang kepotong kalimat: kalau cue sebelumnya tidak berakhir
   // dengan tanda akhir kalimat (. ! ? …) dan jeda ke cue berikutnya < 0,5 detik
   // (kemungkinan lanjutan kalimat, bukan kalimat baru), gabung jadi satu cue.
@@ -1118,14 +1117,19 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // underline di belakang kata aktif): baris terpusat, lebar kata ≈
   // panjang tampil × 0,6 × ukuran font. Aproksimasi (bukan metrik font
   // persis) — cukup untuk menaruh sorotan di belakang kata.
+  // Faktor lebar karakter rata-rata per family (em) — dikalibrasi dari frame
+  // render uji 22 Okt: faktor datar 0,6 meleset jauh di font sempit (Plus
+  // Jakarta/Playfair/Anton) -> pill/glow bergeser kiri. Spasi nyata ~0,32em.
+  const CHAR_F = { 'Montserrat': 0.60, 'Plus Jakarta Sans': 0.52, 'JetBrains Mono': 0.60, 'Playfair Display': 0.50, 'Anton': 0.52, 'Russo One': 0.58, 'Poppins': 0.58, 'Roboto': 0.55, 'Lato': 0.55, 'Oswald': 0.50, 'Bebas Neue': 0.48, 'Liberation Sans': 0.56, 'DejaVu Sans': 0.60 };
+  const charF = CHAR_F[sp.font] || 0.58;
   const estWordX = (lineWords, actWord) => {
-    const lineW = lineWords.reduce((a, w, i) => a + (i ? size * 0.6 : 0) + dispText(w).length * size * 0.6, 0);
+    const lineW = lineWords.reduce((a, w, i) => a + (i ? size * 0.32 : 0) + dispText(w).length * size * charF, 0);
     let x = CX - lineW / 2;
     for (const w of lineWords) {
       if (w === actWord) break;
-      x += dispText(w).length * size * 0.6 + size * 0.6;
+      x += dispText(w).length * size * charF + size * 0.32;
     }
-    return { x, w: dispText(actWord).length * size * 0.6 };
+    return { x: Math.round(x), w: Math.round(dispText(actWord).length * size * charF) };
   };
   // Subtitle ditahan (Sinema/Layar Lebar): subtitle baru muncul setelah
   // judul selesai (hookTotal + titleDurSec).
@@ -1224,7 +1228,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
             const wc = wordColorTag(w);
             if (wc) line += '{\\c' + wc + '&}' + txt + '{\\c' + normalColor + '&} ';
             else if (isKeyword(w)) line += '{\\c' + popColor + '&}{\\fs' + popSize + '}' + txt + '{\\c' + normalColor + '&}{\\fs' + size + '} ';
-            else if (w === wAct) line += '{\\c' + karaokeSec + '&\\3c' + karaokeSec + '&\\bord' + glowBord + '\\blur' + glowBlur + wordAnimInner + '}' + txt + '{\\c' + normalColor + '&\\3c&H80000000&\\bord' + subOutline + '\\blur0\\fscx100\\fscy100} ';
+            else if (w === wAct) line += '{\\c' + karaokeSec + '&' + wordAnimInner + '}' + txt + '{\\c' + normalColor + '&\\fscx100\\fscy100} ';
             else line += txt + ' ';
           });
           if (!hasText) return;
@@ -1245,6 +1249,16 @@ function buildAss(cues, start, end, subStyle, overlay) {
             const ex = estWordX(lineWords, wAct);
             out.push(boxRectEvent('BoxRect_' + ulHex, ws, we,
               ex.x, OUT_H - mv - Math.round(6 * S), ex.w, Math.round(4 * S), ''));
+          }
+          // Glow kata aktif (preset berglow di presets.json, mis. Karaoke
+          // spek spreadsheet): salinan kata aktif sewarna penuh dengan
+          // \\bord8\\blur8 sebagai event TERPISAH di belakang teks.
+          // (Tag span langsung terbukti jadi kabut menutupi baris pada gaya
+          // berkotak/BorderStyle 3 — terverifikasi frame render uji.)
+          if (lineWords.indexOf(wAct) >= 0 && sp.glow && !wAct.sensor) {
+            const ex = estWordX(lineWords, wAct);
+            const gTxt = escapeAssText(dispText(wAct));
+            if (gTxt) out.push('Dialogue: 0,' + fmtAss(ws) + ',' + fmtAss(we) + ',Default,,0,0,0,,{\\pos(' + (ex.x + Math.round(18 * S)) + ',' + (OUT_H - mv - lineH) + ')\\an7\\c' + karaokeSec + '&\\3c' + karaokeSec + '&\\bord' + Math.max(0, Math.round(+sp.glow.bord || 8)) + '\\blur' + Math.max(0, Math.round(+sp.glow.blur || 8)) + wordAnimInner + '}' + gTxt + '\n'); // +18*S: kalibrasi bearing teks \pos vs estimator (terukur -27px @1080)
           }
           out.push('Dialogue: 0,' + fmtAss(ws) + ',' + fmtAss(we) + ',Default,,0,0,' + mv + ',,' + (subItalic ? '{\\i1}' : '') + line.trimEnd() + '\n');
         });
@@ -1268,7 +1282,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
       let groupTag = subAnimTag;
       if (sp.anim === 'slidepop') {
         const top = Math.max(0, OUT_H - mv - kTotal * lineH);
-        groupTag = '{\\move(' + CX + ',' + (top + Math.round(30 * S)) + ',' + CX + ',' + top + ',0,200)\\fscx85\\fscy85\\t(0,200,\\fscx100\\fscy100)}{\\fad(100,100)}';
+        groupTag = '{\\an8\\move(' + CX + ',' + (top + Math.round(30 * S)) + ',' + CX + ',' + top + ',0,200)\\fscx85\\fscy85\\t(0,200,\\fscx100\\fscy100)}{\\fad(100,100)}';
       }
       out.push('Dialogue: 0,' + fmtAss(gs) + ',' + fmtAss(ge) + ',Default,,0,0,' + mv + ',,' + (subItalic ? '{\\i1}' : '') + groupTag + rendered + '\n');
       // Chat: frasa sebelumnya tampil lebih kecil + memudar di atas.

@@ -1,5 +1,6 @@
 // Script VO Agent: server tanpa dependensi (Node 18+). API key hanya ada di server.
 const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), crypto = require('crypto'), { spawn } = require('child_process');
+const zlib = require('zlib');
 const refs = require('./refs');
 const clipperLib = require('./clipper-lib');
 let tts;
@@ -640,7 +641,7 @@ const clipPublic = job => ({
   sourceHeight: job.sourceHeight || 0, sourceUrl: job.sourceUrl || null,
   videoTitle: job.videoTitle, duration: job.duration, log: job.log, candidates: job.candidates,
   cues: job.cues || [],
-  renders: job.renders.map(r => ({ index: r.index, title: r.title, status: r.status, size: r.size || 0, plainSize: r.plainSize || 0, raw: !!r.raw, thumb: !!r.thumb, autoThumb: !!r.autoThumb, error: r.error || null })),
+  renders: job.renders.map(r => ({ index: r.index, title: r.title, status: r.status, size: r.size || 0, plainSize: r.plainSize || 0, raw: !!r.raw, thumb: !!r.thumb, autoThumb: !!r.autoThumb, error: r.error || null, hash: r.hash || null, assFile: r.assFile || null })),
 });
 // Tahap 1 — Input YouTube: ambil info (-J) + download video ke server, lalu tandai
 // sourceReady. Dipanggil endpoint /api/clipper/input. Video cuma disimpan sekali;
@@ -1660,7 +1661,12 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
       clipRender(job, selected, { hookEnabled: true, subtitle: true }).catch(() => {});
     }
   } catch (e) {
-    if (!job.cancelled) { job.status = 'error'; job.error = e.message || String(e); clipLog(job, 'Gagal: ' + job.error); clipNotifyFail(job); }
+    if (!job.cancelled) {
+      if (job.candidates && job.candidates.length && job.sourceReady) {
+        job.status = 'done';
+        clipLog(job, 'Analisis ulang gagal (' + (e.message || String(e)).slice(0, 120) + ') \u2014 hasil analisis sebelumnya tetap dipakai.');
+      } else { job.status = 'error'; job.error = e.message || String(e); clipLog(job, 'Gagal: ' + job.error); clipNotifyFail(job); }
+    }
   }
 }
 
@@ -1801,6 +1807,21 @@ async function clipFaceTrackSplit(job, sel, cand) {
   return null;
 }
 
+// Hook multi-hook: validasi + ubah waktu absolut (sumber) -> relatif ke
+// awal klip. Dipakai render (clipRender) + endpoint ASS pratinjau hook.
+function clipHookRel(cand, rawHook) {
+  const out = [];
+  for (const h of Array.isArray(rawHook) ? rawHook : []) {
+    if (!h || typeof h !== 'object') continue;
+    const hs = +h.start - cand.start, he = +h.end - cand.start;
+    if (!Number.isFinite(hs) || !Number.isFinite(he) || he - hs < 0.5 || he - hs > 2.5) continue;
+    if (hs < 0 || he > cand.end - cand.start) continue;
+    out.push({ start: Math.round(hs * 100) / 100, end: Math.round(he * 100) / 100, text: clipperLib.cleanTitle(h.text, 30) });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
 async function clipRender(job, selected, opts) {
   if (opts.podcast) clipLog(job, 'Mode Podcast aktif — crop penuh ke 9:16 (tanpa bar hitam/blur), fokus ' + Math.round((opts.focus == null ? 0.5 : opts.focus) * 100) + '%.');
   job.status = 'rendering'; job.phase = 'render'; job.progress = 0;
@@ -1935,17 +1956,15 @@ async function clipRender(job, selected, opts) {
     // disambung di depan klip utama. Frontend kirim sel.hook kalau toggle hook
     // ON; kalau tidak, pakai hook AI di kandidat (kalau ada). Waktu absolut
     // (sumber) -> relatif ke awal klip (cand.start) untuk buildAss + ffmpeg.
+    // Kontrak hook (22 Okt ronde-2): sel.hook === false ATAU cand.hookOn
+    // === false = hook DIMATIKAN buat klip ini (dulu: [] dari halaman jatuh
+    // ke fallback cand.hook -> centang proyek tidak berfungsi). Array =
+    // pakai apa adanya (kosong = tidak ada hook); undefined = fallback
+    // hook AI kandidat.
+    if (sel.hookOn !== undefined) cand.hookOn = !!sel.hookOn;
     let hookRel = [];
-    if (opts.hookEnabled !== false) {
-      const rawHook = Array.isArray(sel.hook) && sel.hook.length ? sel.hook : (cand.hook || []);
-      for (const h of rawHook) {
-        if (!h || typeof h !== 'object') continue;
-        const hs = +h.start - cand.start, he = +h.end - cand.start;
-        if (!Number.isFinite(hs) || !Number.isFinite(he) || he - hs < 0.5 || he - hs > 2.5) continue;
-        if (hs < 0 || he > cand.end - cand.start) continue;
-        hookRel.push({ start: Math.round(hs * 100) / 100, end: Math.round(he * 100) / 100, text: clipperLib.cleanTitle(h.text, 30) });
-        if (hookRel.length >= 3) break;
-      }
+    if (opts.hookEnabled !== false && sel.hook !== false && cand.hookOn !== false) {
+      hookRel = clipHookRel(cand, Array.isArray(sel.hook) ? sel.hook : (cand.hook || []));
     }
     // Sensor kata (Koreksi Kata): kata yang di-sensor di rentang klip ini ->
     // rentang bisu (waktu RELATIF output = relatif klip + hookTotal, karena
@@ -2003,6 +2022,7 @@ async function clipRender(job, selected, opts) {
     // polos beda kalau pakai tracking (_ft) vs fokus statis, biar cache tidak ketuker.
     let faceTrack = null;
     if ((opts.podcast || opts.gameplay) && opts.faceTrack !== false) faceTrack = await clipFaceTrack(job, sel, cand);
+    else if ((opts.podcast || opts.gameplay) && done === 0) clipLog(job, 'Face tracking NONAKTIF (centang \u{1F3AF} Auto face tracking di Pengaturan Proyek mati) \u2014 crop pakai fokus statis.');
     // Face tracking Split (checkbox ON): 2 track (kiri + kanan) per klip.
     // Gagal / tidak ada 2 wajah -> null -> fallback belah dua tetap.
     let splitTrack = null;
@@ -2239,6 +2259,17 @@ async function clipRender(job, selected, opts) {
       }
       if (!r || r.code !== 0 || !fs.existsSync(outFile)) throw new Error('ffmpeg gagal: ' + clipFfmpegError(r ? r.stderr : ''));
       rec.status = 'done'; rec.size = fs.statSync(outFile).size;
+      // Versi render (brief F, 22 Okt): hash dari isi ASS final + mode +
+      // kualitas. ASS versi ini disimpan permanen (clip_<i>_<hash>.ass) dan
+      // hash masuk nama + URL unduhan -> tidak ada unduhan versi lama.
+      try {
+        if (srtPath && fs.existsSync(srtPath)) {
+          rec.hash = crypto.createHash('sha1').update(fs.readFileSync(srtPath)).update(String(effMode || '') + '|' + String(quality || '')).digest('hex').slice(0, 10);
+          const vAss = path.join(job.dir, 'clip_' + sel.index + '_' + rec.hash + '.ass');
+          if (!fs.existsSync(vAss)) fs.copyFileSync(srtPath, vAss);
+          rec.assFile = path.basename(vAss);
+        }
+      } catch {}
       // Thumbnail otomatis dari video FINAL (dengan overlay terbakar): kartu
       // menampilkan wajah terang + kartu judul + subtitle — persis Klipaja.
       // Gagal bikin thumbnail -> render tetap sukses (thumbnail bukan
@@ -2261,14 +2292,45 @@ async function clipRender(job, selected, opts) {
 }
 // Muat ulang proyek Clipper yang tersimpan di disk (dari deploy/restart sebelumnya).
 clipRestoreJobs();
+// Preview ringan (lite): salinan 360p video klip buat editor di HP —
+// unduhan jauh lebih kecil + mulai putar jauh lebih cepat. Dibuat
+// on-demand sekali, disimpan di samping file asli; basi bila asli lebih
+// baru. Gagal buat -> pemanggil tetap pakai file asli.
+const clipLiteInflight = new Map();
+function clipEnsureLite(srcFile) {
+  const liteFile = srcFile.replace(/\.mp4$/i, '') + '_lite.mp4';
+  let stale = true;
+  try { stale = !fs.existsSync(liteFile) || fs.statSync(liteFile).mtimeMs < fs.statSync(srcFile).mtimeMs; } catch { stale = true; }
+  if (!stale) return Promise.resolve(liteFile);
+  if (clipLiteInflight.has(liteFile)) return clipLiteInflight.get(liteFile);
+  const pr = new Promise((resolve) => {
+    const tmp = liteFile + '.tmp.mp4';
+    let ff;
+    try { ff = spawn('ffmpeg', ['-y', '-i', srcFile, '-vf', 'scale=360:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart', tmp], { windowsHide: true }); }
+    catch { clipLiteInflight.delete(liteFile); return resolve(null); }
+    let done = false;
+    const fin = (ok) => { if (done) return; done = true; clipLiteInflight.delete(liteFile); try { if (ok) fs.renameSync(tmp, liteFile); else if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch {} resolve(ok && fs.existsSync(liteFile) ? liteFile : null); };
+    ff.on('error', () => fin(false));
+    ff.on('close', (code) => fin(code === 0 && fs.existsSync(tmp)));
+    setTimeout(() => { try { ff.kill(); } catch {} fin(false); }, 120000);
+  });
+  clipLiteInflight.set(liteFile, pr);
+  return pr;
+}
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'), p = u.pathname;
   // no-cache: browser WAJIB revalidasi HTML tiap muat — tanpa ini heuristik
   // cache browser menyajikan index.html LAMA setelah deploy (UI "nyangkut"
   // sampai refresh manual; keluhan Dzaky 20 Okt).
-  const serve = (f, type) => fs.createReadStream(path.join(__dirname, 'public', f))
-    .on('open', () => res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' }))
-    .on('error', () => { res.writeHead(404); res.end('Tidak ditemukan'); }).pipe(res);
+  const serve = (f, type) => {
+    // Gzip teks (HTML 430KB -> ~125KB): di jaringan HP Dzaky yang lambat,
+    // ini yang bikin halaman terasa "ngedownload" tiap dibuka.
+    const gz = /^(text\/|application\/(json|javascript))/.test(type) && /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+    const st = fs.createReadStream(path.join(__dirname, 'public', f));
+    st.on('open', () => res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache', ...(gz ? { 'content-encoding': 'gzip', 'vary': 'accept-encoding' } : {}) }));
+    st.on('error', () => { if (!res.headersSent) res.writeHead(404); res.end('Tidak ditemukan'); });
+    return gz ? st.pipe(zlib.createGzip()).pipe(res) : st.pipe(res);
+  };
   // Login & logout selalu terbuka
   if (req.method === 'POST' && p === '/api/login') {
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e4) break; }
@@ -2593,7 +2655,33 @@ const server = http.createServer(async (req, res) => {
     let fname = '';
     try { fname = decodeURIComponent(p.slice('/fonts/'.length)); } catch { fname = ''; }
     if (!fname || fname !== path.basename(fname) || !/\.(ttf|otf)$/i.test(fname)) { res.writeHead(404); return res.end('Tidak ditemukan'); }
-    return serve('fonts/' + fname, 'font/ttf');
+    fs.readFile(path.join(__dirname, 'public', 'fonts', fname), (err, buf) => {
+      if (err) { res.writeHead(404); return res.end('Tidak ditemukan'); }
+      res.writeHead(200, { 'content-type': 'font/ttf', 'cache-control': 'public, max-age=2592000', 'content-length': buf.length });
+      return res.end(req.method === 'HEAD' ? undefined : buf);
+    });
+    return;
+  }
+  // Aset vendor (JASSUB/libass-wasm) untuk preview editor: GET /vendor/<path>
+  // — hanya dari public/vendor, guard traversal, tipe per ekstensi.
+  // (22 Okt: rute ini belum ada -> /vendor/* selalu 404 walau file ada.)
+  if ((req.method === 'GET' || req.method === 'HEAD') && p.startsWith('/vendor/')) {
+    let rel = '';
+    try { rel = decodeURIComponent(p.slice('/vendor/'.length)); } catch { rel = ''; }
+    const base = path.join(__dirname, 'public', 'vendor');
+    const fp = path.join(base, rel);
+    const VTYPES = { '.js': 'text/javascript; charset=utf-8', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.css': 'text/css; charset=utf-8', '.json': 'application/json' };
+    const vtype = VTYPES[path.extname(fp).toLowerCase()];
+    if (!rel || !vtype || !fp.startsWith(base + path.sep)) { res.writeHead(404); return res.end('Tidak ditemukan'); }
+    // Cache keras: URL mesin berversi (?v=N di halaman) — aman disimpan
+    // peramban setahun penuh. Tanpa ini, HP mengunduh ulang 2,3MB mesin
+    // tiap buka editor -> start worker/wasm bisa >30 dtk di 4G (timeout).
+    fs.readFile(fp, (err, buf) => {
+      if (err) { res.writeHead(404); return res.end('Tidak ditemukan'); }
+      res.writeHead(200, { 'content-type': vtype, 'cache-control': 'public, max-age=31536000, immutable', 'content-length': buf.length });
+      return res.end(req.method === 'HEAD' ? undefined : buf);
+    });
+    return;
   }
   if (req.method === 'GET' && p === '/api/health') {
     const direct = Object.fromEntries(Object.keys(KEY).map(k => {
@@ -2940,8 +3028,17 @@ const server = http.createServer(async (req, res) => {
     try { if (job.aiCtrl) job.aiCtrl.abort(); } catch {}
     try { if (job.abortCtrl) job.abortCtrl.abort(); } catch {}
     if (job.status === 'running' || job.status === 'rendering') {
-      job.status = 'error'; job.error = 'Dihentikan oleh pengguna';
-      clipLog(job, 'Dihentikan oleh pengguna.');
+      // Proyek yang SUDAH punya hasil analisis (kandidat + sumber siap) tidak
+      // boleh diracuni stop analisis-ulang: status kembali 'done' agar render
+      // tetap jalan dengan hasil sebelumnya (kasus 22 Okt: stop Whisper lokal
+      // bikin semua render mental 409 'Analisis belum selesai').
+      if (job.candidates && job.candidates.length && job.sourceReady) {
+        job.status = 'done'; job.error = null;
+        clipLog(job, 'Proses dihentikan \u2014 hasil analisis sebelumnya tetap dipakai (proyek kembali Siap).');
+      } else {
+        job.status = 'error'; job.error = 'Dihentikan oleh pengguna';
+        clipLog(job, 'Dihentikan oleh pengguna.');
+      }
     }
     return send(res, 200, { ok: true });
   }
@@ -3276,7 +3373,7 @@ const server = http.createServer(async (req, res) => {
     // download=1 -> download video sumber FULL (attachment), bukan preview streaming.
     const dl = u.searchParams.get('download') === '1';
     const dlName = 'sumber-' + (job.videoTitle || 'video').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.' + ext;
-    res.writeHead(status, { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': end - start + 1, ...(status === 206 ? { 'content-range': 'bytes ' + start + '-' + end + '/' + size } : {}), ...(dl ? { 'content-disposition': 'attachment; filename="' + dlName + '"' } : {}) });
+    res.writeHead(status, { 'content-type': type, 'accept-ranges': 'bytes', 'cache-control': 'private, max-age=3600', 'content-length': end - start + 1, ...(status === 206 ? { 'content-range': 'bytes ' + start + '-' + end + '/' + size } : {}), ...(dl ? { 'content-disposition': 'attachment; filename="' + dlName + '"' } : {}) });
     const stream = fs.createReadStream(file, { start, end });
     stream.on('error', () => { try { res.end(); } catch {} });
     stream.pipe(res);
@@ -3293,15 +3390,17 @@ const server = http.createServer(async (req, res) => {
     // (judul/subtitle/CTA yang sedang diedit) tidak tampil ganda di atas teks
     // yang sudah terbakar. Default: preview video berjudul (hasil render).
     const plain = u.searchParams.get('plain') === '1';
-    const file = plain && rec.plainFile
+    let file = plain && rec.plainFile
       ? path.join(job.dir, path.basename(rec.plainFile))
       : path.join(job.dir, 'clip_' + idx + '.mp4');
     if (!fs.existsSync(file)) return send(res, 404, { error: 'File klip tidak ditemukan (mungkin sudah dibersihkan).' });
+    // lite=1 → salinan 360p (on-demand, sekali buat); gagal -> file asli.
+    if (u.searchParams.get('lite') === '1') { const lf = await clipEnsureLite(file); if (lf) file = lf; }
     const size = fs.statSync(file).size;
     let start = 0, end = size - 1, status = 200;
     const m = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
     if (m) { start = m[1] ? Math.min(+m[1], size - 1) : 0; end = m[2] ? Math.min(+m[2], size - 1) : size - 1; status = 206; }
-    res.writeHead(status, { 'content-type': 'video/mp4', 'accept-ranges': 'bytes', 'content-length': end - start + 1, ...(status === 206 ? { 'content-range': 'bytes ' + start + '-' + end + '/' + size } : {}) });
+    res.writeHead(status, { 'content-type': 'video/mp4', 'accept-ranges': 'bytes', 'cache-control': 'private, max-age=3600', 'content-length': end - start + 1, ...(status === 206 ? { 'content-range': 'bytes ' + start + '-' + end + '/' + size } : {}) });
     const stream = fs.createReadStream(file, { start, end });
     stream.on('error', () => { try { res.end(); } catch {} });
     stream.pipe(res);
@@ -3344,6 +3443,78 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-cache' });
     fs.createReadStream(thumbFile).pipe(res); return;
   }
+  // Spek preset tunggal (brief A): presets.json di root app dibaca halaman
+  // (grid preset) + lib (generator ASS) — satu sumber kebenaran gaya.
+  if (req.method === 'GET' && p === '/presets.json') {
+    const fp = path.join(__dirname, 'presets.json');
+    if (!fs.existsSync(fp)) return send(res, 404, { error: 'presets.json tidak ditemukan' });
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-cache' });
+    fs.createReadStream(fp).pipe(res);
+    return;
+  }
+  // ASS preview editor (brief C): bangun .ass dengan generator yang SAMA
+  // persis dengan render (clipperLib.buildAss) dari setting editor saat ini
+  // (body.sel = field yang sama dengan body render). Murni baca — kandidat
+  // dan job TIDAK diubah. Mode utama: tanpa hook (garis waktu klip utama).
+  // body.hookMode === 'hook' (22 Okt ronde-2): trek KHUSUS hook — event
+  // Hook di waktu sumbernya (hookAtSource) — pemutar editor memutar
+  // potongan hook dari video polos lalu beralih ke trek utama.
+  if (req.method === 'POST' && p === '/api/clipper/ass') {
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e5) break; }
+    let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
+    const job = clipperJobs.get(String(b.jobId || ''));
+    if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    const cand = (job.candidates || []).find(c => c.index === +b.clip);
+    if (!cand) return send(res, 404, { error: 'Klip tidak ditemukan' });
+    const sel = (b.sel && typeof b.sel === 'object') ? b.sel : {};
+    const hexOrU = (v) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : undefined;
+    const numU = (v) => Number.isFinite(+v) && v !== undefined && v !== null ? +v : undefined;
+    const title = String(sel.title !== undefined ? sel.title : (cand.title || '')).trim();
+    const showTitle = sel.showTitle !== undefined ? !!sel.showTitle : (cand.showTitle !== undefined ? !!cand.showTitle : true);
+    const showSub = sel.showSub !== undefined ? !!sel.showSub : true;
+    const subPreset = String(sel.subPreset || cand.subPreset || 'default');
+    const hookPreset = String(sel.hookPreset || cand.hookPreset || 'kartu');
+    const mode = String(sel.mode || cand.mode || '');
+    const ass = clipperLib.buildAss(job.cues || [], cand.start, cand.end, {}, {
+      title, titleColor1: hexOrU(sel.titleColor1) !== undefined ? hexOrU(sel.titleColor1) : hexOrU(cand.titleColor1),
+      titleColor2: undefined,
+      titleCardColor: hexOrU(sel.titleCardColor) !== undefined ? hexOrU(sel.titleCardColor) : hexOrU(cand.titleCardColor),
+      titleYPercent: numU(sel.titleYPercent) !== undefined ? numU(sel.titleYPercent) : (numU(cand.titleYPercent) !== undefined ? numU(cand.titleYPercent) : 56),
+      titleSizePercent: numU(sel.titleSizePercent) !== undefined ? numU(sel.titleSizePercent) : numU(cand.titleSizePercent),
+      subYPercent: numU(sel.subYPercent) !== undefined ? numU(sel.subYPercent) : (numU(cand.subYPercent) !== undefined ? numU(cand.subYPercent) : 70),
+      subSizePercent: numU(sel.subSizePercent) !== undefined ? numU(sel.subSizePercent) : numU(cand.subSizePercent),
+      subCenterY: (mode === 'split' && sel.subYPercent === undefined && cand.subYPercent === undefined) ? 960
+        : (mode === 'gameplay' && sel.subYPercent === undefined && cand.subYPercent === undefined) ? clipperLib.gameplayTopH(1920) : undefined,
+      showTitle, showSub, subPreset, hookPreset,
+      subFontPick: clipperLib.clipFontOk(sel.subFont || cand.subFont || '') || undefined,
+      titleFontPick: clipperLib.clipFontOk(sel.titleFont || cand.titleFont || '') || undefined,
+      titleDur: ['default', 'full', 'manual'].includes(String(sel.titleDur || '')) ? String(sel.titleDur) : (cand.titleDur || 'default'),
+      titleDurSec: numU(sel.titleDurSec) !== undefined ? numU(sel.titleDurSec) : (numU(cand.titleDurSec) !== undefined ? numU(cand.titleDurSec) : 4),
+      kertasFont: sel.kertasFont || cand.kertasFont, kertasTextColor: hexOrU(sel.kertasTextColor) || hexOrU(cand.kertasTextColor),
+      kertasPaperColor: hexOrU(sel.kertasPaperColor) || hexOrU(cand.kertasPaperColor),
+      kertasHighlightColor: hexOrU(sel.kertasHighlightColor) || hexOrU(cand.kertasHighlightColor),
+      pillColor: hexOrU(sel.pillColor) || hexOrU(cand.pillColor),
+      kinetikTextColor: hexOrU(sel.kinetikTextColor) || hexOrU(cand.kinetikTextColor),
+      kinetikBigColor: hexOrU(sel.kinetikBigColor) || hexOrU(cand.kinetikBigColor),
+      titleAnim: sel.titleAnim !== undefined ? !!sel.titleAnim : (cand.titleAnim !== undefined ? !!cand.titleAnim : undefined),
+      watermark: (sel.watermark && sel.watermark.enabled && sel.watermark.text) ? { text: String(sel.watermark.text), pos: String(sel.watermark.pos || 'bl') } : null,
+      cta: { enabled: false },
+      hook: [],
+    });
+    if (b.hookMode === 'hook') {
+      const rawHook = (sel.hook === false || cand.hookOn === false) ? [] : (Array.isArray(sel.hook) ? sel.hook : (cand.hook || []));
+      const assHook = clipperLib.buildAss([], cand.start, cand.end, {}, {
+        title: '', showTitle: false, showSub: false,
+        hook: clipHookRel(cand, rawHook), hookAtSource: true,
+      });
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(assHook || '');
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(ass || '');
+    return;
+  }
   if (req.method === 'GET' && p === '/api/clipper/download') {
     const job = clipperJobs.get(u.searchParams.get('id') || '');
     const idx = +u.searchParams.get('clip');
@@ -3363,8 +3534,8 @@ const server = http.createServer(async (req, res) => {
       ? path.join(job.dir, path.basename(rec.plainFile))
       : path.join(job.dir, 'clip_' + idx + '.mp4');
     if (!fs.existsSync(file)) return send(res, 404, { error: 'File klip tidak ditemukan (mungkin sudah dibersihkan).' });
-    const name = 'clipper-' + idx + '-' + (plain ? 'polos-' : '') + (job.videoTitle || 'video').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.mp4';
-    res.writeHead(200, { 'content-type': 'video/mp4', 'content-disposition': 'attachment; filename="' + name + '"' });
+    const name = 'clipper-' + idx + '-' + (plain ? 'polos-' : '') + (!plain && rec.hash ? rec.hash + '-' : '') + (job.videoTitle || 'video').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.mp4';
+    res.writeHead(200, { 'content-type': 'video/mp4', 'content-disposition': 'attachment; filename="' + name + '"', 'cache-control': 'no-store' });
     const stream = fs.createReadStream(file);
     stream.on('error', () => { try { res.end(); } catch {} });
     // Sumber TIDAK dihapus pas download (sebelumnya res.on('finish') hapus source
@@ -3432,4 +3603,4 @@ const server = http.createServer(async (req, res) => {
 });
 if (require.main === module) server.listen(PORT, () => console.log('Script VO Agent berjalan di http://localhost:' + PORT));
 // Ekspor helper (untuk tes unit): require() tidak menyalakan server.
-module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan };
+module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan };
