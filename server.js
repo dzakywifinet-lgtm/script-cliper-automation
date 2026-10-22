@@ -641,7 +641,7 @@ const clipPublic = job => ({
   sourceHeight: job.sourceHeight || 0, sourceUrl: job.sourceUrl || null,
   videoTitle: job.videoTitle, duration: job.duration, log: job.log, candidates: job.candidates,
   cues: job.cues || [],
-  renders: job.renders.map(r => ({ index: r.index, title: r.title, status: r.status, size: r.size || 0, plainSize: r.plainSize || 0, raw: !!r.raw, thumb: !!r.thumb, autoThumb: !!r.autoThumb, error: r.error || null, hash: r.hash || null, assFile: r.assFile || null })),
+  renders: job.renders.map(r => ({ index: r.index, title: r.title, status: r.status, size: r.size || 0, plainSize: r.plainSize || 0, raw: !!r.raw, thumb: !!r.thumb, autoThumb: !!r.autoThumb, cover: !!r.cover, error: r.error || null, hash: r.hash || null, assFile: r.assFile || null })),
 });
 // Tahap 1 — Input YouTube: ambil info (-J) + download video ke server, lalu tandai
 // sourceReady. Dipanggil endpoint /api/clipper/input. Video cuma disimpan sekali;
@@ -921,6 +921,35 @@ async function clipMakeThumb(job, sel, videoFile, offset, clipLen, outName) {
     try { fs.copyFileSync(best.file, outPath); } catch { return null; }
     try { fs.unlinkSync(best.file); } catch {}
     return outPath;
+  } catch { return null; }
+}
+// Poster COVER per klip (Fase 2 — gaya ClipperStudio Smart Cover): frame
+// dari video POLOS di detik pilihan user (cand.coverAt) + teks cover besar
+// (clipperLib.buildCoverAss) dibakar via libass -> cover_<idx>.jpg di job.dir.
+// Gagal -> null (tidak pernah menggagalkan render).
+async function clipMakeCover(job, cand) {
+  try {
+    const rec = (job.renders || []).find(r => r.index === cand.index);
+    const plain = rec && rec.plainFile ? path.join(job.dir, path.basename(rec.plainFile)) : null;
+    const finalF = path.join(job.dir, 'clip_' + cand.index + '.mp4');
+    const src = plain && fs.existsSync(plain) ? plain : (fs.existsSync(finalF) ? finalF : null);
+    if (!src) return null;
+    const len = Math.max(0.2, (cand.end || 0) - (cand.start || 0));
+    const at = Math.min(Math.max(0, len - 0.1), Math.max(0, Number.isFinite(+cand.coverAt) ? +cand.coverAt : Math.min(2, len * 0.3)));
+    const text = String(cand.coverText || cand.title || '').trim();
+    if (!text) return null;
+    const tmpFrame = path.join(os.tmpdir(), 'clipcover-' + job.id + '-' + cand.index + '.jpg');
+    const assFile = path.join(job.dir, 'cover_' + cand.index + '.ass');
+    fs.writeFileSync(assFile, clipperLib.buildCoverAss(text));
+    const ex = await clipRun('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-ss', String(at), '-i', src, '-frames:v', '1', '-q:v', '3', '-y', tmpFrame], { timeout: 60000 });
+    if (ex.code !== 0 || !fs.existsSync(tmpFrame)) return null;
+    const out = path.join(job.dir, 'cover_' + cand.index + '.jpg');
+    const vf = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,ass='" + clipperLib.ffmpegFilterPath(assFile) + "':fontsdir='" + clipperLib.ffmpegFilterPath(clipFontsDir()) + "'";
+    const ex2 = await clipRun('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', tmpFrame, '-vf', vf, '-frames:v', '1', '-q:v', '3', '-y', out], { timeout: 60000 });
+    try { fs.unlinkSync(tmpFrame); } catch {}
+    if (ex2.code !== 0 || !fs.existsSync(out)) return null;
+    if (rec) { rec.cover = true; clipSaveJob(job); }
+    return out;
   } catch { return null; }
 }
 // Transkrip otomatis (Whisper, lokal) via whisper-transcribe.py — dipakai saat
@@ -1584,8 +1613,9 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
           + 'Video: "' + job.videoTitle + '" (durasi ' + Math.round(job.duration) + ' detik).\n'
           + 'Transkrip segmen [' + ch.start.toFixed(0) + 's - ' + ch.end.toFixed(0) + 's]:\n' + ch.text.slice(0, 12000) + '\n\n'
           + 'Tugas: cari ' + count + ' momen paling wah (mengejutkan, lucu, emosional, kontroversial, atau bikin penasaran) untuk klip durasi sekitar ' + targetDur + ' detik.\n'
-          + 'Balas HANYA JSON array (tanpa markdown, tanpa penjelasan): [{"start":detik,"end":detik,"title":"Judul hook singkat maks 60 karakter","score":0-100,"reason":"satu kalimat","hook":[{"start":detik,"end":detik,"text":"TEKS 2-5 KATA"}],"caption":"1-2 kalimat caption siap posting tanpa hashtag","hashtags":["#tag1","#tag2"]}]\n'
+          + 'Balas HANYA JSON array (tanpa markdown, tanpa penjelasan): [{"start":detik,"end":detik,"title":"Judul hook singkat maks 60 karakter","score":0-100,"reason":"satu kalimat","hook":[{"start":detik,"end":detik,"text":"TEKS 2-5 KATA"}],"caption":"1-2 kalimat caption siap posting tanpa hashtag","hashtags":["#tag1","#tag2"],"hookDur":"full"}]\n'
           + 'Caption + hashtag per kandidat (gaya Klipaja): caption 1-2 kalimat siap posting (tanpa hashtag, maks 200 karakter, nyambung sama momen klip itu), hashtags 3-5 hashtag relevan (diawali #).\n'
+        + 'hookDur: "full" bila judul hook-nya layak tampil SEPANJANG klip (momen padat/klip pendek), "short" bila cukup tampil sebentar di awal.\n'
           + 'Hook multi-hook (WAJIB, gaya Hook V2): untuk TIAP kandidat, pilih 2–3 potongan pendek (0,5–2 detik) dari momen paling mencolok/kontroversial/emosional DI DALAM kandidat itu (start/end hook HARUS di dalam start/end kandidat), diurutkan dari paling kuat ke paling lemah, masing-masing dengan teks on-screen singkat 2–5 kata (huruf besar).\n'
           + aiNoteTxt
           + 'Aturan: start/end angka detik (start >= ' + Math.floor(ch.start) + ', end <= ' + Math.ceil(ch.end) + '), end-start ' + targetDur + ' detik (boleh 10 s/d ' + (targetDur + 30) + '), jangan tumpang tindih berat antar kandidat.';
@@ -1597,8 +1627,9 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
         + 'Video: "' + job.videoTitle + '" oleh ' + (job.metaUploader || '-') + ' (durasi ' + Math.round(job.duration) + ' detik).\n'
         + (desc ? 'Deskripsi: ' + desc + '\n' : '')
         + 'Tugas: bagi video menjadi ' + count + ' kandidat klip durasi sekitar ' + targetDur + ' detik yang tersebar merata (awal, tengah, akhir), karena momen spesifik tidak bisa diketahui tanpa transkrip.\n'
-        + 'Balas HANYA JSON array (tanpa markdown, tanpa penjelasan): [{"start":detik,"end":detik,"title":"Judul hook singkat maks 60 karakter","score":0-100,"reason":"satu kalimat","hook":[{"start":detik,"end":detik,"text":"TEKS 2-5 KATA"}],"caption":"1-2 kalimat caption siap posting tanpa hashtag","hashtags":["#tag1","#tag2"]}]\n'
+        + 'Balas HANYA JSON array (tanpa markdown, tanpa penjelasan): [{"start":detik,"end":detik,"title":"Judul hook singkat maks 60 karakter","score":0-100,"reason":"satu kalimat","hook":[{"start":detik,"end":detik,"text":"TEKS 2-5 KATA"}],"caption":"1-2 kalimat caption siap posting tanpa hashtag","hashtags":["#tag1","#tag2"],"hookDur":"full"}]\n'
         + 'Caption + hashtag per kandidat (gaya Klipaja): caption 1-2 kalimat siap posting (tanpa hashtag, maks 200 karakter), hashtags 3-5 hashtag relevan (diawali #).\n'
+        + 'hookDur: "full" bila judul hook-nya layak tampil SEPANJANG klip (momen padat/klip pendek), "short" bila cukup tampil sebentar di awal.\n'
         + 'Hook multi-hook: untuk TIAP kandidat, isi 2–3 potongan pendek (0,5–2 detik) DI DALAM kandidat itu (start/end hook HARUS di dalam start/end kandidat, tersebar di awal/tengah/akhir kandidat), masing-masing dengan teks on-screen singkat 2–5 kata (huruf besar).\n'
         + aiNoteTxt
         + 'Aturan: start/end angka detik dalam 0 s/d ' + Math.round(job.duration) + ', end-start ' + targetDur + ' detik (boleh 10 s/d ' + (targetDur + 30) + '), jangan tumpang tindih berat.' });
@@ -1871,8 +1902,11 @@ async function clipRender(job, selected, opts) {
     const subPreset = sel.subPreset !== undefined ? String(sel.subPreset || 'default') : (cand.subPreset || 'default');
     const hookPreset = sel.hookPreset !== undefined ? String(sel.hookPreset || 'kartu') : (cand.hookPreset || job.hookPreset || 'kartu');
     // Durasi judul (Detail): sel > tersimpan di kandidat > default (4 detik).
-    if (sel.titleDur !== undefined && ['default', 'full', 'manual'].includes(String(sel.titleDur))) cand.titleDur = String(sel.titleDur);
+    if (sel.titleDur !== undefined && ['default', 'full', 'manual', '5s', 'auto'].includes(String(sel.titleDur))) cand.titleDur = String(sel.titleDur);
     if (sel.titleDurSec !== undefined && Number.isFinite(+sel.titleDurSec)) cand.titleDurSec = Math.min(120, Math.max(0.5, +sel.titleDurSec));
+    // Cover per-klip (Fase 2): teks cover + detik frame pilihan user.
+    if (sel.coverText !== undefined) cand.coverText = String(sel.coverText || '').slice(0, 90);
+    if (sel.coverAt !== undefined && Number.isFinite(+sel.coverAt)) cand.coverAt = Math.max(0, +sel.coverAt);
     const titleDur = sel.titleDur !== undefined ? String(sel.titleDur) : (cand.titleDur || 'default');
     const titleDurSec = sel.titleDurSec !== undefined ? +sel.titleDurSec : (cand.titleDurSec || 4);
     // Posisi/ukuran judul & subtitle per-klip (Detail, slider persen Klipaja)
@@ -2074,7 +2108,7 @@ async function clipRender(job, selected, opts) {
           subPreset, hookPreset, // preset Gaya Subtitle / Judul Hook (Detail) — buildAss override gaya
           subFontPick: clipperLib.clipFontOk(sel.subFont || cand.subFont || '') || undefined, // font per-klip (Edit) > preset > global
           titleFontPick: clipperLib.clipFontOk(sel.titleFont || cand.titleFont || '') || undefined,
-          titleDur, titleDurSec, // durasi judul (Detail): default 4 detik / full / manual
+          titleDur, titleDurSec, hookDurAi: cand.hookDurAi, // durasi judul (Detail): default 4 detik / full / manual / 5s / auto (saran AI)
           // Setting per-preset (Edit): Kertas font + 3 warna, Pill warna,
           // Kinetik 2 warna, toggle Animasi judul, Watermark (tab Video).
           kertasFont, kertasTextColor, kertasPaperColor, kertasHighlightColor,
@@ -3114,6 +3148,8 @@ const server = http.createServer(async (req, res) => {
       watermark: s.watermark, music: s.music,
       // Durasi judul (Detail): default 4 detik / full / manual (detik).
       titleDur: s.titleDur, titleDurSec: s.titleDurSec,
+      // Cover per-klip (Fase 2, tab Cover di Edit): teks + detik frame.
+      coverText: s.coverText, coverAt: s.coverAt,
       // Posisi/ukuran judul & subtitle per-klip (Detail, slider persen Klipaja)
       // + warna teks/kartu judul per-klip (picker Warna teks / Warna kartu).
       titleYPercent: s.titleYPercent, titleSizePercent: s.titleSizePercent,
@@ -3419,6 +3455,12 @@ const server = http.createServer(async (req, res) => {
     // exception yang membunuh server (handler async tanpa try/catch = crash).
     if (!job || job.user !== sessUser(req) || !job.dir) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
     const cand = (job.candidates || []).find(c => c.index === idx);
+    if (u.searchParams.get('cover') === '1') {
+      const cf = path.join(job.dir, 'cover_' + idx + '.jpg');
+      if (!fs.existsSync(cf)) return send(res, 404, { error: 'Cover belum dibuat (Edit klip > tab Cover).' });
+      res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-cache' });
+      fs.createReadStream(cf).pipe(res); return;
+    }
     // raw=1 -> thumbnail dari video POLOS (tanpa teks ter-bake), poster
     // kartu Detail/editor (model Klipaja: editor = RAW + overlay HTML).
     // Tanpa raw -> thumbnail Final (berteks), dipakai Library.
@@ -3488,7 +3530,8 @@ const server = http.createServer(async (req, res) => {
       showTitle, showSub, subPreset, hookPreset,
       subFontPick: clipperLib.clipFontOk(sel.subFont || cand.subFont || '') || undefined,
       titleFontPick: clipperLib.clipFontOk(sel.titleFont || cand.titleFont || '') || undefined,
-      titleDur: ['default', 'full', 'manual'].includes(String(sel.titleDur || '')) ? String(sel.titleDur) : (cand.titleDur || 'default'),
+      titleDur: ['default', 'full', 'manual', '5s', 'auto'].includes(String(sel.titleDur || '')) ? String(sel.titleDur) : (cand.titleDur || 'default'),
+      hookDurAi: cand.hookDurAi,
       titleDurSec: numU(sel.titleDurSec) !== undefined ? numU(sel.titleDurSec) : (numU(cand.titleDurSec) !== undefined ? numU(cand.titleDurSec) : 4),
       kertasFont: sel.kertasFont || cand.kertasFont, kertasTextColor: hexOrU(sel.kertasTextColor) || hexOrU(cand.kertasTextColor),
       kertasPaperColor: hexOrU(sel.kertasPaperColor) || hexOrU(cand.kertasPaperColor),
@@ -3543,6 +3586,20 @@ const server = http.createServer(async (req, res) => {
     // "Video sumber sudah dihapus"). Sumber hanya terhapus pas hapus proyek.
     stream.pipe(res);
     return;
+  }
+  if (req.method === 'POST' && p === '/api/clipper/cover') {
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e5) break; }
+    let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
+    const job = clipperJobs.get(String(b.jobId || b.id || ''));
+    if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    const cand = (job.candidates || []).find(c => c.index === +b.clip);
+    if (!cand) return send(res, 404, { error: 'Klip tidak ditemukan.' });
+    if (b.coverText !== undefined) cand.coverText = String(b.coverText || '').slice(0, 90);
+    if (b.coverAt !== undefined && Number.isFinite(+b.coverAt)) cand.coverAt = Math.max(0, +b.coverAt);
+    clipSaveJob(job);
+    const out = await clipMakeCover(job, cand);
+    if (!out) return send(res, 422, { error: 'Poster cover gagal dibuat (video polos/final klip ini belum ada).' });
+    return send(res, 200, { ok: true, cover: true });
   }
   if (req.method === 'POST' && p === '/api/clipper/cleanup') {
     const user = sessUser(req);

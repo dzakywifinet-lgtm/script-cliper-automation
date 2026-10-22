@@ -2095,6 +2095,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     const clipDur = Math.max(0.1, ((cand.end || 0) - (cand.start || 0)));
     if (cand.titleDur === 'full') return Infinity;
     if (cand.titleDur === 'manual') return Math.min(clipDur, Math.max(0.5, +cand.titleDurSec || 4));
+    if (cand.titleDur === '5s') return Math.min(clipDur, 5);
+    if (cand.titleDur === 'auto') { // cermin resolveTitleDurMode (clipper-lib)
+      if (cand.hookDurAi === 'full') return Infinity;
+      if (cand.hookDurAi === 'short') return Math.min(clipDur, 4);
+      return clipDur <= 35 ? Infinity : Math.min(clipDur, 4);
+    }
     return Math.min(clipDur, 4);
   }
   // Strip tanda baca akhir kata untuk TAMPILAN (cermin stripDisplayPunct di clipper-lib.js).
@@ -2917,6 +2923,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       titleAnim: c.titleAnim !== undefined ? !!c.titleAnim : undefined,
       watermark: { enabled: !!c.watermarkEnabled, text: c.watermarkText || '', pos: c.watermarkPos || 'bl' },
       titleDur: c.titleDur || 'default', titleDurSec: c.titleDurSec !== undefined ? +c.titleDurSec : 4,
+      coverText: c.coverText || '', coverAt: c.coverAt !== undefined ? +c.coverAt : undefined,
       titleYPercent: c.titleYPercent !== undefined ? +c.titleYPercent : 56, titleSizePercent: c.titleSizePercent !== undefined ? +c.titleSizePercent : undefined,
       titleColor1: c.titleColor1, titleCardColor: c.titleCardColor,
       subYPercent: c.subYPercent !== undefined ? +c.subYPercent : 70, subSizePercent: c.subSizePercent !== undefined ? +c.subSizePercent : undefined,
@@ -3090,6 +3097,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     const titleColor1 = cand.titleColor1 || (CLIP_HOOK_PRESETS[cand.hookPreset || 'kartu'] || {}).color1 || '#FFFFFF';
     const titleCardColor = cand.titleCardColor || (CLIP_HOOK_PRESETS[cand.hookPreset || 'kartu'] || {}).boxColor || '#FFFFFF';
     const subYPercent = cand.subYPercent !== undefined ? +cand.subYPercent : 70;
+    const coverAt0 = cand.coverAt !== undefined ? +cand.coverAt : Math.round(Math.min(2, Math.max(0.1, (cand.end - cand.start)) * 0.3) * 10) / 10;
     const subSizePercent = cand.subSizePercent !== undefined ? +cand.subSizePercent : 100;
     // Kartu preset (gaya referensi): klik -> simpan id ke kandidat + set preview.
     // Subtitle pakai mini-preview "AKU BISA" (latar hitam); judul cuma teks
@@ -3114,16 +3122,18 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '</div>'
       // KANAN: panel tab (plek ketiplek editor referensi) — bisa digulir atas-bawah
       + '<div class="clip-tpl-panel" style="flex:1 1 280px;min-width:260px">'
-      + '<div class="clip-tpl-tabs"><button type="button" class="btn" data-cliptab="judul" style="flex:1;font-size:12px">Judul</button><button type="button" class="btn ghost" data-cliptab="subtitle" style="flex:1;font-size:12px">Subtitle</button><button type="button" class="btn ghost" data-cliptab="video" style="flex:1;font-size:12px">Video</button></div>'
+      + '<div class="clip-tpl-tabs"><button type="button" class="btn" data-cliptab="judul" style="flex:1;font-size:12px">Judul</button><button type="button" class="btn ghost" data-cliptab="subtitle" style="flex:1;font-size:12px">Subtitle</button><button type="button" class="btn ghost" data-cliptab="video" style="flex:1;font-size:12px">Video</button><button type="button" class="btn ghost" data-cliptab="kata" style="flex:1;font-size:12px">Kata</button><button type="button" class="btn ghost" data-cliptab="cover" style="flex:1;font-size:12px">Cover</button></div>'
       // TAB JUDUL (plek ketiplek editor referensi)
       + '<div data-clippanel="judul">'
       + '<label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplShowTitle" ' + (cand.showTitle !== false ? 'checked' : '') + '> Tampilkan judul di video</label>'
       + '<label style="font-size:12px;display:block;margin-top:8px">Judul overlay<input data-cliptitle="' + idx + '" value="' + esc(cand.title || '') + '" style="margin-top:2px;font-weight:800" maxlength="120"></label>'
+      + '<details id="clipTplTitleAdv" style="margin-top:8px;border:1px solid #333;border-radius:8px;padding:8px"><summary style="cursor:pointer;font-weight:800;font-size:12px">🎛 Atur posisi, ukuran & durasi judul</summary>'
       + '<div id="clipTplTitlePosBlock" style="margin-top:8px"><b style="font-size:12px">📍 Posisi judul</b><div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn ghost" data-titlepos="top" style="flex:1;font-size:12px">Atas</button><button type="button" class="btn ghost" data-titlepos="center" style="flex:1;font-size:12px">Tengah</button></div><label style="font-size:12px;display:block;margin-top:4px">Posisi vertikal judul <span id="clipTplTitleYPercentV">' + titleYPercent + '%</span><input id="clipTplTitleYPercent" type="range" min="0" max="100" step="1" value="' + titleYPercent + '" style="width:100%"></label></div>'
       + '<p class="hint" id="clipTplTitlePosNote" style="margin:4px 0 0;display:none">Posisinya tetap, jadi tidak perlu diatur. Subtitle otomatis ditahan selama judul tampil.</p>'
       + '<label id="clipTplTitleAnimBlock" style="font-size:12px;display:flex;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="clipTplTitleAnim" checked> ✨ Animasi judul (animasi masuk sesuai gaya)</label>'
       + '<div style="margin-top:8px"><b style="font-size:12px">🔠 Tampilan</b><label style="font-size:12px;display:block;margin-top:4px">Ukuran teks <span id="clipTplTitleSizePercentV">' + titleSizePercent + '%</span><input id="clipTplTitleSizePercent" type="range" min="50" max="200" step="5" value="' + titleSizePercent + '" style="width:100%"></label><button type="button" class="btn ghost" id="clipTplTitleSizeAuto" style="font-size:12px;margin-top:4px">Auto (100%)</button></div>'
-      + '<div style="margin-top:8px"><b style="font-size:12px">⏱ Durasi judul tampil</b><div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn ghost" data-titledur="default" style="flex:1;font-size:12px">Default (4s)</button><button type="button" class="btn ghost" data-titledur="full" style="flex:1;font-size:12px">Sampai akhir</button><button type="button" class="btn ghost" data-titledur="manual" style="flex:1;font-size:12px">Manual</button></div><label style="font-size:12px;display:block;margin-top:4px">Detik (kalau Manual)<input id="clipTplTitleDurSec" type="number" min="0.5" max="120" step="0.5" value="' + (cand.titleDurSec || 4) + '" style="margin-top:2px"></label></div>'
+      + '<div style="margin-top:8px"><b style="font-size:12px">⏱ Durasi judul tampil</b><div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn ghost" data-titledur="default" style="flex:1;font-size:12px">Default (4s)</button><button type="button" class="btn ghost" data-titledur="full" style="flex:1;font-size:12px">Sampai akhir</button><button type="button" class="btn ghost" data-titledur="5s" style="flex:1;font-size:12px">5 dtk</button><button type="button" class="btn ghost" data-titledur="auto" style="flex:1;font-size:12px" title="AI pilihkan: sepanjang klip atau sebentar, dari analisis">✨ Otomatis</button><button type="button" class="btn ghost" data-titledur="manual" style="flex:1;font-size:12px">Manual</button></div><label style="font-size:12px;display:block;margin-top:4px">Detik (kalau Manual)<input id="clipTplTitleDurSec" type="number" min="0.5" max="120" step="0.5" value="' + (cand.titleDurSec || 4) + '" style="margin-top:2px"></label></div>'
+      + '</details>'
       + '<div style="margin-top:8px"><b style="font-size:12px">🎯 Gaya Judul</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' + hookPresetCards + '</div></div>'
       + '</div>'
       // TAB SUBTITLE (plek ketiplek editor referensi)
@@ -3133,7 +3143,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '<div style="margin-top:8px"><b style="font-size:12px">📍 Posisi subtitle</b><div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn ghost" data-subpos="bottom" style="flex:1;font-size:12px">Bawah</button><button type="button" class="btn ghost" data-subpos="center" style="flex:1;font-size:12px">Tengah</button></div><label style="font-size:12px;display:block;margin-top:4px">Posisi vertikal subtitle <span id="clipTplSubYPercentV">' + subYPercent + '%</span><input id="clipTplSubYPercent" type="range" min="0" max="100" step="1" value="' + subYPercent + '" style="width:100%"></label></div>'
       + '<div style="margin-top:8px"><b style="font-size:12px">🔠 Ukuran teks</b><label style="font-size:12px;display:block;margin-top:4px">Ukuran teks <span id="clipTplSubSizePercentV">' + subSizePercent + '%</span><input id="clipTplSubSizePercent" type="range" min="50" max="200" step="5" value="' + subSizePercent + '" style="width:100%"></label><button type="button" class="btn ghost" id="clipTplSubSizeAuto" style="font-size:12px;margin-top:4px">Auto (100%)</button></div>'
       + '<div id="clipTplSubPresetSettings" style="margin-top:8px"></div>'
-+ '<h4 style="margin:12px 0 0">📝 Script & Koreksi Kata</h4>'
+      + '</div>'
+      + '<div data-clippanel="kata" hidden>'
+      + '<h4 style="margin:2px 0 0">📝 Script & Koreksi Kata</h4>'
       + '<p class="hint" style="margin:4px 0">Ketuk kata = video lompat ke momen kata itu (angka kecil = milidetik dari awal klip) + panel koreksi. Garis biru = kata yang sedang diputar. <span id="clipTplWordCount">0 kata diubah</span></p>'
       + '<div id="clipTplWordChips" style="display:flex;flex-wrap:wrap;gap:5px"></div>'
       + '<div id="clipTplWordEdit" style="display:none;margin-top:8px;border:1px solid #444;border-radius:8px;padding:8px"><p style="font-size:12px;margin:0 0 6px">Kata asli: <b id="clipTplWordOrig"></b></p><label style="font-size:12px">✏️ Kata<input id="clipTplWordText" style="margin-top:2px"></label><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn ghost" id="clipTplWordDisable" style="font-size:12px">🚫 Nonaktifkan</button><button class="btn ghost" id="clipTplWordSensor" style="font-size:12px">🔇 Sensor</button><button class="btn ghost" id="clipTplWordReset" style="font-size:12px">↩ Reset</button><button class="btn ghost" id="clipTplWordKeyword" style="font-size:12px">⭐ Keyword</button><button class="btn ghost" id="clipTplWordNormal" style="font-size:12px">↩ Normal</button><button class="btn" id="clipTplWordSave" style="font-size:12px;background:#22c55e;color:#fff">Simpan kata</button><button class="btn ghost" id="clipTplWordCancel" style="font-size:12px">Batal</button></div><p class="hint" style="margin:6px 0 0">Nonaktifkan: teks hilang. Sensor: suaranya bisu.</p><label style="font-size:12px;display:block;margin-top:6px">Kata kunci<select id="clipTplWordKeywordMode" style="margin-top:2px"><option value="auto">Otomatis</option><option value="yes">Ya</option><option value="no">Tidak</option></select></label><p class="hint" style="margin:4px 0 0">Ya: kata ini berwarna saat diucapkan, kuning, atau merah untuk kata larangan dan bahaya. Tidak: tidak pernah berwarna.</p><label style="font-size:12px;display:block;margin-top:6px">Warna kata<select id="clipTplWordColor" style="margin-top:2px"><option value="">Otomatis</option><option value="#FFFF00">Kuning</option><option value="#FFA500">Oranye</option><option value="#FF0000">Merah</option><option value="#FF69B4">Pink</option><option value="#0000FF">Biru</option><option value="#FFFFFF">Putih</option></select></label><p class="hint" style="margin:4px 0 0">Kata ini tampil dengan warna ini, saat diucapkan maupun tidak.</p></div>'
@@ -3141,6 +3153,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '</div>'
       // TAB VIDEO (editor referensi — sebagian fitur belum ada di
       // dashboard ini, jadi switch-nya nonaktif + keterangan)
+      + '<div data-clippanel="cover" hidden>'
+      + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">🖼️ Teks Cover (poster / thumbnail)</b><p class="hint" style="margin:4px 0">Teks BESAR di poster klip — beda dari judul hook di dalam video (gaya ClipperStudio Smart Cover). Kata yang ditulis HURUF BESAR semua tampil <b style="color:#facc15">kuning</b>. Enaknya 3–6 kata.</p><input id="clipTplCoverText" value="' + esc(cand.coverText || cand.title || '') + '" maxlength="90" style="margin-top:2px;font-weight:800" placeholder="mis. Lyodra KAGET Setengah Mati"></div>'
+      + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🎞️ Frame cover</b><p class="hint" style="margin:4px 0">Geser slider buat milih momen posternya — atau putar preview, jeda di frame yang pas, lalu klik tombol di bawah.</p><label style="font-size:12px;display:block">Detik ke <span id="clipTplCoverAtV">' + coverAt0.toFixed(1) + ' dtk</span><input id="clipTplCoverAt" type="range" min="0" max="' + clipDur + '" step="0.1" value="' + coverAt0 + '" style="width:100%"></label><button type="button" class="btn ghost" id="clipTplCoverUsePreview" style="font-size:12px;margin-top:4px">⏸ Pakai frame yang lagi tampil di preview</button></div>'
+      + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🖼️ Poster</b><div style="margin-top:6px;text-align:center"><img id="clipTplCoverImg" alt="Poster cover" src="' + ((rec && rec.cover) ? '/api/clipper/thumb?id=' + encodeURIComponent(jobId) + '&clip=' + idx + '&cover=1' : '') + '" style="max-width:180px;width:100%;border-radius:8px;display:' + ((rec && rec.cover) ? '' : 'none') + '"></div><p class="hint" id="clipTplCoverNote" style="margin:6px 0 0">Poster dibuat dari video polos + teks cover di atas.</p><button type="button" class="btn" id="clipTplCoverBuild" style="background:#22c55e;color:#fff;font-weight:800;margin-top:6px">🖼️ Buat / Perbarui Poster</button></div>'
+      + '</div>'
       + '<div data-clippanel="video" hidden>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">📐 Kualitas Render (klip ini)</b><select id="clipTplQuality" style="margin-top:4px"><option value="720p"' + (cand.quality !== '1080p' ? ' selected' : '') + '>720p (default)</option><option value="1080p"' + (cand.quality === '1080p' ? ' selected' : '') + '>1080p (lebih tajam, render lebih lambat)</option></select><span class="hint">Disimpan per klip — dipakai saat Simpan Versi Edit.</span></div>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🖥️ Layout Klip (klip ini)</b><select id="clipTplLayout" style="margin-top:4px"><option value=""' + (!cand.mode ? ' selected' : '') + '>Ikuti Mode Proyek</option><option value="podcast"' + (cand.mode === 'podcast' ? ' selected' : '') + '>🎙️ Podcast (crop wajah 9:16)</option><option value="auto"' + (cand.mode === 'auto' ? ' selected' : '') + '>✨ Auto</option><option value="landscape"' + (cand.mode === 'landscape' ? ' selected' : '') + '>🖼️ Landscape (fit penuh)</option><option value="split"' + (cand.mode === 'split' ? ' selected' : '') + '>👥 Split (2 pembicara atas-bawah)</option><option value="crop11"' + (cand.mode === 'crop11' ? ' selected' : '') + '>▣ Crop 1:1</option><option value="gameplay"' + (cand.mode === 'gameplay' ? ' selected' : '') + '>🎮 Gameplay (game + facecam)</option></select><span class="hint">Disimpan per klip — mengalahkan Mode Proyek saat klip ini di-render.</span></div>'
@@ -3170,6 +3187,21 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     { const edSel = box.querySelector('#clipEdSelect'); if (edSel) edSel.addEventListener('change', () => { const n = +edSel.value; if (n !== idx) openClipTemplate(n); }); }
     box.querySelectorAll('[data-hookon]').forEach(b => b.addEventListener('click', () => { const d = clipEditDraft && clipEditDraft.data; if (!d) return; d.hookOn = b.dataset.hookon === '1'; clipHookTogglePaint(); clipAssPreviewSchedule(); }));
     clipHookTogglePaint();
+    // Fase 2 — tab Cover: teks + frame + poster (Smart Cover ala ClipperStudio).
+    { const ct = $c('clipTplCoverText'), ca = $c('clipTplCoverAt'), cav = $c('clipTplCoverAtV'), up = $c('clipTplCoverUsePreview'), bd = $c('clipTplCoverBuild'), im = $c('clipTplCoverImg'), nt = $c('clipTplCoverNote');
+      const cc0 = () => (candCache || []).find(x => x.index === idx);
+      const syncCoverImg = () => { if (im) { im.src = '/api/clipper/thumb?id=' + encodeURIComponent(jobId) + '&clip=' + idx + '&cover=1&v=' + Date.now(); const rc = (rendersCache || []).find(x => x.index === idx); if (rc && rc.cover) im.style.display = ''; } };
+      if (im) { im.onload = () => { im.style.display = ''; if (nt) nt.textContent = 'Poster cover klip ini (cover_' + idx + '.jpg) — bisa diunduh juga dari kartu klip.'; }; im.onerror = () => { im.style.display = 'none'; }; syncCoverImg(); }
+      if (ct) ct.addEventListener('change', () => { cand.coverText = ct.value; const cc = cc0(); if (cc) cc.coverText = ct.value; });
+      if (ca) ca.addEventListener('input', () => { cand.coverAt = +ca.value; if (cav) cav.textContent = (+ca.value).toFixed(1) + ' dtk'; const cc = cc0(); if (cc) cc.coverAt = +ca.value; });
+      if (up) up.addEventListener('click', () => { const v = box.querySelector('[data-clipmodalvideo]'); if (v && ca) { ca.value = Math.min(+ca.max || 0, Math.max(0, v.currentTime || 0)); ca.dispatchEvent(new Event('input')); } });
+      if (bd) bd.addEventListener('click', async () => { const old = bd.textContent; bd.disabled = true; bd.textContent = '⏳ Membuat poster…';
+        try { const r = await fetch('/api/clipper/cover', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId, clip: idx, coverText: cand.coverText || (ct ? ct.value : ''), coverAt: cand.coverAt !== undefined ? +cand.coverAt : (ca ? +ca.value : 0) }) });
+          const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+          const rec = (rendersCache || []).find(x => x.index === idx); if (rec) rec.cover = true; syncCoverImg(); if (im) im.style.display = '';
+        } catch (e) { if (nt) nt.textContent = '❌ ' + ((e && e.message) || e); }
+        bd.disabled = false; bd.textContent = old; });
+    }
     // Pil layout di bawah preview: nyetir <select id="clipTplLayout"> yang
     // sama (handler change-nya yang menyimpan mode per-klip tetap yang jalan).
     { const ly = $c('clipTplLayout'); const lp = box.querySelectorAll('[data-laypill]');
@@ -3591,10 +3623,11 @@ const renderSubPresetSettings = () => {
       const polos = card.querySelector('[data-jobpolos="' + r.index + '"]');
       if (polos) polos.style.display = (r.status === 'done') ? '' : 'none';
       // Baris status milik renderRenders (teks saja, bukan tombol).
+      const coverLink = r.cover ? ' <a href="/api/clipper/thumb?id=' + encodeURIComponent(jobId) + '&clip=' + r.index + '&cover=1" download style="color:#7dd3fc">🖼️ Unduh Cover</a>' : '';
       const acts = card.querySelector('[data-clipactions="' + r.index + '"]');
       if (acts) {
-        if (r.status === 'done' && r.raw) acts.innerHTML = '<span class="hint" style="font-size:11px">Video polos (RAW) — Edit lalu Simpan untuk Final.</span>';
-        else if (r.status === 'done') acts.innerHTML = '<span class="hint" style="font-size:11px">Final tersedia di Hasil — kartu tetap RAW (edit lagi bebas).</span>';
+        if (r.status === 'done' && r.raw) acts.innerHTML = '<span class="hint" style="font-size:11px">Video polos (RAW) — Edit lalu Simpan untuk Final.</span>' + coverLink;
+        else if (r.status === 'done') acts.innerHTML = '<span class="hint" style="font-size:11px">Final tersedia di Hasil — kartu tetap RAW (edit lagi bebas).</span>' + coverLink;
         else if (r.status === 'running') acts.innerHTML = '<span class="hint" style="font-size:11px">⏳ Merender…</span>';
         else if (r.status === 'error') acts.innerHTML = '<span class="hint" style="font-size:11px;color:#f87171">❌ Gagal' + (r.error ? ': ' + esc(String(r.error)) : '') + ' — klik Unduh untuk render ulang.</span>';
         else acts.innerHTML = '<span class="hint" style="font-size:11px">⏳ Menunggu render… (otomatis via Analisis &amp; Render)</span>';
@@ -3936,6 +3969,22 @@ const renderSubPresetSettings = () => {
   { const el = $c('clipBgProj'); if (el) el.addEventListener('change', () => saveLs()); }
   { const el = $c('clipPodcastFocus'); if (el) el.addEventListener('change', () => saveLs()); }
   { const el = $c('clipFaceTrack'); if (el) el.addEventListener('change', () => saveLs()); }
+  // Fase 1 dashboard bersih (Dzaky 22 Okt): SEMUA kartu pengaturan klip
+  // (kartu Pengaturan + Pengaturan Lanjutan) dipindah ke satu panel yang
+  // dibuka dari 1 tombol "⚙️ Pengaturan" di kartu Buat Klip. Elemen +
+  // listener + ID utuh (cuma pindah induk) — fungsi tidak berubah.
+  { const hub = document.querySelector('#clipViewCreate .clip-hub');
+    const sc = $c('clipSettingsCard'), sw = $c('clipSettingsWrap');
+    if (hub && sc && sw) {
+      const panel = document.createElement('div');
+      panel.id = 'clipAllSettings'; panel.hidden = true;
+      hub.after(panel); panel.appendChild(sc); panel.appendChild(sw);
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn ghost'; btn.id = 'clipSettingsToggle';
+      btn.textContent = '⚙️ Pengaturan'; btn.style.marginTop = '10px'; btn.style.width = '100%';
+      btn.addEventListener('click', () => { panel.hidden = !panel.hidden; btn.textContent = panel.hidden ? '⚙️ Pengaturan' : '⚙️ Tutup Pengaturan'; });
+      hub.querySelector('.clip-card').appendChild(btn);
+    } }
   // Durasi Clip (detik) — disimpan di localStorage, default 30. Sebelumnya
   // tidak di-persist (setting lain sudah), jadi Pengaturan balik ke 15
   // setiap reload padahal user set 30. Body Analisis tetap baca select
@@ -4188,6 +4237,8 @@ const renderSubPresetSettings = () => {
         // Durasi judul (Detail): kandidat > default (4 detik).
         titleDur: cand && cand.titleDur ? cand.titleDur : 'default',
         titleDurSec: cand && cand.titleDurSec ? +cand.titleDurSec : 4,
+        // Cover per-klip (Fase 2, tab Cover).
+        coverText: cand && cand.coverText ? cand.coverText : '', coverAt: cand && cand.coverAt !== undefined ? +cand.coverAt : undefined,
         // Posisi/ukuran/warna per-klip (Detail, slider persen referensi).
         titleYPercent: cand && cand.titleYPercent !== undefined ? +cand.titleYPercent : 56,
         titleSizePercent: cand && cand.titleSizePercent !== undefined ? +cand.titleSizePercent : undefined,

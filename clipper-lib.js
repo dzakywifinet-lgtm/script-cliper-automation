@@ -769,8 +769,8 @@ function buildAss(cues, start, end, subStyle, overlay) {
   const clipDur = Math.max(0.2, (end || 0) - (start || 0));
   // Durasi judul (gaya Klipaja): 'default' = 4 detik (judul hook cuma di awal),
   // 'full' = sepanjang klip, 'manual' = titleDurSec detik. CTA tetap sepanjang klip.
-  const titleDurMode = ov.titleDur === 'full' ? 'full' : ov.titleDur === 'manual' ? 'manual' : 'default';
-  const titleDurSec = titleDurMode === 'full' ? clipDur : titleDurMode === 'manual' ? Math.min(clipDur, Math.max(0.5, +ov.titleDurSec || 4)) : Math.min(clipDur, 4);
+  const titleDurMode = resolveTitleDurMode(ov.titleDur, ov.hookDurAi, clipDur);
+  const titleDurSec = titleDurMode === 'full' ? clipDur : titleDurMode === 'manual' ? Math.min(clipDur, Math.max(0.5, +ov.titleDurSec || 4)) : titleDurMode === '5s' ? Math.min(clipDur, 5) : Math.min(clipDur, 4);
   // --- Hook multi-hook (gaya Hook V2): potongan pendek (0,5–2,5 detik) disambung
   // di DEPAN klip utama. ov.hook = array {start, end, text} waktu RELATIF ke
   // awal klip (sudah dikurangi cand.start oleh server). Timeline hook: item
@@ -1305,6 +1305,46 @@ function buildAss(cues, start, end, subStyle, overlay) {
 // - judul dibersihkan, skor 0-100
 // - kandidat yang tumpang tindih > 50% (yang skornya lebih rendah) dibuang
 // - urut skor tertinggi, ambil maksimal `count`
+// Resolusi mode durasi judul efektif (satu sumber: buildAss + preview):
+// 'auto' -> saran AI (hookDurAi 'full'/'short'); tanpa saran -> aturan:
+// klip <= 35 dtk judul sepanjang klip, lebih panjang -> default 4 detik.
+function resolveTitleDurMode(titleDur, hookDurAi, clipDur) {
+  if (titleDur === 'full') return 'full';
+  if (titleDur === 'manual') return 'manual';
+  if (titleDur === '5s') return '5s';
+  if (titleDur === 'auto') {
+    if (hookDurAi === 'full') return 'full';
+    if (hookDurAi === 'short') return 'default';
+    return clipDur <= 35 ? 'full' : 'default';
+  }
+  return 'default';
+}
+// ASS poster COVER (Fase 2, gaya ClipperStudio Smart Cover): teks cover
+// BESAR di sepertiga atas frame 1080x1920 — pisah dari judul hook di video.
+// Kata yang ditulis HURUF BESAR semua (min 3 huruf) tampil KUNING, sisanya
+// putih; pinggiran hitam tebal biar kebaca di frame apa pun. Wrap manual
+// maks ~15 karakter/baris, maks 4 baris.
+function buildCoverAss(text) {
+  const esc = (t) => String(t || '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+  const words = esc(text).split(' ').filter(Boolean).slice(0, 14);
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    if ((cur + ' ' + w).trim().length > 15 && cur) { lines.push(cur); cur = w; }
+    else cur = (cur + ' ' + w).trim();
+    if (lines.length >= 4) break;
+  }
+  if (cur && lines.length < 4) lines.push(cur);
+  const rich = lines.map(line => line.split(' ').map(w => {
+    const isKey = w.length >= 3 && /[A-Z]/.test(w) && w === w.toUpperCase() && /[A-Z]{3,}/.test(w);
+    return isKey ? '{\\c&H00FFFF&}' + w + '{\\c&HFFFFFF&}' : w;
+  }).join(' ')).join('\\N');
+  return '[Script Info]\nTitle: Cover\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n'
+    + '[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n'
+    + 'Style: Cover,Montserrat,118,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,10,3,8,40,40,300,1\n\n'
+    + '[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'
+    + 'Dialogue: 0,0:00:00.00,0:00:01.00,Cover,,0,0,0,,' + rich + '\n';
+}
 function sanitizeCandidates(raw, videoDuration, targetDur, count) {
   const dur = +videoDuration || 0;
   const maxLen = (targetDur || 60) + 30;
@@ -1346,6 +1386,10 @@ function sanitizeCandidates(raw, videoDuration, targetDur, count) {
         // Caption + hashtag per klip (gaya Klipaja: caption + # siap posting).
         // AI diminta mengisinya di prompt; klip lama / tanpa AI = kosong.
         caption: cleanTitle(c.caption, 280),
+        // Saran AI buat durasi judul hook (Fase 2, gaya ClipperStudio "AI
+        // pilihkan"): 'full' = judul layak tampil sepanjang klip, 'short' =
+        // cukup sebentar di awal. Dipakai buildAss saat titleDur='auto'.
+        hookDurAi: (c.hookDur === 'full' || c.hookDur === 'short') ? c.hookDur : undefined,
         hashtags: (() => { const hs = []; if (Array.isArray(c.hashtags)) { for (const h of c.hashtags) { let t = String(h || '').trim(); if (!t) continue; if (!t.startsWith('#')) t = '#' + t; t = t.replace(/\s+/g, ''); if (t.length > 1 && t.length <= 40) hs.push(t); if (hs.length >= 6) break; } } return hs; })(),
       });
     }
@@ -1776,7 +1820,7 @@ function buildFfmpegArgs(o) {
 module.exports = {
   isYoutubeUrl, clampInt, cleanTitle, escapeDrawtext, escapeFilterValue, ffmpegFilterPath,
   CLIP_FONT_FAMILIES, clipFontOk,
-  parseVtt, fmtSrt, buildSrt, buildAss, sanitizeCandidates, fallbackCandidates,
+  parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, sanitizeCandidates, fallbackCandidates,
   chunkTranscript, fmtClock, buildFfmpegArgs, wrapTitle, faceTrackExpr,
   gameplayTopH,
   distributeWords, cueWords, normalizeCueWords, dedupeTranscriptCues,
