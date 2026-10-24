@@ -1944,6 +1944,14 @@ function buildFfmpegArgs(o) {
     filters.push('[' + last + "][brollv]overlay=0:0:enable='between(t," + broll.start + ',' + (Math.round((broll.start + broll.dur) * 100) / 100) + ")'[vovr]");
     last = 'vovr';
   }
+  // Filter Cerah HD (Fase 21, permintaan Dzaky 24 Okt): cerah + kontras +
+  // warna + denoise tipis + penajaman halus. Diterapkan ke VIDEO sebelum
+  // subtitle dibakar (teks tetap bersih), hanya Final (bukan video polos),
+  // hanya bila o.enhanceFx (batch kandidat bertanda fx 'cerah').
+  if (o.enhanceFx && !o.plainOnly) {
+    filters.push('[' + last + ']eq=brightness=0.05:contrast=1.08:saturation=1.12,hqdn3d=1.2:1.2:4:4,unsharp=5:5:0.7:5:5:0.3[venh]');
+    last = 'venh';
+  }
   if (!o.plainOnly && o.srtPath) {
     // File subtitle adalah .ass (buildAss) — gayanya sudah di dalam file
     // (PlayResX/Y 720x1280 + FontSize/MarginV/warna). Jangan pakai force_style
@@ -2001,6 +2009,33 @@ function buildFfmpegArgs(o) {
   // Judul + CTA TIDAK lagi pakai drawtext (ffmpeg Pi tidak punya filter itu).
   // Keduanya dibakar lewat file .ass (buildAss: style Title1/Title2/Cta) + filter
   // subtitles — jadi judul + CTA selalu muncul, tidak lagi ke-drop fallback.
+  // Smart Cover jadi PEMBUKA Final (Fase 22, permintaan Dzaky): gambar cover
+  // dibakar ±1 detik di PALING AWAL Final — ditambahkan SESUDAH semua olahan
+  // (hook/subtitle/sensor/musik) supaya timing isi tidak bergeser sama
+  // sekali; audio isi didahului hening se-durasi cover. Hanya Final
+  // (overlayOnly) — video polos tidak pernah kena. File hasil unduhan jadi
+  // membawa cover-nya (tampang awal pas diposting ke medsos = cover).
+  if (o.coverPath && !o.plainOnly) {
+    const covIdx = 1 + (broll ? 1 : 0) + (musicIdx >= 0 ? 1 : 0);
+    args.push('-loop', '1', '-i', String(o.coverPath));
+    const covDur = Number.isFinite(+o.coverDur) ? Math.min(3, Math.max(0.3, +o.coverDur)) : 1;
+    filters.push('[' + covIdx + ':v]scale=' + OW + ':' + OH + ':force_original_aspect_ratio=increase,crop=' + OW + ':' + OH + ',trim=duration=' + covDur + ',setpts=PTS-STARTPTS,fps=30,format=yuv420p[covv]');
+    const covHasAudio = o.audioCodec !== null && o.audioCodec !== false && o.hasAudio !== false;
+    if (covHasAudio) {
+      let mainA = null;
+      if (audioOut) mainA = audioOut.slice(1, -1);
+      else if (hook.length) mainA = 'outa';
+      else { filters.push('[0:a]anull[maina]'); mainA = 'maina'; }
+      filters.push('[' + mainA + ']aresample=44100,aformat=channel_layouts=stereo[maina2]');
+      filters.push('anullsrc=r=44100:cl=stereo,atrim=duration=' + covDur + ',asetpts=PTS-STARTPTS,aformat=channel_layouts=stereo[cova]');
+      filters.push('[covv][' + last + ']concat=n=2:v=1:a=0[vcov]');
+      filters.push('[cova][maina2]concat=n=2:v=0:a=1[acov]');
+      last = 'vcov'; audioOut = '[acov]';
+    } else {
+      filters.push('[covv][' + last + ']concat=n=2:v=1:a=0[vcov]');
+      last = 'vcov';
+    }
+  }
   args.push('-filter_complex', filters.join(';'));
   args.push('-map', '[' + last + ']');
   // o.hasAudio === false (input tanpa stream audio) -> output tanpa audio

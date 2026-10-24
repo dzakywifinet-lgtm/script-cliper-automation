@@ -990,6 +990,39 @@ async function clipMakeThumb(job, sel, videoFile, offset, clipLen, outName) {
 // dari video POLOS di detik pilihan user (cand.coverAt) + teks cover besar
 // (clipperLib.buildCoverAss) dibakar via libass -> cover_<idx>.jpg di job.dir.
 // Gagal -> null (tidak pernah menggagalkan render).
+// ZIP STORE streaming (Fase 22, Download All): header lokal + data
+// descriptor per berkas (CRC/ukuran ditulis SESUDAH data) — ZIP bisa
+// mengalir langsung dari disk tanpa menampung file di memori server.
+const CLIP_CRC_TABLE = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c; } return t; })();
+function clipCrc32(buf, crc) { let c = (crc === undefined ? 0 : crc) ^ -1; for (let i = 0; i < buf.length; i++) c = (c >>> 8) ^ CLIP_CRC_TABLE[(c ^ buf[i]) & 0xFF]; return (c ^ -1) >>> 0; }
+function clipDosTime(d) { const dt = d instanceof Date ? d : new Date(); return { time: ((dt.getHours() & 31) << 11) | ((dt.getMinutes() & 63) << 5) | ((Math.floor(dt.getSeconds() / 2)) & 31), date: (((Math.max(1980, dt.getFullYear()) - 1980) & 127) << 9) | (((dt.getMonth() + 1) & 15) << 5) | (dt.getDate() & 31) }; }
+async function clipWriteZip(out, files) {
+  const central = []; let offset = 0;
+  const write = async (buf) => { offset += buf.length; await new Promise((res2, rej) => out.write(buf, e => e ? rej(e) : res2())); };
+  for (const f of files) {
+    const nameBuf = Buffer.from(f.name, 'utf8');
+    const tt = clipDosTime(f.mtime);
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0x0808, 6); lh.writeUInt16LE(0, 8);
+    lh.writeUInt16LE(tt.time, 10); lh.writeUInt16LE(tt.date, 12); lh.writeUInt32LE(0, 14); lh.writeUInt32LE(0, 18); lh.writeUInt32LE(0, 22);
+    lh.writeUInt16LE(nameBuf.length, 26); lh.writeUInt16LE(0, 28);
+    const localOffset = offset;
+    await write(Buffer.concat([lh, nameBuf]));
+    let crc = 0, size = 0;
+    await new Promise((res2, rej) => { const rs = fs.createReadStream(f.file); rs.on('data', ch => { crc = clipCrc32(ch, crc); size += ch.length; out.write(ch); }); rs.on('end', res2); rs.on('error', rej); });
+    offset += size;
+    const dd = Buffer.alloc(16); dd.writeUInt32LE(0x08074b50, 0); dd.writeUInt32LE(crc, 4); dd.writeUInt32LE(size, 8); dd.writeUInt32LE(size, 12);
+    await write(dd);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(0x0808, 8); ch.writeUInt16LE(0, 10);
+    ch.writeUInt16LE(tt.time, 12); ch.writeUInt16LE(tt.date, 14); ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(size, 20); ch.writeUInt32LE(size, 24);
+    ch.writeUInt16LE(nameBuf.length, 28); ch.writeUInt32LE(localOffset, 42);
+    central.push(Buffer.concat([ch, nameBuf]));
+  }
+  const cdStart = offset; const cdBuf = Buffer.concat(central); await write(cdBuf);
+  const eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(central.length, 8); eocd.writeUInt16LE(central.length, 10); eocd.writeUInt32LE(cdBuf.length, 12); eocd.writeUInt32LE(cdStart, 16);
+  await write(eocd); out.end();
+}
 async function clipMakeCover(job, cand) {
   try {
     const rec = (job.renders || []).find(r => r.index === cand.index);
@@ -1640,7 +1673,7 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
       const hm = await clipFetchHeatmap(job);
       const { candidates, usedFallback } = await clipHeatmapOrFallback(job, hm, targetDur, count);
       const final = clipperLib.sanitizeCandidates(candidates, job.duration, targetDur);
-      const newCands = clipAppendCandidates(job, final.length ? final : fallbackCandidates(job.duration, targetDur, count), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset });
+      const newCands = clipAppendCandidates(job, final.length ? final : fallbackCandidates(job.duration, targetDur, count), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset, fx: job.enhanceFx ? 'cerah' : undefined });
       if (job.hookPreset) for (const c of newCands) c.hookPreset = job.hookPreset; // Kartu Buat Klip → default semua kandidat baru
       if (!newCands.length) throw new Error('Tidak bisa membuat kandidat klip dari video ini.');
       job.status = 'done'; job.progress = 100;
@@ -1656,7 +1689,7 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
       if (job.cancelled) return;
       cand = clipperLib.sanitizeCandidates(cand, job.duration, targetDur, count);
       if (!cand.length) { cand = clipperLib.fallbackCandidates(job.duration, targetDur, count); clipLog(job, 'Deteksi suara tidak menemukan kandidat — memakai pembagian merata.'); }
-      const newCands = clipAppendCandidates(job, cand.map(c => ({ ...c, hookPreset: job.hookPreset || c.hookPreset || 'kartu' })), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset });
+      const newCands = clipAppendCandidates(job, cand.map(c => ({ ...c, hookPreset: job.hookPreset || c.hookPreset || 'kartu' })), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset, fx: job.enhanceFx ? 'cerah' : undefined });
       job.phase = 'done'; job.progress = 100; job.status = 'done';
       clipLog(job, 'Analisis selesai: ' + newCands.length + ' kandidat klip baru (tanpa AI) — total ' + job.candidates.length + ' klip.');
       clipNotify(job, '🎯 Analisis selesai: ' + newCands.length + ' kandidat klip baru (total ' + job.candidates.length + ').');
@@ -1798,7 +1831,7 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
     }
     let cand = clipperLib.sanitizeCandidates(allCand, job.duration, targetDur, count);
     if (!cand.length) { cand = clipperLib.fallbackCandidates(job.duration, targetDur, count); clipLog(job, 'AI tidak mengembalikan kandidat valid — memakai pembagian merata.'); }
-    const newCands = clipAppendCandidates(job, cand.map(c => ({ ...c, hookPreset: job.hookPreset || c.hookPreset || 'kartu' })), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset });
+    const newCands = clipAppendCandidates(job, cand.map(c => ({ ...c, hookPreset: job.hookPreset || c.hookPreset || 'kartu' })), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset, fx: job.enhanceFx ? 'cerah' : undefined });
     if (job.cancelled) return;
     job.phase = 'done'; job.progress = 100; job.status = 'done';
     clipLog(job, 'Analisis selesai: ' + newCands.length + ' kandidat klip baru — total ' + job.candidates.length + ' klip.');
@@ -2381,6 +2414,10 @@ async function clipRender(job, selected, opts) {
         clipLog(job, 'Memakai video polos tersimpan — tidak re-encode video (hemat CPU).');
       }
       rec.plainSize = fs.statSync(plainFile).size;
+      // Pemanasan lite (Fase 23): salinan preview 360p dibuat SEKARANG di
+      // latar (tidak ditunggu) begitu video polos ada — Studio nanti
+      // membukanya sekejap, tidak menunggu encode lagi.
+      try { clipEnsureLite(plainFile).catch(() => {}); } catch {}
       // Thumbnail RAW (frame terang dari video POLOS, tanpa teks ter-bake)
       // — poster kartu Detail/editor (model Klipaja: editor = RAW + overlay
       // HTML, jadi poster-nya harus RAW, bukan Final yang sudah berteks).
@@ -2465,11 +2502,20 @@ async function clipRender(job, selected, opts) {
         sensorRel = [];
         srtPath = buildAssFile(false);
       }
+      // Smart Cover jadi PEMBUKA Final (Fase 22): cover dibuat DULU dari
+      // video polos, lalu dibakar ±1 detik di awal encode Final ini — file
+      // hasil unduhan membawa cover-nya (buat posting medsos). Gagal buat
+      // cover -> render tetap jalan tanpa pembuka (poster menyusul dibuat
+      // ulang oleh jalur lama sesudah render).
+      let coverIntroPath = null;
+      if (job.smartCover) { try { coverIntroPath = await clipMakeCover(job, cand); } catch {} }
       const attempt = { simple: false, subs: !!srtPath, vcodec: 'libx264', acodec: 'aac', hook: plainHasAudio && hookRel.length > 0 };
       let r = null;
       for (let tryN = 0; tryN < 8 && !job.cancelled; tryN++) {
         const args = clipperLib.buildFfmpegArgs({
           input: plainFile, output: outFile, overlayOnly: true,
+          enhanceFx: !!(cand.batch && cand.batch.fx === 'cerah'), // Filter Cerah HD (Fase 21) per-batch kandidat
+          coverPath: coverIntroPath || undefined, coverDur: 1, // Smart Cover pembuka (Fase 22)
           hook: attempt.hook ? hookRel : [],
           speakers: speakersRel,
           hasAudio: plainHasAudio, // false = input tanpa audio -> hook video-only + sensor di-skip (lib)
@@ -2511,7 +2557,7 @@ async function clipRender(job, selected, opts) {
       rec.status = 'done'; rec.size = fs.statSync(outFile).size;
       // Smart Cover (Fase 3): poster otomatis tiap Final selesai (bila skill-nya ON di proyek ini).
       if (fs.existsSync(path.join(job.dir, 'cover_' + sel.index + '.jpg'))) rec.cover = true; // cover lama tetap diakui walau record render baru
-      if (job.smartCover) { const cc = cand; clipMakeCover(job, cc).then(p => { if (p) clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' dibuat otomatis.'); else clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' TIDAK dibuat (sumber polos/final tidak ketemu atau ffmpeg gagal) — buat manual dari tab Cover di Edit klip.'); }).catch(() => { try { clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' gagal dibuat (error) — buat manual dari tab Cover.'); } catch {} }); }
+      if (job.smartCover && !coverIntroPath) { const cc = cand; clipMakeCover(job, cc).then(p => { if (p) clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' dibuat otomatis.'); else clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' TIDAK dibuat (sumber polos/final tidak ketemu atau ffmpeg gagal) — buat manual dari tab Cover di Edit klip.'); }).catch(() => { try { clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' gagal dibuat (error) — buat manual dari tab Cover.'); } catch {} }); }
       else clipLog(job, '🖼️ Smart Cover nonaktif di proyek ini — poster otomatis tidak dibuat (nyalakan di Pengaturan > Skill Packs).');
       // Versi render (brief F, 22 Okt): hash dari isi ASS final + mode +
       // kualitas. ASS versi ini disimpan permanen (clip_<i>_<hash>.ass) dan
@@ -3361,6 +3407,7 @@ const server = http.createServer(async (req, res) => {
     job.focus = clipperLib.clampInt(b.focus, 0, 100, 50) / 100;
     job.faceTrack = b.faceTrack !== false;
     job.smartCover = !!b.smartCover; // Skill Smart Cover (Fase 3): poster otomatis tiap Final
+    job.enhanceFx = !!b.enhanceFx; // Filter Cerah HD (Fase 21): ditempel ke batch kandidat (fx 'cerah')
     job.titleDurDefault = ['auto', '5s', 'full'].includes(b.titleDurDefault) ? b.titleDurDefault : null; // Skill Smart Hook (Fase 3): durasi judul bawaan kandidat baru
     job.quality = b.quality === '1080p' ? '1080p' : '720p'; // Kualitas Render (Pengaturan, default 720p)
     // Kartu judul (dropdown Kartu di Buat Klip, gaya Klipaja): preset judul
@@ -3459,7 +3506,7 @@ const server = http.createServer(async (req, res) => {
   // GET = baca; POST = simpan (hanya kunci yang dikenal, + updatedAt).
   // Frontend: startup muat dari server (server menang bila ada), tiap
   // perubahan disimpan ke server (debounce) + localStorage (fallback offline).
-  const CLIPPER_SETTING_KEYS = ['route', 'model', 'provider', 'transcribe', 'transcriptLang', 'duration', 'moment', 'mode', 'bg', 'focus', 'faceTrack', 'quality', 'hookPreset', 'smartCover', 'titleDurDefault'];
+  const CLIPPER_SETTING_KEYS = ['route', 'model', 'provider', 'transcribe', 'transcriptLang', 'duration', 'moment', 'mode', 'bg', 'focus', 'faceTrack', 'quality', 'hookPreset', 'smartCover', 'titleDurDefault', 'enhanceFx'];
   if (req.method === 'GET' && p === '/api/clipper/settings') {
     let st = {}; try { st = JSON.parse(fs.readFileSync(stateFile(sessUser(req)), 'utf8')); } catch {}
     const s = (st && typeof st.clipperSettings === 'object') ? st.clipperSettings : {};
@@ -3860,8 +3907,18 @@ const server = http.createServer(async (req, res) => {
       ? path.join(job.dir, path.basename(rec.plainFile))
       : path.join(job.dir, 'clip_' + idx + '.mp4');
     if (!fs.existsSync(file)) return send(res, 404, { error: 'File klip tidak ditemukan (mungkin sudah dibersihkan).' });
-    // lite=1 → salinan 360p (on-demand, sekali buat); gagal -> file asli.
-    if (u.searchParams.get('lite') === '1') { const lf = await clipEnsureLite(file); if (lf) file = lf; }
+    // lite=1 → salinan 360p BILA SUDAH SIAP. Belum siap -> sajikan file
+    // asli SEKARANG juga (Fase 23: dulu request ini MENUNGGU encode lite
+    // selesai sebelum mengirim byte pertama — Studio terasa macet belasan
+    // detik di bukaan pertama tiap klip). Lite dibuat di latar; bukaan
+    // berikutnya otomatis dapat yang ringan.
+    if (u.searchParams.get('lite') === '1') {
+      const liteFile = file.replace(/\.mp4$/i, '') + '_lite.mp4';
+      let liteReady = false;
+      try { liteReady = fs.existsSync(liteFile) && fs.statSync(liteFile).mtimeMs >= fs.statSync(file).mtimeMs; } catch {}
+      if (liteReady) file = liteFile;
+      else { try { clipEnsureLite(file).catch(() => {}); } catch {} }
+    }
     const size = fs.statSync(file).size;
     let start = 0, end = size - 1, status = 200;
     const m = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
@@ -4009,13 +4066,41 @@ const server = http.createServer(async (req, res) => {
       : path.join(job.dir, 'clip_' + idx + '.mp4');
     if (!fs.existsSync(file)) return send(res, 404, { error: 'File klip tidak ditemukan (mungkin sudah dibersihkan).' });
     const name = 'clipper-' + idx + '-' + (plain ? 'polos-' : '') + (!plain && rec.hash ? rec.hash + '-' : '') + (job.videoTitle || 'video').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.mp4';
-    res.writeHead(200, { 'content-type': 'video/mp4', 'content-disposition': 'attachment; filename="' + name + '"', 'cache-control': 'no-store' });
-    const stream = fs.createReadStream(file);
+    // Range (Fase 23 — audit "klip macet pas diputar"): preview penonton
+    // (feed) memutar Final LEWAT endpoint ini; tanpa Range browser tidak
+    // bisa buffer/seek bertahap -> video sering macet/berhenti di tengah.
+    const fsize = fs.statSync(file).size;
+    let dstart = 0, dend = fsize - 1, dstatus = 200;
+    const dm = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+    if (dm) { dstart = dm[1] ? Math.min(+dm[1], fsize - 1) : 0; dend = dm[2] ? Math.min(+dm[2], fsize - 1) : fsize - 1; dstatus = 206; }
+    res.writeHead(dstatus, { 'content-type': 'video/mp4', 'content-disposition': 'attachment; filename="' + name + '"', 'cache-control': 'no-store', 'accept-ranges': 'bytes', 'content-length': dend - dstart + 1, ...(dstatus === 206 ? { 'content-range': 'bytes ' + dstart + '-' + dend + '/' + fsize } : {}) });
+    const stream = fs.createReadStream(file, { start: dstart, end: dend });
     stream.on('error', () => { try { res.end(); } catch {} });
     // Sumber TIDAK dihapus pas download (sebelumnya res.on('finish') hapus source
     // -> abis download 1 klip, sumber hilang -> render/analisis berikutnya gagal
     // "Video sumber sudah dihapus"). Sumber hanya terhapus pas hapus proyek.
     stream.pipe(res);
+    return;
+  }
+  // Download All (Fase 22, permintaan Dzaky): satu ZIP berisi SEMUA klip
+  // Final proyek ini (nama berkas: NN - Judul.mp4). RAW tidak ikut.
+  if (req.method === 'GET' && p === '/api/clipper/download-all') {
+    const job = clipperJobs.get(u.searchParams.get('id') || '');
+    if (!job || job.user !== sessUser(req) || !job.dir) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    const finals = [];
+    for (const rec of (job.renders || [])) {
+      if (!rec || rec.status !== 'done' || rec.raw) continue;
+      const f = path.join(job.dir, 'clip_' + rec.index + '.mp4');
+      if (!fs.existsSync(f)) continue;
+      const cand = (job.candidates || []).find(c => c.index === rec.index);
+      const title = String((cand && cand.title) || rec.title || ('Klip ' + (rec.index + 1))).replace(/[\\/:*?"<>|-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || ('Klip ' + (rec.index + 1));
+      const st = fs.statSync(f);
+      finals.push({ file: f, name: String(rec.index + 1).padStart(2, '0') + ' - ' + title + '.mp4', mtime: st.mtime });
+    }
+    if (!finals.length) return send(res, 404, { error: 'Belum ada Final di proyek ini.' });
+    const zipName = ('clipper-' + (job.videoTitle || 'video')).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '-semua-klip.zip';
+    res.writeHead(200, { 'content-type': 'application/zip', 'content-disposition': 'attachment; filename="' + zipName + '"', 'cache-control': 'no-store' });
+    try { await clipWriteZip(res, finals); } catch (e) { try { res.end(); } catch {} }
     return;
   }
   if (req.method === 'GET' && p === '/api/clipper/peaks') {
