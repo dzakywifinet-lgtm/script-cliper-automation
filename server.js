@@ -179,6 +179,69 @@ for (const [slug, c] of Object.entries(CUSTOM)) {
   M['custom:' + slug] = c.model || 'gpt-3.5-turbo';
   call['custom:' + slug] = (msgs, job) => customCall(slug, msgs, job);
 }
+// ===== Koneksi AI per-user (permintaan Dzaky 23 Okt) =====
+// Akun 'dzaky' = ADMIN: semua koneksi server (9router, Groq, Direct bawaan,
+// custom global) seperti biasa. Akun LAIN: kosongan — Koneksi AI hanya berisi
+// provider yang mereka tambahkan sendiri (nama + base URL + API key + model,
+// tersimpan per akun di user-providers.json, key tidak pernah ke browser);
+// tanpa itu fitur AI tidak jalan dan transkrip jatuh ke Whisper lokal.
+const ADMIN_USER = 'dzaky';
+const isAdminUser = (u) => String(u || '').toLowerCase() === ADMIN_USER;
+const USER_PROVIDERS_FILE = path.join(__dirname, 'user-providers.json');
+let USER_PROVIDERS = {};
+try { const j = JSON.parse(fs.readFileSync(USER_PROVIDERS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) USER_PROVIDERS = j; } catch {}
+const saveUserProviders = () => { try { fs.writeFileSync(USER_PROVIDERS_FILE, JSON.stringify(USER_PROVIDERS, null, 2)); } catch {} };
+const userCustom = (u) => (USER_PROVIDERS[String(u || '').toLowerCase()] || {});
+// API TTS pribadi per user (ElevenLabs) — file terpisah user-tts-keys.json:
+// { [userLower]: { elevenlabs: '<key>' } }. Key tidak pernah ke browser.
+const USER_TTS_FILE = path.join(__dirname, 'user-tts-keys.json');
+let USER_TTS_KEYS = {};
+try { const j = JSON.parse(fs.readFileSync(USER_TTS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) USER_TTS_KEYS = j; } catch {}
+const saveUserTtsKeys = () => { try { fs.writeFileSync(USER_TTS_FILE, JSON.stringify(USER_TTS_KEYS, null, 2)); } catch {} };
+const userTtsKey = (u) => (USER_TTS_KEYS[String(u || '').toLowerCase()] || {}).elevenlabs || '';
+const userTtsJobs = new Map(), userTtsAudios = new Map();
+function userTtsChunk(text, limit) {
+  const parts = []; let cur = '';
+  for (const piece of String(text || '').split(/(?<=[.!?…])\s+|\n+/)) {
+    const t = piece.trim(); if (!t) continue;
+    if ((cur + ' ' + t).trim().length > limit && cur) { parts.push(cur.trim()); cur = t; }
+    else cur = (cur + ' ' + t).trim();
+    while (cur.length > limit) { parts.push(cur.slice(0, limit)); cur = cur.slice(limit); }
+  }
+  if (cur) parts.push(cur);
+  return parts.length ? parts : [''];
+}
+async function userTtsSynth(job, b, apiKey) {
+  const ELEVEN = E.ELEVEN_BASE || 'https://api.elevenlabs.io';
+  const chunks = userTtsChunk(b.text, 4000);
+  job.total = chunks.length; job.done = 0;
+  const bufs = [];
+  const speed = Math.min(1.2, Math.max(0.7, +b.speed || 1));
+  for (let i = 0; i < chunks.length; i++) {
+    if (job.stopped) throw new Error('Dibatalkan oleh pengguna');
+    const r = await fetch(ELEVEN + '/v1/text-to-speech/' + encodeURIComponent(String(b.voice || '')), {
+      method: 'POST', headers: { 'xi-api-key': apiKey, 'content-type': 'application/json', accept: 'audio/mpeg' },
+      body: JSON.stringify({ text: chunks[i], model_id: E.TTS_ELEVEN_MODEL || 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75, speed } }),
+      signal: AbortSignal.timeout(120000),
+    });
+    if (!r.ok) { const t = await r.text().catch(() => ''); let m = 'HTTP ' + r.status; try { const j = JSON.parse(t); m = (j.detail && (j.detail.message || j.detail.status)) || m; } catch {} throw new Error('ElevenLabs: ' + m); }
+    bufs.push(Buffer.from(await r.arrayBuffer()));
+    job.done = i + 1;
+  }
+  const buf = Buffer.concat(bufs);
+  userTtsAudios.set(job.id, { buf, ts: Date.now(), format: 'mp3' });
+  while (userTtsAudios.size > 4) userTtsAudios.delete(userTtsAudios.keys().next().value);
+  job.status = 'done'; job.bytes = buf.length; job.format = 'mp3';
+}
+const userCustomCall = async (u, slug, msgs, job) => {
+  const c = userCustom(u)[slug]; if (!c) throw fail('Provider custom tidak ditemukan: ' + slug, 'input');
+  if (!c.apiKey) throw fail('API key ' + (c.name || slug) + ' belum diisi.', 'input');
+  const base = String(c.baseUrl || '').replace(/\/$/, '');
+  const j = await post(base + '/v1/chat/completions', { authorization: 'Bearer ' + c.apiKey },
+    { model: c.model || 'gpt-3.5-turbo', messages: msgs }, job.ctrl.signal);
+  const fr = j.choices?.[0]?.finish_reason; if (fr) { job.finish = fr; job.truncated = !NORMAL.test(fr); }
+  return cleanThink(j.choices?.[0]?.message?.content || '');
+};
 // Alasan berhenti yang berarti selesai normal; selain itu (length, max_tokens, MAX_TOKENS, dll) = terpotong
 const NORMAL = /^(?:finish_reason_)?(stop|end_turn|stop_sequence|eos|completed?|natural)$/i;
 const abortErr = (e, job) => e.name === 'AbortError' ? (job.stopped ? fail('Dihentikan oleh pengguna', 'stopped') : fail('Waktu habis menunggu AI (10 menit)', 'timeout')) : null;
@@ -639,9 +702,9 @@ const clipPublic = job => ({
   id: job.id, status: job.status, phase: job.phase, progress: job.progress, downloadPct: job.downloadPct || 0, error: job.error || null,
   sourceReady: !!job.sourceReady, transcribeVia: job.transcribeVia || 'local',
   sourceHeight: job.sourceHeight || 0, sourceUrl: job.sourceUrl || null,
-  videoTitle: job.videoTitle, duration: job.duration, log: job.log, candidates: job.candidates,
+  videoTitle: job.videoTitle, metaUploader: job.metaUploader || '', duration: job.duration, log: job.log, candidates: job.candidates,
   cues: job.cues || [],
-  renders: job.renders.map(r => ({ index: r.index, title: r.title, status: r.status, size: r.size || 0, plainSize: r.plainSize || 0, raw: !!r.raw, thumb: !!r.thumb, autoThumb: !!r.autoThumb, cover: !!r.cover, error: r.error || null, hash: r.hash || null, assFile: r.assFile || null })),
+  renders: job.renders.map(r => ({ index: r.index, title: r.title, status: r.status, size: r.size || 0, plainSize: r.plainSize || 0, raw: !!r.raw, thumb: !!r.thumb, autoThumb: !!r.autoThumb, cover: !!r.cover || fs.existsSync(path.join(job.dir, 'cover_' + r.index + '.jpg')), error: r.error || null, hash: r.hash || null, assFile: r.assFile || null })), // cover: file di disk = sumber kebenaran (flag rec.cover bisa hilang saat render ulang membuat record baru)
 });
 // Tahap 1 — Input YouTube: ambil info (-J) + download video ke server, lalu tandai
 // sourceReady. Dipanggil endpoint /api/clipper/input. Video cuma disimpan sekali;
@@ -935,12 +998,36 @@ async function clipMakeCover(job, cand) {
     const src = plain && fs.existsSync(plain) ? plain : (fs.existsSync(finalF) ? finalF : null);
     if (!src) return null;
     const len = Math.max(0.2, (cand.end || 0) - (cand.start || 0));
-    const at = Math.min(Math.max(0, len - 0.1), Math.max(0, Number.isFinite(+cand.coverAt) ? +cand.coverAt : Math.min(2, len * 0.3)));
+    let at = Math.min(Math.max(0, len - 0.1), Math.max(0, Number.isFinite(+cand.coverAt) ? +cand.coverAt : Math.min(2, len * 0.3)));
+    // Frame TERBAIK (gaya Smart Cover ClipperStudio): bila user tidak
+    // memilih frame sendiri dan ada track wajah, pakai detik dengan wajah
+    // TERBESAR (sedang ngomong dapat bonus) — bukan asal detik awal, biar
+    // poster tidak kena frame gelap / sisipan grafis tanpa orang.
+    if (!Number.isFinite(+cand.coverAt)) {
+      try {
+        const tfb = path.join(job.dir, 'clip_' + cand.index + '_facetrack.json');
+        if (fs.existsSync(tfb)) {
+          const tdb = JSON.parse(fs.readFileSync(tfb, 'utf8'));
+          let bt = null, bs = -1;
+          for (const smp of tdb.track || []) {
+            if (!smp || !Array.isArray(smp.faces) || !smp.faces.length) continue;
+            const area = Math.max.apply(null, smp.faces.map(f => (+f.w || 0) * (+f.h || 0)));
+            const sc = area * (smp.speaking ? 1.15 : 1);
+            if (sc > bs) { bs = sc; bt = +smp.t || 0; }
+          }
+          if (bt !== null && Number.isFinite(bt)) at = Math.min(Math.max(0, len - 0.1), Math.max(0, bt));
+        }
+      } catch {}
+    }
     const text = String(cand.coverText || cand.title || '').trim();
     if (!text) return null;
     const tmpFrame = path.join(os.tmpdir(), 'clipcover-' + job.id + '-' + cand.index + '.jpg');
     const assFile = path.join(job.dir, 'cover_' + cand.index + '.ass');
-    fs.writeFileSync(assFile, clipperLib.buildCoverAss(text));
+    // Posisi kotak cover (keputusan Dzaky 23 Okt): gaya Kartu di BAWAH,
+    // tengah kotak mengikuti posisi subtitle klip (cand.subYPercent,
+    // bawaan 65%) — bukan lagi zona atas/bawah dari posisi wajah.
+    const yPctCover = Number.isFinite(+cand.subYPercent) ? Math.min(88, Math.max(12, +cand.subYPercent)) : 65;
+    fs.writeFileSync(assFile, clipperLib.buildCoverAss(text, { yPercent: yPctCover }));
     const ex = await clipRun('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-ss', String(at), '-i', src, '-frames:v', '1', '-q:v', '3', '-y', tmpFrame], { timeout: 60000 });
     if (ex.code !== 0 || !fs.existsSync(tmpFrame)) return null;
     const out = path.join(job.dir, 'cover_' + cand.index + '.jpg');
@@ -979,7 +1066,7 @@ async function clipWhisperTranscribe(file, job) {
 // dulu (bila key ada), lalu Whisper lokal, lalu throw (pemanggil fallback
 // ke caption YouTube).
 function clipNormTranscribeVia(v) {
-  return v === 'groq' ? 'groq' : v === 'local' ? 'local' : 'auto';
+  return v === 'groq' ? 'groq' : v === 'local' ? 'local' : v === 'device' ? 'device' : 'auto';
 }
 // Transkrip otomatis (STT bertimestamp per kata — mekanisme Flufclip: percaya
 // timestamp kata STT apa adanya, tanpa offset). Mode dari setting Transkrip:
@@ -1025,7 +1112,20 @@ function clipFilterMixedLang(segments) {
   return filtered.map(({ _lang, ...rest }) => rest);
 }
 async function clipTranscribeAuto(file, job, transcribeVia) {
-  const mode = clipNormTranscribeVia(transcribeVia);
+  let mode = clipNormTranscribeVia(transcribeVia);
+  if (!isAdminUser(job && job.user) && (mode === 'groq' || mode === 'auto')) {
+    mode = 'local';
+    clipLog(job, 'Akun non-admin: transkrip memakai Whisper lokal (Groq cloud khusus akun admin).');
+  }
+  if (mode === 'device') {
+    // Whisper di PERANGKAT user (browser): cues diunggah duluan oleh klien
+    // lewat /api/clipper/cues (source 'device'). Di sini tinggal pakai.
+    if (job && job.transcriptSource === 'device' && Array.isArray(job.cues) && job.cues.length) {
+      clipLog(job, 'Memakai transkrip dari perangkat user (' + job.cues.length + ' cue).');
+      return { segments: job.cues.map(c => ({ start: c.start, end: c.end, text: c.text, words: c.words })), language: clipTranscriptLang(job) || '', source: 'device' };
+    }
+    throw new Error('Transkrip perangkat belum diterima — browser user harus mentranskrip dulu (pilihan Transkrip: Perangkat saya, lalu klik Analisis).');
+  }
   // Filter bilingual: bila bahasa dipaksa 'id', buang duplikat EN (utamakan ID).
   const maybeFilter = (res) => {
     if (clipTranscriptLang(job) === 'id' && res && Array.isArray(res.segments)) {
@@ -1444,10 +1544,11 @@ async function clipFetchTranscript(job, dir) {
   const savedOk = job.cues && job.cues.length &&
     ((mode === 'groq' && job.transcriptSource === 'groq') ||
      (mode === 'local' && job.transcriptSource === 'whisper') ||
+     (mode === 'device' && job.transcriptSource === 'device') ||
      (mode === 'auto' && (job.transcriptSource === 'groq' || job.transcriptSource === 'whisper')));
   if (savedOk) {
     cues = job.cues;
-    source = job.transcriptSource === 'groq' ? 'Groq' : 'Whisper';
+    source = job.transcriptSource === 'groq' ? 'Groq' : job.transcriptSource === 'device' ? 'Perangkat kamu' : 'Whisper';
     const forced = clipTranscriptLang(job);
     langLabel = forced === 'en' ? 'Inggris' : forced === 'id' ? 'Indonesia' : 'Otomatis';
     clipLog(job, 'Memakai transkrip tersimpan (' + source + ', ' + cues.length + ' cue) — tidak transkrip ulang.');
@@ -1465,7 +1566,7 @@ async function clipFetchTranscript(job, dir) {
         // Catat eksplisit di log biar kelihatan sumber ketidakpresisiannya.
         if (!t.segments.some(s => Array.isArray(s.words) && s.words.length)) clipLog(job, 'Transkrip tanpa timestamp per kata — subtitle pakai bagi-rata (sinkronisasi perkiraan, tidak presisi).');
         job.transcriptSource = t.source;
-        source = t.source === 'groq' ? 'Groq' : 'Whisper';
+        source = t.source === 'groq' ? 'Groq' : t.source === 'device' ? 'Perangkat kamu' : 'Whisper';
         langLabel = autoLang === 'en' ? 'Inggris' : autoLang === 'id' ? 'Indonesia' : 'Otomatis';
       }
     } catch (e) {
@@ -1512,6 +1613,12 @@ function clipAppendCandidates(job, newCands, batchInfo) {
   const batchN = existing.reduce((m, c) => Math.max(m, (c.batch && +c.batch.n) || 0), 0) + 1;
   const batch = Object.assign({ n: batchN }, batchInfo || {});
   const stamped = (newCands || []).map((c, i) => Object.assign({}, c, { index: base + i, batch }));
+  if (job.titleDurDefault) for (const c of stamped) c.titleDur = job.titleDurDefault; // Smart Hook: durasi judul bawaan proyek
+  for (const c of stamped) { // Default gaya render dari sumber (Dzaky 23 Okt): judul gaya Kartu (hookPreset proyek) posisi atas 5%, subtitle Monospace posisi 65% — hanya bila kandidat belum membawa nilainya sendiri.
+    if (c.subPreset === undefined) c.subPreset = 'monospace';
+    if (c.subYPercent === undefined) c.subYPercent = 65;
+    if (c.titleYPercent === undefined) c.titleYPercent = 5;
+  }
   job.candidates = existing.concat(stamped);
   return stamped;
 }
@@ -1532,7 +1639,7 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
     if (job.moment === 'heatmap') {
       const hm = await clipFetchHeatmap(job);
       const { candidates, usedFallback } = await clipHeatmapOrFallback(job, hm, targetDur, count);
-      const final = sanitizeCandidates(candidates, job.duration, targetDur);
+      const final = clipperLib.sanitizeCandidates(candidates, job.duration, targetDur);
       const newCands = clipAppendCandidates(job, final.length ? final : fallbackCandidates(job.duration, targetDur, count), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset });
       if (job.hookPreset) for (const c of newCands) c.hookPreset = job.hookPreset; // Kartu Buat Klip → default semua kandidat baru
       if (!newCands.length) throw new Error('Tidak bisa membuat kandidat klip dari video ini.');
@@ -1569,10 +1676,13 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
     const chunks = cues.length ? clipperLib.chunkTranscript(cues, 8, 5000) : [];
     const useRouter = route === 'router' || route === 'router-pi' || route === 'router-pc' ? true : route === 'direct' ? false : !!R;
     const rWhich = routerWhich(route);
-    if (useRouter && rWhich === 'pc' && !RPC) throw fail('ROUTER_URL_PC belum diisi di .env untuk jalur 9router PC.', 'input');
-    if (useRouter && !model) throw fail('Pilih model/combo 9router untuk analisis di pengaturan AI Auto Clipper.', 'input');
-    if (!useRouter && !call[provider]) throw fail('Provider Direct tidak dikenal.', 'input');
-    if (!useRouter && !E[KEY[provider]]) throw fail(KEY[provider] + ' belum diisi di .env.', 'input');
+    const clipAdmin = isAdminUser(job.user);
+    if (clipAdmin) {
+      if (useRouter && rWhich === 'pc' && !RPC) throw fail('ROUTER_URL_PC belum diisi di .env untuk jalur 9router PC.', 'input');
+      if (useRouter && !model) throw fail('Pilih model/combo 9router untuk analisis di pengaturan AI Auto Clipper.', 'input');
+      if (!useRouter && !call[provider]) throw fail('Provider Direct tidak dikenal.', 'input');
+      if (!useRouter && !E[KEY[provider]]) throw fail(KEY[provider] + ' belum diisi di .env.', 'input');
+    }
     let allCand = [];
     const jobs = [];
     // Model cadangan kalau model 9router yang dipilih ternyata sudah EOL (410 Gone)
@@ -1602,6 +1712,17 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
       for (const p of DIRECT_ROT) if (p !== provider) attDirect(p);
       for (const p of Object.keys(call)) if (p.startsWith('custom:') && !DIRECT_ROT.includes(p) && p !== provider) attDirect(p);
     }
+    if (!clipAdmin) {
+      const own = userCustom(job.user);
+      for (const slug of Object.keys(own)) {
+        if (!clipAttempts.some(a => a.provider === 'custom:' + slug)) clipAttempts.push({ kind: 'direct', provider: 'custom:' + slug, label: 'Direct ' + slug });
+      }
+      for (let i = clipAttempts.length - 1; i >= 0; i--) {
+        const a = clipAttempts[i];
+        if (a.kind !== 'direct' || !String(a.provider || '').startsWith('custom:') || !own[String(a.provider).slice(7)]) clipAttempts.splice(i, 1);
+      }
+      if (!clipAttempts.length) throw fail('Akunmu belum punya koneksi AI. Tambahkan API key / base URL kamu di menu Koneksi AI dulu (tombol + Tambah AI), lalu analisis lagi.', 'input');
+    }
     const clipAiState = { idx: 0 };
     // Instruksi AI per proyek (dari Pengaturan Proyek, opsional): disisipkan ke
     // SEMUA prompt analisis (segmen + metadata) — misal "fokus ke momen lucu".
@@ -1612,7 +1733,8 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
         const prompt = 'Kamu analis konten video. Cari momen paling "wah" untuk klip Shorts/Reels.\n'
           + 'Video: "' + job.videoTitle + '" (durasi ' + Math.round(job.duration) + ' detik).\n'
           + 'Transkrip segmen [' + ch.start.toFixed(0) + 's - ' + ch.end.toFixed(0) + 's]:\n' + ch.text.slice(0, 12000) + '\n\n'
-          + 'Tugas: cari ' + count + ' momen paling wah (mengejutkan, lucu, emosional, kontroversial, atau bikin penasaran) untuk klip durasi sekitar ' + targetDur + ' detik.\n'
+          + 'Tugas: cari ' + (job.countAll ? 'SEMUA' : count) + ' momen paling wah (mengejutkan, lucu, emosional, kontroversial, atau bikin penasaran) untuk klip durasi sekitar ' + targetDur + ' detik.\n'          + 'ATURAN UNIT UTUH (WAJIB, permintaan pemilik channel): tiap kandidat harus SATU KESATUAN UTUH, bukan potongan menggantung. (1) Ada PERTANYAAN di momen itu (host bertanya, tamu ditanya, dst): start dari pertanyaan itu mulai diajukan, end SETELAH jawabannya selesai diucapkan — JANGAN berhenti di tengah jawaban. (2) Momen PENJELASAN / cerita: ambil sampai penjelasannya TUNTAS (ada kesimpulan / kalimat penutupnya), jangan kepotong di tengah penjelasan. (3) Keutuhan LEBIH penting daripada pas durasi: end boleh lebih panjang (dalam batas aturan durasi di bawah) demi menyelesaikan jawaban/penjelasan. (4) Prioritaskan momen tanya-jawab yang lengkap, penjelasan yang tuntas, dan momen berisi kata-kata bagus / quotable di atas momen sesaat yang menggantung. Ambil SEMUA momen yang memenuhi kriteria di segmen ini sampai jumlah yang diminta.\n'
+
           + 'Balas HANYA JSON array (tanpa markdown, tanpa penjelasan): [{"start":detik,"end":detik,"title":"Judul hook singkat maks 60 karakter","score":0-100,"reason":"satu kalimat","hook":[{"start":detik,"end":detik,"text":"TEKS 2-5 KATA"}],"caption":"1-2 kalimat caption siap posting tanpa hashtag","hashtags":["#tag1","#tag2"],"hookDur":"full"}]\n'
           + 'Caption + hashtag per kandidat (gaya Klipaja): caption 1-2 kalimat siap posting (tanpa hashtag, maks 200 karakter, nyambung sama momen klip itu), hashtags 3-5 hashtag relevan (diawali #).\n'
         + 'hookDur: "full" bila judul hook-nya layak tampil SEPANJANG klip (momen padat/klip pendek), "short" bila cukup tampil sebentar di awal.\n'
@@ -1646,7 +1768,7 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
         const timer = setTimeout(() => aiJob.ctrl.abort(), 10 * 60 * 1000);
         try {
           out = att.kind === 'router' ? await viaRouter(att.model, msgs, aiJob, att.which)
-            : await call[att.provider](msgs, aiJob);
+            : (clipAdmin ? await call[att.provider](msgs, aiJob) : await userCustomCall(job.user, String(att.provider).replace(/^custom:/, ''), msgs, aiJob));
           if (!String(out || '').trim()) throw fail('Model membalas kosong', 'empty');
           clipAiState.idx = k;
           lastErr = null;
@@ -1731,7 +1853,7 @@ function clipFfmpegError(stderr) {
 // { ok: false, attempted, error } bila semua runner gagal. Tiap runner yang
 // gagal di-log + lanjut ke runner berikutnya (Docker gagal BUKAN langsung
 // menyerah ke fokus statis — native dicoba dulu).
-async function clipRunFaceTrackRunner(job, ftArgs, dockerImage, logPrefix) {
+async function clipRunFaceTrackRunner(job, ftArgs, dockerImage, logPrefix, timeoutMs) {
   const script = path.join(__dirname, 'face_track.py');
   const runners = [];
   if (dockerImage) {
@@ -1753,7 +1875,7 @@ async function clipRunFaceTrackRunner(job, ftArgs, dockerImage, logPrefix) {
       // Timeout per runner 90 dtk (dulu 180): jalan normal ~25 dtk/klip 60 dtk;
       // 180 dtk bikin 1 klip gagal ngabisin 3 menit sebelum fallback fokus
       // statis (kejadian live 20 Okt: klip 3 timeout persis 180 dtk).
-      const out = await clipRun(r.cmd, r.args, { timeout: 90000 });
+      const out = await clipRun(r.cmd, r.args, { timeout: timeoutMs || 90000 });
       if (out && out.code !== 0) throw new Error('exit ' + out.code + (out.stderr ? ': ' + String(out.stderr).trim().split('\n').slice(-1)[0] : ''));
       return { ok: true, runner: r.name, attempted: runners.slice(0, i + 1).map(x => x.name) };
     }
@@ -1770,7 +1892,7 @@ async function clipFaceTrack(job, sel, cand) {
   try {
     if (fs.existsSync(trackFile) && fs.statSync(trackFile).size > 0) {
       const d = JSON.parse(fs.readFileSync(trackFile, 'utf8'));
-      if (Array.isArray(d.track) && d.track.length >= 2) return d.track;
+      if (Array.isArray(d.track) && d.track.length >= 2 && (+d.v || 1) >= 3) return d.track; // v<3 = track dari kode tracker lama -> hitung ulang
     }
   } catch {}
   const script = path.join(__dirname, 'face_track.py');
@@ -1790,6 +1912,28 @@ async function clipFaceTrack(job, sel, cand) {
     clipLog(job, 'Face tracking gagal (' + (e.message || e).toString().slice(0, 120) + ') — pakai fokus statis.');
   }
   return null;
+}
+
+// Scan kehadiran wajah RINGAN (fallback bila tracking penuh gagal/timeout —
+// permintaan Dzaky 23 Okt): face_track.py --presence mencatat ada/tidaknya
+// wajah per detik. Hasil -> segmen campuran (clipPresenceSegs): bagian ada
+// muka di-crop 9:16 full muka (track sintetis), sisanya Landscape. Cache
+// clip_<i>_presence.json. null bila scan gagal / file tidak kebaca.
+async function clipFacePresence(job, sel, cand) {
+  const file = path.join(job.dir, 'clip_' + sel.index + '_presence.json');
+  const toSegs = (d) => (d && Array.isArray(d.samples) && d.samples.length >= 2)
+    ? clipperLib.clipPresenceSegs(d.samples, cand.end - cand.start, d.width || 0, d.cropW || 0) : null;
+  try { if (fs.existsSync(file) && fs.statSync(file).size > 0) { const r = toSegs(JSON.parse(fs.readFileSync(file, 'utf8'))); if (r) return r; } } catch {}
+  const script = path.join(__dirname, 'face_track.py');
+  if (!fs.existsSync(script)) return null;
+  const dockerImage = E.FACE_TRACK_IMAGE || (E.FACE_TRACK_DOCKER === '1' ? 'facetrack' : null);
+  try {
+    clipLog(job, 'Scan wajah ringan klip ' + (sel.index + 1) + ' (fallback tracking gagal)…');
+    const args = ['--input', job.source, '--start', String(cand.start), '--end', String(cand.end), '--out', file, '--fps', '1', '--presence'];
+    const res = await clipRunFaceTrackRunner(job, args, dockerImage, 'Scan wajah', 120000);
+    if (!res.ok) { clipLog(job, 'Scan wajah gagal (' + res.attempted.join(' + ') + ').'); return null; }
+    return toSegs(JSON.parse(fs.readFileSync(file, 'utf8')));
+  } catch (e) { clipLog(job, 'Scan wajah gagal (' + (e.message || e).toString().slice(0, 120) + ').'); return null; }
 }
 
 // Face tracking SPLIT (2 pembicara atas-bawah): jalankan face_track.py --split
@@ -1863,6 +2007,7 @@ async function clipRender(job, selected, opts) {
     const cand = job.candidates.find(c => c.index === sel.index);
     if (!cand) { job.renders.push({ index: sel.index, title: sel.title || '', status: 'error', error: 'Kandidat tidak ditemukan' }); done++; continue; }
     const title = clipperLib.cleanTitle(sel.title, 120) || cand.title || ('Klip ' + (sel.index + 1)); // judul TIDAK PERNAH kosong
+    const titleText = String(sel.hookText || cand.hookText || '').trim() || title; // Teks Hook (panel Cover): teks judul yang tampil di video; kosong = judul klip
     // Geser Momen (Detail: tombol ⏪ Geser −5 dtk / ⏩ Geser +5 dtk): sel.start /
     // sel.end (hanya dikirim bila user menggeser — render biasa tidak mengirim,
     // jadi kandidat lama tidak tertimpa nilai basi) menimpa cand.start/cand.end.
@@ -2057,6 +2202,76 @@ async function clipRender(job, selected, opts) {
     let faceTrack = null;
     if ((opts.podcast || opts.gameplay) && opts.faceTrack !== false) faceTrack = await clipFaceTrack(job, sel, cand);
     else if ((opts.podcast || opts.gameplay) && done === 0) clipLog(job, 'Face tracking NONAKTIF (centang \u{1F3AF} Auto face tracking di Pengaturan Proyek mati) \u2014 crop pakai fokus statis.');
+    // Auto pintar (Fase 3, permintaan Dzaky): mode Auto + 2 wajah besar
+    // berdampingan di banyak sampel -> JANGAN crop 1 orang; pakai Landscape
+    // (muat utuh + background blur) biar dua-duanya kelihatan.
+    if ((effMode === 'auto' || effMode === 'podcast') && faceTrack) { // Auto + Podcast (pilihan Dzaky 23 Okt)
+      try {
+        const tf = path.join(job.dir, 'clip_' + sel.index + '_facetrack.json');
+        const td = JSON.parse(fs.readFileSync(tf, 'utf8'));
+        const duo = clipperLib.clipDuoInfo(td.track || faceTrack, td.width || 0);
+        if (duo.duo) {
+          clipLog(job, '✨ Kamera 2 orang klip ' + (sel.index + 1) + ': 2 wajah berdampingan di ' + Math.round(duo.ratio * 100) + '% frame — pakai Landscape (background blur), bukan crop 1 orang.');
+          faceTrack = null; opts.podcast = false;
+        }
+      } catch {}
+    }
+    // Gerbang kualitas tracking (tuning 23 Okt, permintaan Dzaky): bila
+    // tracking DIMINTA tapi hasilnya jelek (tracker gagal total, atau wajah
+    // jarang benar-benar di dalam jendela crop — crop meleset ke meja /
+    // tempat kosong), klip ini dirender LANDSCAPE (background blur) saja.
+    // Berlaku mode Podcast + Auto (mode FT). Face tracking MATI (centang
+    // off) tidak kena gerbang — tetap fokus statis seperti pilihan user.
+    // Framing per-bagian (Dzaky 23 Okt): JANGAN lagi satu klip penuh
+    // Landscape cuma karena tracking jelek/gagal. Yang benar: bagian yang
+    // ADA mukanya = crop 9:16 full muka; bagian TANPA muka (>= 1,5 dtk) =
+    // Landscape. mixFaceSegs = daftar segmen muka (detik relatif klip);
+    // buildFfmpegArgs mencampur dua rantai (portrait di segmen muka,
+    // Landscape di luar itu). Urutan keputusan:
+    //  - track gagal/timeout -> scan kehadiran ringan (--presence); muka
+    //    cukup sering (>= 15%) -> track sintetis + campuran; tidak -> Landscape penuh.
+    //  - track ada tapi crop sering kosong (gerbang lama) -> campuran dari
+    //    kehadiran track bila muka >= 15%; tidak -> Landscape penuh.
+    //  - track sehat -> campuran hanya bila ada celah tanpa wajah.
+    let mixFaceSegs = null;
+    if ((opts.podcast || opts.gameplay) && opts.faceTrack !== false) { // Podcast + Auto (duo Auto sudah diputus di blok Auto pintar)
+      let bad = false, why = '';
+      let td = null;
+      try { td = JSON.parse(fs.readFileSync(path.join(job.dir, 'clip_' + sel.index + '_facetrack.json'), 'utf8')); } catch {}
+      if (!faceTrack) { bad = true; why = 'tracker gagal / tidak ada track'; }
+      else if (td) {
+        const q = clipperLib.clipTrackQuality(td.track || faceTrack, td.cropW || 0);
+        if (q.bearing >= 4 && q.faceIn < 0.5) { bad = true; why = 'wajah di dalam frame cuma ' + Math.round(q.faceIn * 100) + '%'; }
+      }
+      if (opts.podcast && !faceTrack) {
+        const scanned = await clipFacePresence(job, sel, cand);
+        if (scanned && scanned.faceRatio >= 0.15 && scanned.track && scanned.faceSegs.length) {
+          faceTrack = scanned.track; mixFaceSegs = scanned.faceSegs;
+          clipLog(job, '🛟 Tracking gagal — scan wajah ringan: muka terdeteksi di ' + Math.round(scanned.faceRatio * 100) + '% klip. Bagian ada muka = full frame 9:16, sisanya Landscape.');
+        } else {
+          clipLog(job, '🛟 Tracking wajah kurang bagus klip ' + (sel.index + 1) + ' (' + why + ') — pakai Landscape (background blur) biar aman.');
+          opts.podcast = false;
+        }
+      } else if (opts.podcast && bad) {
+        const pres = (td && Array.isArray(td.track)) ? clipperLib.clipPresenceSegs(td.track.map(p => ({ t: p.t, face: Array.isArray(p.faces) && p.faces.length > 0 })), cand.end - cand.start, td.width || 0, td.cropW || 0) : null;
+        if (pres && pres.faceRatio >= 0.15 && pres.faceSegs.length) {
+          mixFaceSegs = pres.faceSegs;
+          clipLog(job, '🎞️ Klip ' + (sel.index + 1) + ': ' + why + ' — framing per-bagian: ada muka = full frame 9:16, tanpa muka = Landscape.');
+        } else {
+          clipLog(job, '🛟 Tracking wajah kurang bagus klip ' + (sel.index + 1) + ' (' + why + ') — pakai Landscape (background blur) biar aman.');
+          faceTrack = null; opts.podcast = false;
+        }
+      } else if (opts.podcast && td && Array.isArray(td.track)) {
+        const pres2 = clipperLib.clipPresenceSegs(td.track.map(p => ({ t: p.t, face: Array.isArray(p.faces) && p.faces.length > 0 })), cand.end - cand.start, td.width || 0, td.cropW || 0);
+        const covered = pres2.faceSegs.reduce((a, x) => a + (x.end - x.start), 0);
+        if (pres2.faceSegs.length && covered < (cand.end - cand.start) - 0.05) {
+          mixFaceSegs = pres2.faceSegs;
+          clipLog(job, '🎞️ Klip ' + (sel.index + 1) + ': sebagian klip tidak ada wajah — bagian itu pakai Landscape, bagian ada muka tetap full frame.');
+        }
+      } else if (bad && opts.gameplay) {
+        // Gameplay: perilaku lama (tanpa track -> facecam fokus statis).
+      }
+    }
     // Face tracking Split (checkbox ON): 2 track (kiri + kanan) per klip.
     // Gagal / tidak ada 2 wajah -> null -> fallback belah dua tetap.
     let splitTrack = null;
@@ -2071,7 +2286,7 @@ async function clipRender(job, selected, opts) {
     // kunci ('_q1080') — 720p TIDAK (kunci lama tetap kepakai, cache lama
     // tidak hangus).
     const modeKey = opts.split ? (splitTrack ? 'split_ft' : 'split') : (opts.podcast ? (faceTrack ? 'podcast_ft' : 'podcast') : (opts.crop11 ? 'crop11' : (opts.gameplay ? (faceTrack ? 'gameplay_ft' : 'gameplay') : bg)));
-    const plainFile = path.join(job.dir, clipPlainFileName(sel.index, modeKey + (quality === '1080p' ? '_q1080' : ''), cand.start, cand.end));
+    const plainFile = path.join(job.dir, clipPlainFileName(sel.index, modeKey + (mixFaceSegs ? '_mix' : '') + (quality === '1080p' ? '_q1080' : ''), cand.start, cand.end));
     const rec = { index: sel.index, title, status: 'running', size: 0, plainSize: 0, plainFile: path.basename(plainFile) };
     // Render ulang klip yang sama (misal judul diedit dari hasil render) MENGGANTIKAN
     // entri lama, bukan menambah duplikat — biar hasil render tidak tampil dobel.
@@ -2093,7 +2308,7 @@ async function clipRender(job, selected, opts) {
         const ass = clipperLib.buildAss(job.cues, cand.start, cand.end, {
           size: opts.subSize, marginV: opts.subMarginV, color: opts.subColor, bold: opts.subBold, font: opts.subFont,
         }, {
-          title, titleColor1, titleColor2: opts.titleColor2,
+          title: titleText, titleColor1, titleColor2: opts.titleColor2,
           titleSize: opts.titleSize, titleY: opts.titleY, titleBold: opts.titleBold, titleFont: opts.titleFont, titleItalic: !!opts.italic,
           titleYPercent, titleSizePercent, titleCardColor, // posisi/ukuran/warna kartu judul per-klip (Detail)
           subYPercent, subSizePercent, // posisi/ukuran subtitle per-klip (Detail)
@@ -2114,6 +2329,7 @@ async function clipRender(job, selected, opts) {
           kertasFont, kertasTextColor, kertasPaperColor, kertasHighlightColor,
           pillColor, kinetikTextColor, kinetikBigColor,
           titleAnim, // false = judul statis (tanpa animasi masuk)
+          styleOv: clipperLib.sanitizeStyleOv(sel.styleOv || cand.styleOv), // override gaya per-klip (Fase 13 Item 7-10)
           watermark: watermark.enabled && watermark.text ? { text: watermark.text, pos: watermark.pos } : null,
           cta: { enabled: false }, // CTA dihapus 2026-10-20 — tidak di-render.
           hook: useHook ? hookRel : [],
@@ -2124,7 +2340,7 @@ async function clipRender(job, selected, opts) {
       srtPath = buildAssFile(hookRel.length > 0);
       const len = cand.end - cand.start;
       const runFfmpeg = a => clipRun('ffmpeg', ['-hide_banner', '-loglevel', 'info', ...a], {
-        timeout: 20 * 60 * 1000, signal: job.abortCtrl.signal,
+        timeout: 40 * 60 * 1000, signal: job.abortCtrl.signal, // 40 mnt (Dzaky 23 Okt: Klip 12 Mongol tahap akhir 15,5 mnt — batas 20 mnt terlalu mepet)
         onStderr: s => {
           const m = /time=(\d+):(\d{2}):(\d{2})[.,](\d{2})/.exec(s);
           if (m && len > 0) {
@@ -2143,7 +2359,7 @@ async function clipRender(job, selected, opts) {
         for (let tryN = 0; tryN < 6 && !job.cancelled; tryN++) {
           const args = clipperLib.buildFfmpegArgs({
             start: cand.start, end: cand.end, input: job.source, output: plainFile,
-            bg: attempt.bg, plainOnly: true, simple: attempt.simple, podcast: !!opts.podcast, focus: opts.focus, faceTrack,
+            bg: attempt.bg, plainOnly: true, simple: attempt.simple, podcast: !!opts.podcast, focus: opts.focus, faceTrack, mixFaceSegs,
             split: !!opts.split, splitTrack, // Split: 2 panel atas-bawah (per klip)
             crop11: !!opts.crop11, gameplay: !!opts.gameplay, // Crop 1:1 / Gameplay (per klip)
             outW, outH, // resolusi output (Kualitas Render: 720p / 1080p)
@@ -2293,6 +2509,10 @@ async function clipRender(job, selected, opts) {
       }
       if (!r || r.code !== 0 || !fs.existsSync(outFile)) throw new Error('ffmpeg gagal: ' + clipFfmpegError(r ? r.stderr : ''));
       rec.status = 'done'; rec.size = fs.statSync(outFile).size;
+      // Smart Cover (Fase 3): poster otomatis tiap Final selesai (bila skill-nya ON di proyek ini).
+      if (fs.existsSync(path.join(job.dir, 'cover_' + sel.index + '.jpg'))) rec.cover = true; // cover lama tetap diakui walau record render baru
+      if (job.smartCover) { const cc = cand; clipMakeCover(job, cc).then(p => { if (p) clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' dibuat otomatis.'); else clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' TIDAK dibuat (sumber polos/final tidak ketemu atau ffmpeg gagal) — buat manual dari tab Cover di Edit klip.'); }).catch(() => { try { clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' gagal dibuat (error) — buat manual dari tab Cover.'); } catch {} }); }
+      else clipLog(job, '🖼️ Smart Cover nonaktif di proyek ini — poster otomatis tidak dibuat (nyalakan di Pengaturan > Skill Packs).');
       // Versi render (brief F, 22 Okt): hash dari isi ASS final + mode +
       // kualitas. ASS versi ini disimpan permanen (clip_<i>_<hash>.ass) dan
       // hash masuk nama + URL unduhan -> tidak ada unduhan versi lama.
@@ -2532,7 +2752,37 @@ const server = http.createServer(async (req, res) => {
   const libLoad = u => { try { const a = JSON.parse(fs.readFileSync(libFile(u), 'utf8')); return Array.isArray(a) ? a : []; } catch { return []; } };
   const libSave = (u, arr) => { try { fs.writeFileSync(libFile(u), JSON.stringify(arr)); return true; } catch { return false; } };
   const LIB_TYPES = ['long', 'short', 'riset', 'seo', 'clipper'];
+  // Hapus file video milik entri Library klip (render di folder proyek +
+  // Final yang diselamatkan di folder library). Proyek + sumber TIDAK disentuh.
+  function libDeleteClipFiles(it) {
+    if (!it || it.type !== 'clipper') return;
+    if (it.jobId) { try { const job = clipperJobs && clipperJobs.get(it.jobId); const r = job && job.renders && job.renders[it.renderIdx]; if (r && r.file && fs.existsSync(r.file)) fs.unlinkSync(r.file); } catch {} }
+    for (const rel of [it.finalVideo, it.finalThumb]) {
+      if (!rel || rel.includes('..') || path.isAbsolute(rel)) continue;
+      try { const f = path.join(libDir(), rel); if (f.startsWith(libDir() + path.sep) && fs.existsSync(f)) fs.unlinkSync(f); } catch {}
+    }
+  }
+  // Auto-hapus Hasil klip berumur > 1 minggu (pilihan Dzaky 23 Okt — folder
+  // server lega). Hanya entri type 'clipper' (Hasil Script VO tidak ikut).
+  // Jalan throttled saat GET /api/library (maks 1x/jam per user).
+  const libSweepAt = new Map();
+  function libSweepExpired(user) {
+    try {
+      const now = Date.now();
+      if (now - (libSweepAt.get(user) || 0) < 3600e3) return;
+      libSweepAt.set(user, now);
+      const arr = libLoad(user);
+      const keep = []; let changed = false;
+      for (const it of arr) {
+        const age = now - (+it.createdAt || now);
+        if (it.type === 'clipper' && age > 7 * 24 * 3600e3) { libDeleteClipFiles(it); changed = true; continue; }
+        keep.push(it);
+      }
+      if (changed) libSave(user, keep);
+    } catch {}
+  }
   if (req.method === 'GET' && p === '/api/library') {
+    libSweepExpired(sessUser(req));
     const items = libLoad(sessUser(req)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     const counts = {}; LIB_TYPES.forEach(t => counts[t] = items.filter(x => x.type === t).length);
     return send(res, 200, { items, counts, total: items.length });
@@ -2680,6 +2930,78 @@ const server = http.createServer(async (req, res) => {
     }, 300);
     return;
   }
+  // Kunci TTS pribadi (Koneksi AI, slot API TTS) — GET tidak pernah mengembalikan key.
+  if (p === '/api/my-tts-key') {
+    const tu = sessUser(req).toLowerCase();
+    if (req.method === 'GET') return send(res, 200, { set: !!userTtsKey(tu) });
+    if (req.method === 'POST') {
+      let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e4) break; }
+      let b = {}; try { b = JSON.parse(raw); } catch {}
+      const key = String(b.apiKey || '').trim();
+      if (/[\r\n]/.test(key) || key.length > 2000) return send(res, 400, { error: 'API key tidak valid' });
+      if (!USER_TTS_KEYS[tu]) USER_TTS_KEYS[tu] = {};
+      if (key) USER_TTS_KEYS[tu].elevenlabs = key; else delete USER_TTS_KEYS[tu].elevenlabs;
+      saveUserTtsKeys();
+      return send(res, 200, { ok: true, set: !!key });
+    }
+  }
+  // Gerbang TTS non-admin: engine server (9router/Gemini/Google/OpenAI/ElevenLabs
+  // admin) tertutup; yang terbuka hanya ElevenLabs dengan key pribadi user.
+  if (p.startsWith('/api/tts') && !isAdminUser(sessUser(req))) {
+    const tu = sessUser(req);
+    const myKey = userTtsKey(tu);
+    const adminNote = 'Khusus akun admin — akunmu memakai API TTS milikmu sendiri (ElevenLabs, slot API TTS di Koneksi AI).';
+    if (req.method === 'GET' && p === '/api/tts/engines') {
+      return send(res, 200, { engines: [
+        { id: 'router', label: '9router (Edge TTS gratis, dll.)', ok: false, note: adminNote },
+        { id: 'gemini', label: 'Google AI Studio (Gemini TTS, gratis)', ok: false, note: adminNote },
+        { id: 'google', label: 'Google Cloud TTS', ok: false, note: adminNote },
+        { id: 'openai', label: 'OpenAI TTS', ok: false, note: adminNote },
+        { id: 'elevenlabs', label: 'ElevenLabs (API TTS milikmu)', ok: !!myKey, note: myKey ? '' : 'Sambungkan API TTS (ElevenLabs) milikmu di menu Koneksi AI — ElevenLabs ada paket gratisnya.' },
+      ] });
+    }
+    if (req.method === 'GET' && p === '/api/tts/voices') {
+      if (u.searchParams.get('engine') !== 'elevenlabs') return send(res, 400, { error: adminNote });
+      if (!myKey) return send(res, 400, { error: 'Sambungkan API TTS (ElevenLabs) milikmu dulu di menu Koneksi AI.' });
+      try {
+        const r = await fetch((E.ELEVEN_BASE || 'https://api.elevenlabs.io') + '/v1/voices', { headers: { 'xi-api-key': myKey }, signal: AbortSignal.timeout(15000) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error((j.detail && j.detail.message) || 'HTTP ' + r.status);
+        const cap = x => x ? x[0].toUpperCase() + x.slice(1).toLowerCase() : '';
+        const catName = c => ({ premade: 'Premade', cloned: 'Kloningan', generated: 'AI', professional: 'Pro', famous: 'Famous' }[(c || '').toLowerCase()] || (c ? cap(c) : 'Suara'));
+        const voices = (j.voices || []).map(v => ({ id: v.voice_id, label: (v.labels && v.labels.gender ? cap(v.labels.gender) + ' - ' : '') + v.name + ' (' + catName(v.category) + ')' })).slice(0, 200);
+        return send(res, 200, { voices, pitch: false, note: 'Gratis: 10.000 karakter/bulan untuk semua voice di daftar. Kecepatan hanya 0.7x–1.2x.' });
+      } catch (e) { return send(res, 502, { error: 'ElevenLabs: ' + e.message }); }
+    }
+    if (req.method === 'POST' && p === '/api/tts') {
+      let raw = ''; for await (const c of req) { raw += c; if (raw.length > 4e5) return send(res, 413, { error: 'Terlalu besar' }); }
+      let b = {}; try { b = JSON.parse(raw || '{}'); } catch {}
+      if (String(b.engine || '') !== 'elevenlabs') return send(res, 400, { error: adminNote });
+      if (!myKey) return send(res, 400, { error: 'Sambungkan API TTS (ElevenLabs) milikmu dulu di menu Koneksi AI (slot API TTS).' });
+      if (!String(b.text || '').trim()) return send(res, 400, { error: 'Teks kosong' });
+      if (!String(b.voice || '').trim()) return send(res, 400, { error: 'Pilih suara dulu' });
+      const id = 'u' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const job = { id, status: 'running', done: 0, total: 0, ts: Date.now(), stopped: false };
+      userTtsJobs.set(id, job);
+      userTtsSynth(job, b, myKey).catch(e => { job.status = 'error'; job.error = job.stopped ? 'Dibatalkan oleh pengguna' : (e.message || String(e)); });
+      return send(res, 200, { id });
+    }
+    if (req.method === 'GET' && p === '/api/tts/status') {
+      const j = userTtsJobs.get(u.searchParams.get('id') || '');
+      return j ? send(res, 200, { status: j.status, done: j.done, total: j.total, error: j.error || null, bytes: j.bytes || 0, format: j.format || 'mp3' }) : send(res, 404, { error: 'Proses tidak ditemukan (server mungkin restart)' });
+    }
+    if (req.method === 'GET' && p === '/api/tts/audio') {
+      const a = userTtsAudios.get(u.searchParams.get('id') || '');
+      if (!a) return send(res, 404, { error: 'Audio tidak ditemukan atau sudah kedaluwarsa' });
+      res.writeHead(200, { 'content-type': 'audio/mpeg', 'content-length': a.buf.length, 'cache-control': 'no-store' }); res.end(a.buf); return;
+    }
+    if (req.method === 'POST' && p === '/api/tts/stop') {
+      const j = userTtsJobs.get(u.searchParams.get('id') || '');
+      if (j && j.status === 'running') j.stopped = true;
+      return send(res, 200, { ok: true, stopped: j ? 1 : 0 });
+    }
+    return send(res, 403, { error: adminNote });
+  }
   if (await tts.route(req, res, u, p)) return;
   if (req.method === 'GET' && (p === '/' || p === '/index.html'))
     return serve('index.html', 'text/html; charset=utf-8');
@@ -2718,6 +3040,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (req.method === 'GET' && p === '/api/health') {
+    const hUser = sessUser(req);
+    if (!isAdminUser(hUser)) {
+      // Non-admin: hanya provider miliknya sendiri; 9router/kunci bawaan server disembunyikan.
+      const direct = {};
+      for (const [slug, c] of Object.entries(userCustom(hUser))) {
+        direct['custom:' + slug] = c.apiKey ? { ok: true, model: c.model || '', name: c.name, custom: true, baseUrl: c.baseUrl }
+          : { ok: false, model: c.model || '', name: c.name, custom: true, baseUrl: c.baseUrl, reason: 'key belum' };
+      }
+      return send(res, 200, { mode: 'direct', admin: false,
+        router: { ok: false, reason: 'khusus akun admin', host: '', url: '' }, routerPc: { ok: false, reason: 'khusus akun admin', host: '', url: '' },
+        direct, elevenlabs: { ok: false, reason: 'khusus akun admin' }, groq: { ok: false, reason: 'khusus akun admin' }, ...direct });
+    }
     const direct = Object.fromEntries(Object.keys(KEY).map(k => {
       const ok = hasKey(E[KEY[k]]);
       return [k, ok ? { ok, model: M[k] } : { ok, model: M[k], reason: 'key belum' }];
@@ -2731,7 +3065,7 @@ const server = http.createServer(async (req, res) => {
     // Paralel agar health tidak menunggu 2x timeout bila keduanya mati.
     const [router, routerPc] = await Promise.all([probeRouter('pi'), probeRouter('pc')]);
     const elevenlabsOk = hasKey(E.ELEVENLABS_API_KEY), groqOk = hasKey(E.GROQ_API_KEY);
-    return send(res, 200, { mode: R ? 'router' : 'direct', router, routerPc, direct,
+    return send(res, 200, { admin: true, mode: R ? 'router' : 'direct', router, routerPc, direct,
       elevenlabs: elevenlabsOk ? { ok: true } : { ok: false, reason: 'key belum' },
       groq: groqOk ? { ok: true } : { ok: false, reason: 'key belum' }, ...direct,
       // legacy fields agar dashboard lama tetap jalan:
@@ -2754,6 +3088,7 @@ const server = http.createServer(async (req, res) => {
     fs.renameSync(tmp, file);
   }
   if (req.method === 'POST' && p === '/api/key') {
+    if (!isAdminUser(sessUser(req))) return send(res, 403, { error: 'Kunci server hanya bisa diubah akun admin. Tambahkan AI kamu sendiri lewat tombol + Tambah AI di Koneksi AI.' });
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e4) break; }
     let name = '', value = '';
     try { const j = JSON.parse(raw); name = j.name; value = j.value; } catch {}
@@ -2768,6 +3103,28 @@ const server = http.createServer(async (req, res) => {
   // Key langsung aktif (process.env di-set juga), tanpa restart.
   const saveCustom = () => { try { fs.writeFileSync(CUSTOM_FILE, JSON.stringify(Object.values(CUSTOM), null, 2)); } catch {} };
   if (req.method === 'POST' && p === '/api/custom-provider') {
+    const cpUser = sessUser(req);
+    if (!isAdminUser(cpUser)) {
+      let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e4) break; }
+      let b = {}; try { b = JSON.parse(raw); } catch {}
+      const name = String(b.name || '').trim().slice(0, 60);
+      const apiKey = String(b.apiKey || '').trim();
+      const baseUrl = String(b.baseUrl || '').trim().replace(/\/$/, '');
+      const model = String(b.model || '').trim().slice(0, 120);
+      if (!name) return send(res, 400, { error: 'Nama AI wajib diisi' });
+      if (/[\r\n]/.test(apiKey) || apiKey.length > 2000) return send(res, 400, { error: 'API key tidak valid' });
+      if (!/^https?:\/\/.+/i.test(baseUrl)) return send(res, 400, { error: 'Base URL harus diawali http:// atau https://' });
+      if (!model) return send(res, 400, { error: 'Model wajib diisi' });
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'custom';
+      if (slug === 'gemini' || slug === 'claude' || slug === 'openai') return send(res, 400, { error: 'Nama ini bentrok dengan provider bawaan' });
+      const ukey = cpUser.toLowerCase();
+      if (!USER_PROVIDERS[ukey]) USER_PROVIDERS[ukey] = {};
+      const prev = USER_PROVIDERS[ukey][slug];
+      if (!apiKey && !prev) return send(res, 400, { error: 'API key wajib diisi untuk AI baru' });
+      USER_PROVIDERS[ukey][slug] = { slug, name, baseUrl, model, apiKey: apiKey || (prev && prev.apiKey) || '' };
+      saveUserProviders();
+      return send(res, 200, { ok: true, slug, provider: { slug, name, baseUrl, model } });
+    }
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e4) break; }
     let b = {}; try { b = JSON.parse(raw); } catch {}
     const name = String(b.name || '').trim().slice(0, 60);
@@ -2792,6 +3149,14 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'DELETE' && p === '/api/custom-provider') {
     const slug = String(u.searchParams.get('slug') || '').trim();
+    const cdUser = sessUser(req);
+    if (!isAdminUser(cdUser)) {
+      const ukey2 = cdUser.toLowerCase();
+      if (!USER_PROVIDERS[ukey2] || !USER_PROVIDERS[ukey2][slug]) return send(res, 404, { error: 'Provider tidak ditemukan' });
+      delete USER_PROVIDERS[ukey2][slug];
+      saveUserProviders();
+      return send(res, 200, { ok: true });
+    }
     if (!CUSTOM[slug]) return send(res, 404, { error: 'Provider tidak ditemukan' });
     const envVar = CUSTOM[slug].envVar;
     delete CUSTOM[slug]; delete KEY['custom:' + slug]; delete M['custom:' + slug]; delete call['custom:' + slug];
@@ -2801,6 +3166,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, { ok: true });
   }
   if (req.method === 'GET' && p === '/api/models') {
+    if (!isAdminUser(sessUser(req))) return send(res, 200, { models: [] }); // 9router khusus admin
     // ?router=pi|pc (default pi). Router yang dipilih down -> 502 seperti
     // sebelumnya (tanpa fallback otomatis — user pilih manual via dropdown).
     const which = routerWhich(u.searchParams.get('router'));
@@ -2849,7 +3215,14 @@ const server = http.createServer(async (req, res) => {
       // Jika route tidak dikirim, pakai perilaku lama (global R = Pi).
       const useRouter = route === 'router' || route === 'router-pi' || route === 'router-pc' ? true : route === 'direct' ? false : !!R;
       const rWhich = routerWhich(route);
-      if (useRouter) {
+      const runUser = sessUser(req);
+      const runAdmin = isAdminUser(runUser);
+      const ownSlug = (typeof provider === 'string' && provider.startsWith('custom:')) ? provider.slice(7) : '';
+      if (!runAdmin) {
+        if (useRouter || !ownSlug || !userCustom(runUser)[ownSlug]) {
+          return send(res, 400, { error: 'Akunmu belum punya koneksi AI yang bisa dipakai untuk jalur ini. Tambahkan API key / base URL kamu di menu Koneksi AI (tombol + Tambah AI), lalu pilih provider itu (Direct).' });
+        }
+      } else if (useRouter) {
         if (rWhich === 'pc' && !RPC) return send(res, 400, { error: 'ROUTER_URL_PC belum diisi di .env untuk jalur 9router PC' });
         if (rWhich === 'pi' && !R) return send(res, 400, { error: 'ROUTER_URL belum diisi di .env untuk jalur 9router' });
         if (!mdl) return send(res, 400, { error: 'Pilih model atau combo untuk tahap ini' });
@@ -2862,7 +3235,7 @@ const server = http.createServer(async (req, res) => {
       Object.defineProperty(job, 'ctrl', { value: new AbortController(), enumerable: false });
       jobs.set(id, job);
       const timer = setTimeout(() => job.ctrl.abort(), LIMIT);
-      (useRouter ? viaRouter(mdl, msgs, job, rWhich) : call[provider](msgs, job))
+      (useRouter ? viaRouter(mdl, msgs, job, rWhich) : (runAdmin ? call[provider](msgs, job) : userCustomCall(runUser, ownSlug, msgs, job)))
         .then(t => { job.status = 'done'; job.text = t; })
         .catch(e => {
           const a = abortErr(e, job) || e;
@@ -2966,7 +3339,9 @@ const server = http.createServer(async (req, res) => {
     if (job.status === 'running' || job.status === 'rendering') return send(res, 409, { error: 'Masih ada proses clipper berjalan. Tunggu selesai atau hapus dulu.' });
     if (!job.sourceReady || !job.source || !fs.existsSync(job.source)) return send(res, 400, { error: 'Video belum tersimpan di server. Klik Simpan video ke server / Upload video dulu.' });
     const duration = [15, 30, 60, 90, 120].includes(b.duration) ? b.duration : 30; // durasi klip: 15 / 30 / 60 / 90 / 120 detik (preset gaya Klipaja)
-    const count = clipperLib.clampInt(b.count, 1, 6, 3);
+    const countAll = b.count === 'all'; // opsi '✨ Semua klip bagus' (permintaan Dzaky 23 Okt)
+    const count = countAll ? 30 : clipperLib.clampInt(b.count, 1, 6, 3);
+    job.countAll = countAll;
     const provider = (['gemini', 'claude', 'openai', ...Object.keys(CUSTOM).map(s => 'custom:' + s)].includes(b.provider) ? b.provider : 'claude');
     const model = String(b.model || '').slice(0, 200);
     const route = ['router', 'router-pi', 'router-pc', 'direct', 'none'].includes(b.route) ? b.route : null;
@@ -2985,6 +3360,8 @@ const server = http.createServer(async (req, res) => {
     job.bg = ['black', 'white'].includes(b.bg) ? b.bg : 'blur';
     job.focus = clipperLib.clampInt(b.focus, 0, 100, 50) / 100;
     job.faceTrack = b.faceTrack !== false;
+    job.smartCover = !!b.smartCover; // Skill Smart Cover (Fase 3): poster otomatis tiap Final
+    job.titleDurDefault = ['auto', '5s', 'full'].includes(b.titleDurDefault) ? b.titleDurDefault : null; // Skill Smart Hook (Fase 3): durasi judul bawaan kandidat baru
     job.quality = b.quality === '1080p' ? '1080p' : '720p'; // Kualitas Render (Pengaturan, default 720p)
     // Kartu judul (dropdown Kartu di Buat Klip, gaya Klipaja): preset judul
     // default untuk semua kandidat dari analisis ini (Edit per-klip bisa
@@ -3082,7 +3459,7 @@ const server = http.createServer(async (req, res) => {
   // GET = baca; POST = simpan (hanya kunci yang dikenal, + updatedAt).
   // Frontend: startup muat dari server (server menang bila ada), tiap
   // perubahan disimpan ke server (debounce) + localStorage (fallback offline).
-  const CLIPPER_SETTING_KEYS = ['route', 'model', 'provider', 'transcribe', 'transcriptLang', 'duration', 'moment', 'mode', 'bg', 'focus', 'faceTrack', 'quality', 'hookPreset'];
+  const CLIPPER_SETTING_KEYS = ['route', 'model', 'provider', 'transcribe', 'transcriptLang', 'duration', 'moment', 'mode', 'bg', 'focus', 'faceTrack', 'quality', 'hookPreset', 'smartCover', 'titleDurDefault'];
   if (req.method === 'GET' && p === '/api/clipper/settings') {
     let st = {}; try { st = JSON.parse(fs.readFileSync(stateFile(sessUser(req)), 'utf8')); } catch {}
     const s = (st && typeof st.clipperSettings === 'object') ? st.clipperSettings : {};
@@ -3184,6 +3561,58 @@ const server = http.createServer(async (req, res) => {
   // Edit teks subtitle (perbaiki transkrip Whisper yang tidak sesuai ucapan).
   // Frontend mengirim daftar cue lengkap (yang sudah diedit); server validasi +
   // simpan ke job.cues + job.json. Render berikutnya memakai cue yang sudah diperbaiki.
+  if (req.method === 'POST' && p === '/api/clipper/candidates') {
+    // Simpan editan editor (judul/subtitle/gaya per kandidat) TANPA render
+    // (alur baru Dzaky 23 Okt: Simpan != render; render dari tab Render).
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 4e6) break; }
+    let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
+    const job = clipperJobs.get(String(b.id || b.jobId || ''));
+    if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    if (!Array.isArray(b.candidates) || !b.candidates.length) return send(res, 400, { error: 'candidates kosong.' });
+    // Gabung per index dengan whitelist field yang boleh diedit editor
+    // (JANGAN sanitizeCandidates di sini: fungsi itu membuang field gaya +
+    // index/batch). Pola sama seperti rute render meneruskan field per-klip.
+    const EDITABLE = ['title', 'hook', 'speakers', 'quality', 'showTitle', 'showSub', 'subSet', 'subPreset', 'hookPreset', 'subFont', 'titleFont', 'kertasFont', 'kertasTextColor', 'kertasPaperColor', 'kertasHighlightColor', 'pillColor', 'kinetikTextColor', 'kinetikBigColor', 'titleAnim', 'titleYPercent', 'titleSizePercent', 'subYPercent', 'subSizePercent', 'titleDur', 'titleDurSec', 'hookOn', 'coverText', 'coverAt', 'hookText', 'musicEnabled', 'musicVolume', 'brollEnabled', 'brollCount', 'brollStart', 'brollDur', 'styleOv'];
+    let n = 0;
+    for (const inc of b.candidates) {
+      if (!inc || typeof inc !== 'object') continue;
+      const cur = job.candidates.find(c => c.index === +inc.index);
+      if (!cur) continue;
+      for (const k of EDITABLE) if (inc[k] !== undefined) cur[k] = inc[k];
+      const st = +inc.start, en = +inc.end; // Geser Momen dari editor (berpenjaga)
+      if (Number.isFinite(st) && Number.isFinite(en) && st >= 0 && en > st && (!job.duration || en <= job.duration + 1)) { cur.start = st; cur.end = en; }
+      n++;
+    }
+    if (!n) return send(res, 400, { error: 'candidates tidak valid.' });
+    clipSaveJob(job);
+    return send(res, 200, { ok: true, count: n });
+  }
+  // Audio untuk Whisper di perangkat user (Fase 10): server mengekstrak
+  // audio sumber jadi mp3 mono 16kHz kecil (mesin yang sama dengan kompres
+  // Groq), browser user mengunduhnya lalu mentranskrip dengan CPU/GPU-nya
+  // sendiri — server tidak ikut terbebani STT.
+  if (req.method === 'POST' && p === '/api/clipper/prepare-audio') {
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e5) break; }
+    let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
+    const job = clipperJobs.get(String(b.jobId || ''));
+    if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    if (!job.source || !fs.existsSync(job.source)) return send(res, 409, { error: 'Video sumber belum tersimpan di server.' });
+    const out = path.join(job.dir, 'audio_device.mp3');
+    try {
+      if (!fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(job.source).mtimeMs) await clipGroqCompress(job.source, 0, 0, out, job);
+      return send(res, 200, { ok: true, size: fs.statSync(out).size });
+    } catch (e) { return send(res, 500, { error: 'Gagal menyiapkan audio: ' + (e.message || e) }); }
+  }
+  if (req.method === 'GET' && p === '/api/clipper/audio') {
+    const job = clipperJobs.get(String(u.searchParams.get('id') || ''));
+    if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    const f = path.join(job.dir, 'audio_device.mp3');
+    if (!fs.existsSync(f)) return send(res, 404, { error: 'Audio belum disiapkan' });
+    const st = fs.statSync(f);
+    res.writeHead(200, { 'content-type': 'audio/mpeg', 'content-length': st.size, 'cache-control': 'no-store' });
+    fs.createReadStream(f).pipe(res);
+    return;
+  }
   if (req.method === 'POST' && p === '/api/clipper/cues') {
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 2e5) break; }
     let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
@@ -3213,6 +3642,7 @@ const server = http.createServer(async (req, res) => {
     }
     cues.sort((a, b2) => a.start - b2.start);
     if (!cues.length) return send(res, 400, { error: 'Tidak ada cue subtitle yang valid.' });
+    if (b.source === 'device') job.transcriptSource = 'device'; // transkrip Whisper dari perangkat user
     job.cues = cues;
     job.ts = Date.now();
     clipSaveJob(job);
@@ -3511,7 +3941,7 @@ const server = http.createServer(async (req, res) => {
     const sel = (b.sel && typeof b.sel === 'object') ? b.sel : {};
     const hexOrU = (v) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : undefined;
     const numU = (v) => Number.isFinite(+v) && v !== undefined && v !== null ? +v : undefined;
-    const title = String(sel.title !== undefined ? sel.title : (cand.title || '')).trim();
+    const title = String(sel.hookText || cand.hookText || (sel.title !== undefined ? sel.title : (cand.title || ''))).trim();
     const showTitle = sel.showTitle !== undefined ? !!sel.showTitle : (cand.showTitle !== undefined ? !!cand.showTitle : true);
     const showSub = sel.showSub !== undefined ? !!sel.showSub : true;
     const subPreset = String(sel.subPreset || cand.subPreset || 'default');
@@ -3540,6 +3970,7 @@ const server = http.createServer(async (req, res) => {
       kinetikTextColor: hexOrU(sel.kinetikTextColor) || hexOrU(cand.kinetikTextColor),
       kinetikBigColor: hexOrU(sel.kinetikBigColor) || hexOrU(cand.kinetikBigColor),
       titleAnim: sel.titleAnim !== undefined ? !!sel.titleAnim : (cand.titleAnim !== undefined ? !!cand.titleAnim : undefined),
+      styleOv: clipperLib.sanitizeStyleOv(sel.styleOv || cand.styleOv), // override gaya per-klip (Fase 13 Item 7-10)
       watermark: (sel.watermark && sel.watermark.enabled && sel.watermark.text) ? { text: String(sel.watermark.text), pos: String(sel.watermark.pos || 'bl') } : null,
       cta: { enabled: false },
       hook: [],
@@ -3587,6 +4018,35 @@ const server = http.createServer(async (req, res) => {
     stream.pipe(res);
     return;
   }
+  if (req.method === 'GET' && p === '/api/clipper/peaks') {
+    // Puncak audio (waveform) trek Audio di Timeline Editor Studio: ffmpeg
+    // ekstrak audio segmen klip (mono 8kHz f32le ke file temp) -> maks abs
+    // per ember (240 ember), dinormalkan 0..1. Cache per (start,end) klip.
+    const job = clipperJobs.get(u.searchParams.get('id') || '');
+    const idx = +(u.searchParams.get('clip') || 0);
+    if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    const cand = (job.candidates || []).find(c => c.index === idx);
+    if (!cand) return send(res, 404, { error: 'Klip tidak ditemukan.' });
+    const cacheF = path.join(job.dir, 'peaks_' + idx + '.json');
+    try { const cached = JSON.parse(fs.readFileSync(cacheF, 'utf8')); if (cached && Math.abs((+cached.start || 0) - cand.start) < 0.05 && Math.abs((+cached.end || 0) - cand.end) < 0.05 && Array.isArray(cached.peaks) && cached.peaks.length) return send(res, 200, { ok: true, peaks: cached.peaks }); } catch {}
+    const srcF = path.join(job.dir, 'source.mp4');
+    if (!fs.existsSync(srcF)) return send(res, 404, { error: 'Video sumber tidak ada.' });
+    const dur = Math.max(0.5, cand.end - cand.start);
+    const tmpPcm = path.join(os.tmpdir(), 'clippeaks-' + job.id + '-' + idx + '.f32');
+    try {
+      const ex = await clipRun('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-ss', String(cand.start), '-i', srcF, '-t', String(dur), '-vn', '-ac', '1', '-ar', '8000', '-f', 'f32le', '-y', tmpPcm], { timeout: 120000 });
+      if (ex.code !== 0 || !fs.existsSync(tmpPcm)) return send(res, 422, { error: 'Gagal membaca audio klip.' });
+      const buf = fs.readFileSync(tmpPcm);
+      const total = Math.floor(buf.length / 4);
+      if (!total) return send(res, 422, { error: 'Audio klip kosong.' });
+      const N = 240, per = total / N, peaks = new Array(N).fill(0);
+      for (let b = 0; b < N; b++) { const s0 = Math.floor(b * per), s1 = Math.max(s0 + 1, Math.floor((b + 1) * per)); let mx = 0; for (let s = s0; s < s1 && s < total; s++) { const v = Math.abs(buf.readFloatLE(s * 4)); if (v > mx) mx = v; } peaks[b] = mx; }
+      const gmax = Math.max.apply(null, peaks) || 1;
+      const norm = peaks.map(v => Math.round((v / gmax) * 1000) / 1000);
+      try { fs.writeFileSync(cacheF, JSON.stringify({ start: cand.start, end: cand.end, peaks: norm })); } catch {}
+      return send(res, 200, { ok: true, peaks: norm });
+    } finally { try { fs.unlinkSync(tmpPcm); } catch {} }
+  }
   if (req.method === 'POST' && p === '/api/clipper/cover') {
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e5) break; }
     let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
@@ -3595,11 +4055,25 @@ const server = http.createServer(async (req, res) => {
     const cand = (job.candidates || []).find(c => c.index === +b.clip);
     if (!cand) return send(res, 404, { error: 'Klip tidak ditemukan.' });
     if (b.coverText !== undefined) cand.coverText = String(b.coverText || '').slice(0, 90);
-    if (b.coverAt !== undefined && Number.isFinite(+b.coverAt)) cand.coverAt = Math.max(0, +b.coverAt);
+    if (b.coverAt === null) delete cand.coverAt; else if (b.coverAt !== undefined && Number.isFinite(+b.coverAt)) cand.coverAt = Math.max(0, +b.coverAt);
     clipSaveJob(job);
     const out = await clipMakeCover(job, cand);
     if (!out) return send(res, 422, { error: 'Poster cover gagal dibuat (video polos/final klip ini belum ada).' });
     return send(res, 200, { ok: true, cover: true });
+  }
+  if (req.method === 'POST' && p === '/api/clipper/cover-all') {
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e5) break; }
+    let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
+    const job = clipperJobs.get(String(b.jobId || b.id || ''));
+    if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    const targets = (job.candidates || []).filter(c => (job.renders || []).some(r => r.index === c.index && r.status === 'done'));
+    if (!targets.length) return send(res, 400, { error: 'Belum ada klip yang selesai dirender di proyek ini.' });
+    clipLog(job, '🖼️ Buat ulang cover SEMUA klip (' + targets.length + ') pakai gaya baru…');
+    let made = 0;
+    for (const c of targets) { if (await clipMakeCover(job, c)) made++; }
+    clipSaveJob(job);
+    clipLog(job, '🖼️ Cover selesai dibuat ulang: ' + made + '/' + targets.length + ' klip.');
+    return send(res, 200, { ok: true, made, total: targets.length });
   }
   if (req.method === 'POST' && p === '/api/clipper/cleanup') {
     const user = sessUser(req);

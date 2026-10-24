@@ -304,8 +304,39 @@ def detect_drift_bounds(values, jump, streak=SEGMENT_STREAK):
     return bounds
 
 
+def merge_short_bounds(values, bounds, min_len=2):
+    """Gabung segmen MIKRO ke tetangganya (Dzaky 23 Okt: crop sempat
+    nyorot kemeja/bahu sepersekian detik). Segmen dengan sampel non-None
+    < min_len (bawaan 2 sampel = 1 dtk @fps 2) tidak mungkin tembakan
+    pembicara yang sah — biasanya fallback badan sesaat / deteksi
+    parsial — batasnya dibuang supaya mediannya ikut segmen tetangga
+    (yang sebelumnya; segmen pertama ikut yang sesudahnya). Murni."""
+    n = len(values)
+    if n == 0 or not bounds or len(bounds) != n:
+        return list(bounds) if bounds else [False] * n
+    b = list(bounds)
+    b[0] = False
+    for _ in range(n):
+        starts = [0] + [i for i in range(n) if b[i]]
+        starts.append(n)
+        segs = list(zip(starts, starts[1:]))
+        changed = False
+        for k, (a, e) in enumerate(segs):
+            cnt = sum(1 for x in values[a:e] if x is not None)
+            if cnt < max(1, int(min_len)) and len(segs) > 1:
+                if k == 0:
+                    b[segs[1][0]] = False  # segmen pertama -> gabung berikutnya
+                else:
+                    b[a] = False           # gabung ke segmen sebelumnya
+                changed = True
+                break
+        if not changed:
+            break
+    return b
+
+
 def segmentize_values(values, bounds=None, jump=None, streak=SEGMENT_STREAK,
-                      lo=None, hi=None):
+                      lo=None, hi=None, min_len=2):
     """Ganti tiap nilai dengan MEDIAN segmennya (model Klipaja: crop STATIS
     per segmen, hard cut antar segmen — tanpa glide / interpolasi).
 
@@ -335,6 +366,7 @@ def segmentize_values(values, bounds=None, jump=None, streak=SEGMENT_STREAK,
             for j, flag in enumerate(sub):
                 if flag:
                     final[a + j] = True
+    final = merge_short_bounds(values, final, min_len)
     out = list(values)
     seg_start = 0
     for i in range(n + 1):
@@ -365,6 +397,89 @@ def split_panel_centers(faces):
     left = ordered[0]
     right = ordered[-1]
     return (left[0] + left[2] / 2.0, right[0] + right[2] / 2.0)
+
+
+def guard_empty_segments(track, crop_w, width):
+    """Penjaga segmen kosong (tuning 22 Okt): setelah segmentasi, periksa tiap
+    run x-sama (satu segmen crop statis): bila jendela crop [x, x+crop_w]
+    TIDAK berisi wajah/badan di mayoritas sampel yang ada orangnya
+    (< 35%), segmen itu "parkir kosong" (mis. pembicara pindah tempat saat
+    deteksi hilang / kunci basi — crop tertinggal di kursi lama). Perbaiki:
+    x digeser ke MEDIAN klaster orang dominan di segmen itu (klaster =
+    pengelompokan pusat wajah/badan per 10% lebar frame, terbanyak menang).
+    Segmen tanpa sampel berorang dibiarkan (tidak ada bukti lebih baik).
+    Fungsi terhadap list track (dict {x, faces, body?}) — bisa diuji murni.
+    """
+    if not track or not crop_w or not width:
+        return track
+    n = len(track)
+    runs = []
+    start = 0
+    for i in range(1, n + 1):
+        if i == n or track[i].get("x") != track[start].get("x"):
+            runs.append((start, i))
+            start = i
+    for (a, b) in runs:
+        x = track[a].get("x")
+        if x is None:
+            continue
+        per_sample = []
+        for p in track[a:b]:
+            cs = []
+            for f in (p.get("faces") or []):
+                try:
+                    cs.append(float(f["x"]) + float(f["w"]) / 2.0)
+                except Exception:
+                    pass
+            bd = p.get("body")
+            if bd:
+                try:
+                    cs.append(float(bd["x"]) + float(bd["w"]) / 2.0)
+                except Exception:
+                    pass
+            per_sample.append(cs)
+        bearing = [cs for cs in per_sample if cs]
+        if not bearing:
+            continue
+        inside = sum(1 for cs in bearing
+                     if any(x - 1.0 <= c <= x + crop_w + 1.0 for c in cs))
+        if inside / float(len(bearing)) >= 0.35:
+            continue
+        allc = [c for cs in bearing for c in cs]
+        binw = max(1.0, float(width) * 0.10)
+        counts = {}
+        for c in allc:
+            k = int(c // binw)
+            counts[k] = counts.get(k, 0) + 1
+        best_bin = max(counts.items(), key=lambda kv: kv[1])[0]
+        cluster = [c for c in allc if int(c // binw) == best_bin]
+        med = _median(cluster)
+        if med is None:
+            continue
+        new_x = round(max(0.0, min(float(width) - float(crop_w),
+                                   med - float(crop_w) / 2.0)), 1)
+        for p in track[a:b]:
+            if p.get("x") is not None:
+                p["x"] = new_x
+    return track
+
+
+def presence_face(scored, locked_cx, frame_w):
+    """Fallback KEHADIRAN (tuning 23 Okt): pilih wajah buat di-frame saat
+    SpeakerLock tidak memilih siapa pun (tidak ada gerak mulut — wajah FOTO /
+    gambar, pendengar diam, penyanyi mulut terbuka lebar). Tanpa ini crop
+    membeku di posisi lama / jatuh ke fallback badan (bisa ke meja).
+    Aturan: wajah terdekat dari kunci pembicara bila masih wajar
+    (<= 25% lebar frame); selain itu wajah TERBESAR (paling dominan).
+    Return dict wajah atau None. Fungsi murni.
+    """
+    if not scored:
+        return None
+    if locked_cx is not None:
+        near = min(scored, key=lambda s: abs((s["x"] + s["w"] / 2.0) - locked_cx))
+        if abs((near["x"] + near["w"] / 2.0) - locked_cx) <= 0.25 * float(frame_w):
+            return near
+    return max(scored, key=lambda s: float(s["w"]) * float(s["h"]))
 
 
 class SpeakerLock:
@@ -514,6 +629,13 @@ def main():
     ap.add_argument("--cascade", default=None,
                     help="Path face_detection_yunet_2023mar.onnx (default: sebelah script)")
     ap.add_argument("--min-face", type=int, default=60)
+    ap.add_argument("--presence", action="store_true",
+                    help="Mode KEHADIRAN ringan (fallback bila tracking penuh "
+                         "gagal/timeout): sampel frame (diperkecil 640px) dan catat "
+                         "saja ada/tidak ada wajah + pusat wajah terbesar per sampel. "
+                         "Output: {presence: true, width, height, cropW, samples}. "
+                         "Server memakainya untuk framing per-bagian: ada muka = "
+                         "crop 9:16 full muka, tidak ada = Landscape.")
     args = ap.parse_args()
 
     dur = max(0.5, args.end - args.start)
@@ -529,6 +651,52 @@ def main():
     # --- Detektor wajah: Blazeface (default) -> YuNet -> Haar (fallback
     # berantai, tracking tidak pernah putus karena detektor tidak tersedia).
     args.method, detector, haar_cascade = select_detector(args.method, args.cascade)
+
+    # --- MODE PRESENCE (ringan): deteksi saja, tanpa SpeakerLock/audio. ---
+    if args.presence:
+        scale = 640.0 / float(W) if W > 640 else 1.0
+        sw, sh = int(W * scale), int(H * scale)
+        if sw % 2: sw -= 1
+        if sh % 2: sh -= 1
+        min_face_p = max(20, int(args.min_face * scale))
+        pcmd = ["ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-ss", str(args.start), "-i", args.input, "-t", str(dur),
+                "-vf", "fps=%s,scale=%d:%d" % (args.fps, sw, sh),
+                "-f", "rawvideo", "-pix_fmt", "bgr24", "pipe:1"]
+        pproc = subprocess.Popen(pcmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        pbytes = sw * sh * 3
+        samples = []
+        t = 0.0
+        dt = 1.0 / args.fps
+        while True:
+            raw = pproc.stdout.read(pbytes)
+            if len(raw) < pbytes:
+                break
+            frame = np.frombuffer(raw, dtype=np.uint8).reshape(sh, sw, 3)
+            if args.method == "blazeface":
+                faces = detect_faces_blazeface(
+                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), detector)
+            elif args.method == "haar":
+                faces = detect_faces_haar(
+                    cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), haar_cascade, min_face_p)
+            else:
+                faces = detect_faces_yunet(frame, detector, min_face_p)
+            if faces:
+                best = max(faces, key=lambda f: float(f[2]) * float(f[3]))
+                cx = (best[0] + best[2] / 2.0) / scale
+                samples.append({"t": round(t, 2), "face": True,
+                                "cx": round(cx, 1)})
+            else:
+                samples.append({"t": round(t, 2), "face": False})
+            t += dt
+        pproc.wait()
+        out = {"v": 1, "presence": True, "width": W, "height": H,
+               "cropW": round(crop_w, 1), "samples": samples}
+        with open(args.out, "w") as fh:
+            json.dump(out, fh)
+        print("presence: %d sampel, %d ada wajah" %
+              (len(samples), sum(1 for x in samples if x["face"])))
+        return
 
     # --- Ekstrak frame (pipe raw BGR). ---
     cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error",
@@ -633,6 +801,15 @@ def main():
             # (biar ketawa/reaksi lawan bicara tidak bikin crop goyang).
             target_face = speaker_lock.pick(scored, W)
             sw = bool(getattr(speaker_lock, "switched", False))
+            if target_face is None:
+                # Tidak ada yang "ngomong" menurut mulut, tapi ada wajah:
+                # frame wajah yang hadir (foto / pendengar diam) — jangan
+                # biarkan crop membeku / lari ke badan-meja.
+                pf = presence_face(scored, speaker_lock.locked_cx, W)
+                if pf is not None:
+                    pcx = pf["x"] + pf["w"] / 2.0
+                    ptx = max(0.0, min(W - crop_w, pcx - crop_w / 2.0))
+                    smooth_x = ema_deadzone(smooth_x, ptx, args.ema, args.deadzone)
             if target_face is not None:
                 speaking = True
                 face_cx = target_face["x"] + target_face["w"] / 2.0
@@ -696,10 +873,13 @@ def main():
             for p, v in zip(track, sv):
                 if v is not None:
                     p["x"] = v
+            # Penjaga segmen kosong: segmen yang jendelanya tidak berisi
+            # orang digeser ke klaster orang dominan segmen itu.
+            guard_empty_segments(track, crop_w, float(W))
     except Exception:
         pass
 
-    result = {"fps": args.fps, "width": W, "height": H, "cropW": round(crop_w, 1),
+    result = {"v": 3, "fps": args.fps, "width": W, "height": H, "cropW": round(crop_w, 1),
               "method": args.method, "hasAudio": has_audio, "meanDb": mean_db,
               "track": track}
     with open(args.out, "w") as f:

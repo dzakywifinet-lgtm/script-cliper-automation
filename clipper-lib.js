@@ -200,6 +200,35 @@ function escapeAssText(t) {
 //   Sans) -> family + Regular (400); Bold=-1 memakai instance bold-nya.
 const CLIP_FONT_FAMILIES = ['Anton', 'Archivo Black', 'Bangers', 'Bebas Neue', 'Comic Neue', 'DejaVu Sans', 'JetBrains Mono', 'Lato', 'Lato Black', 'Liberation Sans', 'Luckiest Guy', 'Montserrat', 'Montserrat Black', 'Montserrat ExtraBold', 'Oswald', 'Permanent Marker', 'Playfair Display', 'Plus Jakarta Sans', 'Poppins', 'Poppins Black', 'Righteous', 'Roboto', 'Russo One'];
 const clipFontOk = (f) => CLIP_FONT_FAMILIES.includes(f) ? f : null;
+// Override gaya per-klip (Fase 13, Item 7-10 — panel ala ClipperStudio:
+// Teks / Kata yang diucapkan / Outline & bayangan / Kotak latar /
+// Tampilan & posisi / Lanjutan). Disanitasi ketat: hanya field dikenal
+// dengan nilai terklamp yang lolos; selain itu dibuang.
+function sanitizeStyleOv(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const o = {};
+  const hex = (v) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : undefined;
+  const num = (v, lo, hi) => { const n = +v; return Number.isFinite(n) && v !== undefined && v !== null && v !== '' ? Math.min(hi, Math.max(lo, n)) : undefined; };
+  if (clipFontOk(raw.font)) o.font = raw.font;
+  const fs = num(raw.fontSize, 20, 110); if (fs !== undefined) o.fontSize = Math.round(fs);
+  if (['asis', 'upper', 'lower'].includes(raw.capsMode)) o.capsMode = raw.capsMode;
+  if (hex(raw.color)) o.color = hex(raw.color);
+  if (['warna', 'kotak', 'membesar', 'glow', 'karaoke'].includes(raw.activeMode)) o.activeMode = raw.activeMode;
+  if (hex(raw.activeColor)) o.activeColor = hex(raw.activeColor);
+  const ol = num(raw.outline, 0, 12); if (ol !== undefined) o.outline = ol;
+  if (hex(raw.outlineColor)) o.outlineColor = hex(raw.outlineColor);
+  const sh = num(raw.shadow, 0, 10); if (sh !== undefined) o.shadow = sh;
+  const ba = num(raw.boxAlpha, 0, 100); if (ba !== undefined) o.boxAlpha = Math.round(ba);
+  if (hex(raw.backColor)) o.backColor = hex(raw.backColor);
+  if (['words', 'sentence'].includes(raw.wordsMode)) o.wordsMode = raw.wordsMode;
+  const mw = num(raw.maxWords, 1, 8); if (mw !== undefined) o.maxWords = Math.round(mw);
+  if ([1, 2, 3].includes(+raw.align)) o.align = +raw.align;
+  const spc = num(raw.spacing, -2, 10); if (spc !== undefined) o.spacing = spc;
+  const ls = num(raw.lineSpacing, -50, 100); if (ls !== undefined) o.lineSpacing = Math.round(ls);
+  const ml = num(raw.marginLR, 0, 200); if (ml !== undefined) o.marginLR = Math.round(ml);
+  const mt = num(raw.marginTB, 0, 200); if (mt !== undefined) o.marginTB = Math.round(mt);
+  return Object.keys(o).length ? o : undefined;
+}
 // Preset Gaya Subtitle + Judul Hook — daftar editor Klipaja (observasi
 // langsung, 2026-10-19): 13 gaya subtitle (12 terobservasi + Pop
 // best-effort dari nama), 15 gaya judul (10 terobservasi + 5 best-effort
@@ -513,7 +542,7 @@ function dewindowCues(cues) {
 // tetap menempati slot waktu (tidak tampil) — timing kata sesudahnya pas.
 // Mengembalikan [{words, lines: [[w...], [w...]], start, end}].
 function chunkSubtitleWords(words, maxLineChars, stripPunct, maxWords) {
-  const maxW = Math.max(1, Math.min(4, Number.isFinite(+maxWords) ? Math.round(+maxWords) : 4));
+  const maxW = Math.max(1, Math.min(12, Number.isFinite(+maxWords) ? Math.round(+maxWords) : 4)); // 12 = mode "satu kalimat" (Fase 13 Item 10)
   const list = (Array.isArray(words) ? words : []).filter(w => w && w.text !== undefined && String(w.text || '').trim());
   if (!list.length) return [];
   // Urut waktu. Timestamp STT dipakai APA ADANYA tanpa offset/penggeseran
@@ -604,6 +633,19 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // sp/hp DISALIN (bukan mutasi SUB_PRESETS/HOOK_PRESETS — objek bersama).
   const sp = { ...(SUB_PRESETS[ov.subPreset] || {}) };
   const hp = { ...((ov.hookPreset === undefined || ov.hookPreset === null) ? (HOOK_PRESETS.kartu || {}) : (HOOK_PRESETS[ov.hookPreset] || {})) };
+  // Override gaya per-klip (Fase 13 Item 7-10): menimpa preset SETELAH
+  // preset dipilih — font/ukuran/warna/caps/mode kata aktif/jumlah kata.
+  // (Outline/kotak/bayangan/margin dibaca langsung dari `sov` di bawah.)
+  const sov = sanitizeStyleOv(ov.styleOv);
+  if (sov) {
+    if (sov.font) sp.font = sov.font;
+    if (sov.fontSize) sp.size = sov.fontSize;
+    if (sov.color) sp.color = sov.color;
+    if (sov.activeColor) sp.activeColor = sov.activeColor;
+    if (sov.capsMode) { sp.caps = sov.capsMode === 'upper'; sp.__capsLower = sov.capsMode === 'lower'; }
+    if (sov.wordsMode === 'sentence') sp.maxWords = 12; else if (sov.wordsMode === 'words') sp.maxWords = 4;
+    if (sov.maxWords) sp.maxWords = sov.maxWords;
+  }
   // Warna subtitle = FULL dari preset gaya (keputusan Dzaky 21 Okt:
   // pemilih warna manual dihapus — "warna full dari preset"). Override
   // warna per-preset yang dulu ada di Edit (Pill/Kinetik/Kertas) dicabut;
@@ -623,7 +665,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // blockHeight (blockHeight = jumlah baris x lineH). Style Default MarginV =
   // fallback estimasi 2 baris. Tanpa persen: pakai marginV lama (px).
   const subTopPx = Number.isFinite(+ov.subYPercent) ? Math.round((+ov.subYPercent) / 100 * OUT_H) : null;
-  const lineH = Math.round(size * 1.25);
+  const lineH = Math.round(size * (1.25 + ((sov && sov.lineSpacing) || 0) / 100));
   // Subtitle terpusat di sambungan (layout Split): ov.subCenterY = y TENGAH
   // blok subtitle (misal 640 = seam Split). MarginV per-event dihitung agar
   // blok terpusat di subCenterY (bukan mulai di subCenterY). Mengalahkan
@@ -633,7 +675,10 @@ function buildAss(cues, start, end, subStyle, overlay) {
   const subMarginVFor = (lines) => subCenterY !== null ? Math.min(OUT_H - 80, Math.max(0, Math.round(OUT_H - subCenterY - (Math.max(1, lines) * lineH) / 2)))
     : subTopPx === null ? 0 : Math.min(OUT_H - 80, Math.max(0, OUT_H - subTopPx - Math.max(1, lines) * lineH));
   const guardSubTop = subCenterY !== null ? subCenterY - lineH : subTopPx;
-  const marginV = (subCenterY !== null || subTopPx !== null) ? subMarginVFor(2) : Math.min(OUT_H - 80, Math.max(0, Math.round((+ss.marginV || 90) * S)));
+  let marginV = (subCenterY !== null || subTopPx !== null) ? subMarginVFor(2) : Math.min(OUT_H - 80, Math.max(0, Math.round((+ss.marginV || 90) * S)));
+  // Ruang atas-bawah (Item 10): hanya berlaku saat posisi margin bebas
+  // (tanpa persen/sambungan) — persen & sambungan sudah presisi.
+  if (sov && sov.marginTB && subTopPx === null && subCenterY === null) marginV = Math.min(OUT_H - 80, Math.max(0, marginV + Math.round(sov.marginTB * S)));
   const color = /^#[0-9a-fA-F]{6}$/.test(String(sp.color || ss.color || '')) ? (sp.color || ss.color) : '#FFFFFF';
   const bold = (sp.bold !== undefined ? sp.bold : ss.bold) === false ? 0 : -1;
   const subItalic = (sp.italic || ss.italic || sp.slant) ? -1 : 0;
@@ -644,12 +689,22 @@ function buildAss(cues, start, end, subStyle, overlay) {
   if (ov.subPreset === 'kertas' && ov.kertasFont === 'ketik') font = 'JetBrains Mono';
   // Kotak subtitle: warna kotak dari preset (Kertas/Chat = kuning, Pill/Kombo
   // = hitam) atau override Detail (ov.subBoxColor). BorderStyle 3 = kotak opaque.
-  const subBoxColor = /^#[0-9a-fA-F]{6}$/.test(String(sp.boxColor || ov.subBoxColor || '')) ? (sp.boxColor || ov.subBoxColor) : null;
-  const subBorder = sp.box ? 3 : 1, subOutline = sp.box ? 0 : (ov.subPreset === 'puisi' ? Math.round(3 * S) : Math.round(6 * S));
+  const subBoxColor = /^#[0-9a-fA-F]{6}$/.test(String(sp.boxColor || (sov && sov.backColor) || ov.subBoxColor || '')) ? (sp.boxColor || (sov && sov.backColor) || ov.subBoxColor) : null;
+  // Kotak latar (Item 9): boxAlpha menimpa on/off kotak preset — 0 =
+  // "Tanpa kotak" (BorderStyle 1 + outline aktif), >0 = kotak dengan
+  // opasitas itu. Tanpa override: ikut preset seperti biasa.
+  const boxOn = sov && sov.boxAlpha !== undefined ? sov.boxAlpha > 0 : !!sp.box;
+  const subBorder = boxOn ? 3 : 1, subOutline = boxOn ? 0 : (sov && sov.outline !== undefined ? Math.round(sov.outline * S) : (ov.subPreset === 'puisi' ? Math.round(3 * S) : Math.round(6 * S)));
   // Outline 6 = ground truth Klipaja (tebal, terukur di klip download).
   // Kotak (Kertas/Chat/dll) tetap 0 — visualnya kotak, bukan outline glyph.
   // Puisi tetap 3 (tipis elegan).
-  const subBack = sp.box ? '&H00' + (subBoxColor || '#000000').slice(5, 7) + (subBoxColor || '#000000').slice(3, 5) + (subBoxColor || '#000000').slice(1, 3) : '&H00000000';
+  const subOutlineColor = sov && sov.outlineColor ? '&H00' + sov.outlineColor.slice(5, 7) + sov.outlineColor.slice(3, 5) + sov.outlineColor.slice(1, 3) : '&H80000000';
+  const subShadow = sov && sov.shadow !== undefined ? sov.shadow : 0;
+  const subAlign = sov && sov.align ? sov.align : 2;
+  const subMarginLR = sov && sov.marginLR !== undefined ? Math.round(sov.marginLR * S) : 10;
+  const subSpacing = sov && sov.spacing !== undefined ? Math.round(sov.spacing * S) : 0;
+  const boxAlphaByte = sov && sov.boxAlpha !== undefined ? Math.round((100 - sov.boxAlpha) / 100 * 255).toString(16).padStart(2, '0').toUpperCase() : '00';
+  const subBack = boxOn ? '&H' + boxAlphaByte + (subBoxColor || '#000000').slice(5, 7) + (subBoxColor || '#000000').slice(3, 5) + (subBoxColor || '#000000').slice(1, 3) : '&H00000000';
   const primary = '&H00' + color.slice(5, 7) + color.slice(3, 5) + color.slice(1, 3);
   // Kata yang sedang diucapin = SecondaryColour (karaoke sweep \k):
   // Karaoke = kuning, Casual = hijau, dst. Tanpa activeColor, secondary =
@@ -764,7 +819,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
   };
   // WrapStyle: 0 = smart wrapping (libass membungkus teks jadi beberapa baris).
   // Sebelumnya WrapStyle: 2 (no wrapping) → subtitle 1 baris raksasa kepotong layar.
-  const header = '[Script Info]\nTitle: Auto Clipper\nScriptType: v4.00+\nPlayResX: ' + OUT_W + '\nPlayResY: ' + OUT_H + '\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,' + font + ',' + size + ',' + primary + ',' + karaokeSec + ',&H80000000,' + subBack + ',' + bold + ',' + subItalic + ',0,0,100,100,0,0,' + subBorder + ',' + subOutline + ',0,2,10,10,' + marginV + ',1\nStyle: Title1,' + tFont + ',' + tEffSize + ',' + tP1 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Title2,' + tFont + ',' + tEffSize + ',' + tP2 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Cta,' + tFont + ',' + ctaSize + ',' + ctaP + ',&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,8,10,10,' + ctaY + ',1\nStyle: Hook,' + tFont + ',' + Math.round(tSize * 1.3) + ',&H00FFFFFF,&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,5,10,10,0,1\nStyle: Watermark,' + tFont + ',' + Math.round(24 * S) + ',&H80FFFFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n' + boxStyles + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+  const header = '[Script Info]\nTitle: Auto Clipper\nScriptType: v4.00+\nPlayResX: ' + OUT_W + '\nPlayResY: ' + OUT_H + '\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,' + font + ',' + size + ',' + primary + ',' + karaokeSec + ',' + subOutlineColor + ',' + subBack + ',' + bold + ',' + subItalic + ',0,0,100,100,' + subSpacing + ',0,' + subBorder + ',' + subOutline + ',' + subShadow + ',' + subAlign + ',' + subMarginLR + ',' + subMarginLR + ',' + marginV + ',1\nStyle: Title1,' + tFont + ',' + tEffSize + ',' + tP1 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Title2,' + tFont + ',' + tEffSize + ',' + tP2 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Cta,' + tFont + ',' + ctaSize + ',' + ctaP + ',&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,8,10,10,' + ctaY + ',1\nStyle: Hook,' + tFont + ',' + Math.round(tSize * 1.3) + ',&H00FFFFFF,&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,5,10,10,0,1\nStyle: Watermark,' + tFont + ',' + Math.round(24 * S) + ',&H80FFFFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n' + boxStyles + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
   const out = [header];
   const clipDur = Math.max(0.2, (end || 0) - (start || 0));
   // Durasi judul (gaya Klipaja): 'default' = 4 detik (judul hook cuma di awal),
@@ -925,7 +980,9 @@ function buildAss(cues, start, end, subStyle, overlay) {
         const chars = ln.text.split('');
         chars.forEach((_, ci) => {
           const prefix = ln.text.slice(0, ci + 1) + (ci === chars.length - 1 ? '▌' : '');
-          out.push('Dialogue: 0,' + fmtAss(hookTotal + ci * 0.04) + ',' + fmtAss(hookTotal + titleDurSec) + ',' + (ln.pi === 0 ? 'Title1' : 'Title2') + ',,0,0,' + mv + ',,' + escapeAssText(prefix) + '\n');
+          // Akhir event = awal karakter berikutnya (BUKAN akhir judul): semua prefix berakhir di akhir judul bikin libass menumpuk semua tahap ketikan jadi tangga garis (bug 23 Okt).
+          const evEnd = ci === chars.length - 1 ? hookTotal + titleDurSec : hookTotal + (ci + 1) * 0.04;
+          out.push('Dialogue: 0,' + fmtAss(hookTotal + ci * 0.04) + ',' + fmtAss(evEnd) + ',' + (ln.pi === 0 ? 'Title1' : 'Title2') + ',,0,0,' + mv + ',,' + escapeAssText(prefix) + '\n');
         });
       });
     } else if (hp.anim === 'glitch') {
@@ -1007,7 +1064,8 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // kalimat biasa). Batas kalimat/frasa tetap dibaca dari teks mentah
   // (chunkSubtitleWords).
   const dispText = (w) => {
-    const t = (w && w.edit !== undefined && String(w.edit || '').trim()) ? String(w.edit).trim() : String((w && w.text) || '');
+    let t = (w && w.edit !== undefined && String(w.edit || '').trim()) ? String(w.edit).trim() : String((w && w.text) || '');
+    if (sp.__capsLower) t = t.toLowerCase(); // Item 7: mode huruf "aa" (kecil semua)
     return useCaps ? stripDisplayPunct(upperSub(t)) : t;
   };
   // Warna kata (Koreksi Kata: Warna kata) — menimpa warna preset, tampil
@@ -1027,7 +1085,10 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // \t terikat ke awal Dialogue — event jendela kata dimulai pas kata
   // mulai diucapin, jadi pop sinkron dengan kata. Reset \fscx100 setelah
   // kata aktif adalah jaring pengaman.
-  const wordAnimInner = subWordAnimInner(sp);
+  let wordAnimInner = subWordAnimInner(sp);
+  // Item 8 mode "Membesar": kata aktif mulai 140% lalu turun ke 118%
+  // (tetap lebih besar dari teks biasa selama jendelanya).
+  if (sov && sov.activeMode === 'membesar') wordAnimInner = '\\fscx140\\fscy140\\t(0,280,\\fscx118\\fscy118)';
   // Glow kata aktif (spek spreadsheet via brief 22 Okt): HANYA preset
   // yang mendeklarasikan glow di presets.json (saat ini Karaoke) — outline
   // sewarna kata aktif + \bord8\blur8. Preset lain tetap polos (keputusan
@@ -1104,7 +1165,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // Kombo/Pop: maxWords 2. Lainnya: maxWords preset atau 4.
   const chunkMax = sp.singleWord ? 1 : (sp.maxWords || 4);
   const chunks = chunkSubtitleWords(stream, charsPerLine, useCaps, chunkMax);
-  const isKaraoke = !!(sp.karaoke || sp.activeColor);
+  const isKaraoke = !!(sp.karaoke || sp.activeColor || (sov && sov.activeMode)); // mode kata aktif (Item 8) memaksa jalur per-kata
   const chunkSlot = (ci) => {
     const ch = chunks[ci];
     const s0 = hookTotal + Math.max(0, ch.start - start);
@@ -1236,8 +1297,8 @@ function buildAss(cues, start, end, subStyle, overlay) {
           // Pill (kata aktif di dalam kapsul pill biru) / Kertas (sorotan
           // stabilo kuning di belakang kata aktif): rect di belakang kata
           // aktif, digambar SEBELUM event teks (urutan file = urutan gambar).
-          if (lineWords.indexOf(wAct) >= 0 && (sp.pill || sp.highlight)) {
-            const hlHex = String(sp.pill ? (sp.pillColor || '#2563EB') : (sp.highlight || '#FFFF00')).replace('#', '').toUpperCase();
+          if (lineWords.indexOf(wAct) >= 0 && (sp.pill || sp.highlight || (sov && sov.activeMode === 'kotak'))) {
+            const hlHex = String(sp.pill ? (sp.pillColor || '#2563EB') : sp.highlight ? (sp.highlight || '#FFFF00') : ((sov && sov.activeColor) || '#2563EB')).replace('#', '').toUpperCase();
             const ex = estWordX(lineWords, wAct);
             const pad = Math.round(8 * S);
             out.push(boxRectEvent('BoxRect_' + hlHex, ws, we,
@@ -1255,10 +1316,10 @@ function buildAss(cues, start, end, subStyle, overlay) {
           // \\bord8\\blur8 sebagai event TERPISAH di belakang teks.
           // (Tag span langsung terbukti jadi kabut menutupi baris pada gaya
           // berkotak/BorderStyle 3 — terverifikasi frame render uji.)
-          if (lineWords.indexOf(wAct) >= 0 && sp.glow && !wAct.sensor) {
+          if (lineWords.indexOf(wAct) >= 0 && (sp.glow || (sov && sov.activeMode === 'glow')) && !wAct.sensor) {
             const ex = estWordX(lineWords, wAct);
             const gTxt = escapeAssText(dispText(wAct));
-            if (gTxt) out.push('Dialogue: 0,' + fmtAss(ws) + ',' + fmtAss(we) + ',Default,,0,0,0,,{\\pos(' + (ex.x + Math.round(18 * S)) + ',' + (OUT_H - mv - lineH) + ')\\an7\\c' + karaokeSec + '&\\3c' + karaokeSec + '&\\bord' + Math.max(0, Math.round(+sp.glow.bord || 8)) + '\\blur' + Math.max(0, Math.round(+sp.glow.blur || 8)) + wordAnimInner + '}' + gTxt + '\n'); // +18*S: kalibrasi bearing teks \pos vs estimator (terukur -27px @1080)
+            if (gTxt) out.push('Dialogue: 0,' + fmtAss(ws) + ',' + fmtAss(we) + ',Default,,0,0,0,,{\\pos(' + (ex.x + Math.round(18 * S)) + ',' + (OUT_H - mv - lineH) + ')\\an7\\c' + karaokeSec + '&\\3c' + karaokeSec + '&\\bord' + (sp.glow ? Math.max(0, Math.round(+sp.glow.bord || 8)) : 8) + '\\blur' + (sp.glow ? Math.max(0, Math.round(+sp.glow.blur || 8)) : 8) + wordAnimInner + '}' + gTxt + '\n'); // +18*S: kalibrasi bearing teks \pos vs estimator (terukur -27px @1080)
           }
           out.push('Dialogue: 0,' + fmtAss(ws) + ',' + fmtAss(we) + ',Default,,0,0,' + mv + ',,' + (subItalic ? '{\\i1}' : '') + line.trimEnd() + '\n');
         });
@@ -1308,6 +1369,90 @@ function buildAss(cues, start, end, subStyle, overlay) {
 // Resolusi mode durasi judul efektif (satu sumber: buildAss + preview):
 // 'auto' -> saran AI (hookDurAi 'full'/'short'); tanpa saran -> aturan:
 // klip <= 35 dtk judul sepanjang klip, lebih panjang -> default 4 detik.
+// Info duo (Fase 3 — Auto pintar): seberapa sering DUA wajah besar tampil
+// berdampingan dalam track wajah. Mode Auto memakainya buat mutusin: duo ->
+// Landscape (muat utuh + background blur, dua-duanya kelihatan), bukan crop
+// tracking 1 orang. Wajah dihitung "besar" bila lebarnya >= 5% lebar sumber;
+// "berdampingan" bila jarak pusatnya >= 22% lebar sumber. Duo dinyatakan
+// bila >= 40% sampel (yang ada wajahnya) berdua dan sampel >= 4.
+function clipDuoInfo(track, srcW) {
+  const W = +srcW || 0;
+  if (!Array.isArray(track) || !track.length || W <= 0) return { ratio: 0, duo: false, samples: 0 };
+  let duoN = 0, n = 0;
+  for (const s of track) {
+    const faces = (s && Array.isArray(s.faces)) ? s.faces.filter(f => f && (+f.w || 0) >= W * 0.05) : [];
+    if (!faces.length) continue;
+    n++;
+    let isDuo = false;
+    for (let i = 0; i < faces.length && !isDuo; i++) for (let j = i + 1; j < faces.length; j++) {
+      const ci = (+faces[i].x || 0) + (+faces[i].w || 0) / 2, cj = (+faces[j].x || 0) + (+faces[j].w || 0) / 2;
+      if (Math.abs(ci - cj) >= W * 0.22) { isDuo = true; break; }
+    }
+    if (isDuo) duoN++;
+  }
+  const ratio = n ? duoN / n : 0;
+  return { ratio, duo: n >= 4 && ratio >= 0.4, samples: n };
+}
+// Kualitas track wajah (tuning 23 Okt): seberapa sering jendela crop hasil
+// tracking BENAR-BENAR berisi wajah. faceIn = sampel berwajah yang minimal
+// satu pusat wajahnya di dalam [x, x+cropW], dibagi sampel berwajah. Dipakai
+// gerbang fallback: tracking jelek -> render Landscape blur daripada crop
+// meleset (ke meja / tempat kosong).
+function clipTrackQuality(track, cropW) {
+  const cw = +cropW || 0;
+  if (!Array.isArray(track) || !track.length || cw <= 0) return { faceIn: 0, bearing: 0, samples: 0 };
+  let bearing = 0, inside = 0;
+  for (const s of track) {
+    const faces = (s && Array.isArray(s.faces)) ? s.faces : [];
+    if (!faces.length || !Number.isFinite(+s.x)) continue;
+    bearing++;
+    const x = +s.x;
+    if (faces.some(f => { const c = (+f.x || 0) + (+f.w || 0) / 2; return c >= x - 1 && c <= x + cw + 1; })) inside++;
+  }
+  return { faceIn: bearing ? inside / bearing : 0, bearing, samples: track.length };
+}
+// Framing per-bagian (permintaan Dzaky 23 Okt): dari sampel kehadiran wajah
+// [{t, face, cx}] bangun (a) daftar segmen ADA MUKA (sisanya Landscape) dan
+// (b) track sintetis [{t, x}] (x = tepi kiri crop 9:16 dari median cx per
+// segmen) untuk segmen muka. Run yang lebih pendek dari minRun (detik)
+// digabung ke tetangga biar tidak kedip-kedip ganti mode. Fungsi murni.
+function clipPresenceSegs(samples, len, width, cropW) {
+  const L = Math.max(0.1, +len || 0);
+  const arr = (Array.isArray(samples) ? samples : []).filter(x => x && Number.isFinite(+x.t)).sort((a, b) => a.t - b.t);
+  if (!arr.length || !(+width > 0) || !(+cropW > 0)) return { faceSegs: [], track: null, faceRatio: 0 };
+  const minRun = 1.5;
+  const runs = [];
+  for (let i = 0; i < arr.length; i++) {
+    const t0 = Math.max(0, +arr[i].t), t1 = (i + 1 < arr.length) ? +arr[i + 1].t : L;
+    const f = !!arr[i].face;
+    if (runs.length && runs[runs.length - 1].face === f) runs[runs.length - 1].end = Math.min(L, t1);
+    else runs.push({ start: t0, end: Math.min(L, t1), face: f, cx: [] });
+    if (f && Number.isFinite(+arr[i].cx)) runs[runs.length - 1].cx.push(+arr[i].cx);
+  }
+  // Gabung run pendek ke tetangga yang lebih panjang (berulang sampai stabil).
+  for (let guard = 0; guard < 24; guard++) {
+    const i = runs.findIndex(r => (r.end - r.start) < minRun && runs.length > 1);
+    if (i < 0) break;
+    const prev = runs[i - 1], next = runs[i + 1];
+    const host = (!prev) ? next : (!next) ? prev : ((prev.end - prev.start) >= (next.end - next.start) ? prev : next);
+    host.cx = host.cx.concat(runs[i].cx);
+    host.start = Math.min(host.start, runs[i].start); host.end = Math.max(host.end, runs[i].end);
+    runs.splice(i, 1);
+    // Rapikan tumpang tindih setelah gabung.
+    runs.sort((a, b) => a.start - b.start);
+    for (let k = 1; k < runs.length; k++) if (runs[k].start < runs[k - 1].end) runs[k].start = runs[k - 1].end;
+  }
+  const faceSegs = runs.filter(r => r.face && r.end > r.start).map(r => ({ start: Math.round(r.start * 100) / 100, end: Math.round(r.end * 100) / 100 }));
+  const faceSamples = arr.filter(x => x.face).length;
+  let track = null;
+  const faceRuns = runs.filter(r => r.face && r.cx.length);
+  if (faceRuns.length) {
+    const med = a => { const b = [...a].sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
+    track = faceRuns.map(r => ({ t: Math.round(r.start * 100) / 100, x: Math.round(Math.min(Math.max(med(r.cx) - cropW / 2, 0), Math.max(0, width - cropW))) }));
+    if (track.length === 1) track.push({ t: Math.round(L * 100) / 100, x: track[0].x });
+  }
+  return { faceSegs, track, faceRatio: arr.length ? faceSamples / arr.length : 0 };
+}
 function resolveTitleDurMode(titleDur, hookDurAi, clipDur) {
   if (titleDur === 'full') return 'full';
   if (titleDur === 'manual') return 'manual';
@@ -1324,27 +1469,78 @@ function resolveTitleDurMode(titleDur, hookDurAi, clipDur) {
 // Kata yang ditulis HURUF BESAR semua (min 3 huruf) tampil KUNING, sisanya
 // putih; pinggiran hitam tebal biar kebaca di frame apa pun. Wrap manual
 // maks ~15 karakter/baris, maks 4 baris.
-function buildCoverAss(text) {
-  const esc = (t) => String(t || '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+function buildCoverAss(text, opts) {
+  // Smart Cover gaya KARTU (keputusan Dzaky 23 Okt, ganti gaya teks besar
+  // ClipperStudio): kotak putih sudut membulat + teks judul HITAM tebal
+  // Montserrat di tengah kotak — persis kartu judul di kartu Detail.
+  // Posisi kotak: TENGAH kotak di yPercent% tinggi frame (bawaan 65,
+  // mengikuti posisi subtitle klip — server meneruskan cand.subYPercent).
+  const esc = (t) => String(t || '').replace(/[{}]/g, '').replace(/\\s+/g, ' ').trim();
   const words = esc(text).split(' ').filter(Boolean).slice(0, 14);
-  const lines = [];
-  let cur = '';
-  for (const w of words) {
-    if ((cur + ' ' + w).trim().length > 15 && cur) { lines.push(cur); cur = w; }
-    else cur = (cur + ' ' + w).trim();
-    if (lines.length >= 4) break;
+  // Bungkus SEIMBANG: pecah kata jadi <= maxLines baris dengan panjang
+  // semirip mungkin (DP kecil — kata <= 14) dan tiap baris <= maxCh.
+  function wrapBalanced(ws, maxLines, maxCh) {
+    const n = ws.length;
+    if (!n) return [];
+    let best = null;
+    const lens = ws.map(w => w.length);
+    const cost = (lines) => {
+      const ls = lines.map(l => l.join(' ').length);
+      if (ls.some(x => x > maxCh)) return Infinity;
+      const avg = ls.reduce((a, b) => a + b, 0) / ls.length;
+      return ls.reduce((a, l) => a + (l - avg) * (l - avg), 0) + ls.length;
+    };
+    const rec = (i, lines) => {
+      if (i >= n) { const c = cost(lines); if (best === null || c < best.c) best = { c, lines: lines.map(l => l.slice()) }; return; }
+      if (lines.length >= maxLines) return;
+      for (let j = i; j < n; j++) { lines.push(ws.slice(i, j + 1)); rec(j + 1, lines); lines.pop(); }
+    };
+    rec(0, []);
+    return best ? best.lines : [ws];
   }
-  if (cur && lines.length < 4) lines.push(cur);
-  const rich = lines.map(line => line.split(' ').map(w => {
-    const isKey = w.length >= 3 && /[A-Z]/.test(w) && w === w.toUpperCase() && /[A-Z]{3,}/.test(w);
-    return isKey ? '{\\c&H00FFFF&}' + w + '{\\c&HFFFFFF&}' : w;
-  }).join(' ')).join('\\N');
+  // Ukuran font bertangga: lebar teks maks 916px (frame 1080, kotak maks
+  // 1008 + padding 46/sisi). Lebar aksara Montserrat bold ~ 0,54 x fs
+  // (metrik sama dengan geometri kotak judul di buildAss).
+  const MAX_TEXT_W = 916;
+  let fs = 68, lines = wrapBalanced(words, 3, Math.floor(MAX_TEXT_W / (fs * 0.54)));
+  if (!lines.length || lines.some(l => l.join(' ').length * fs * 0.54 > MAX_TEXT_W)) { fs = 60; lines = wrapBalanced(words, 3, Math.floor(MAX_TEXT_W / (fs * 0.54))); }
+  if (!lines.length || lines.some(l => l.join(' ').length * fs * 0.54 > MAX_TEXT_W)) { fs = 52; lines = wrapBalanced(words, 4, Math.floor(MAX_TEXT_W / (fs * 0.54))); }
+  if (!lines.length) lines = [words];
+  const lineTexts = lines.map(l => l.join(' '));
+  const maxLineW = Math.max.apply(null, lineTexts.map(t => t.length * fs * 0.54));
+  const padX = 46, padTop = 28, padBot = 30;
+  const lineH = Math.round(fs * 1.22);
+  const boxW = Math.min(1080 - 48, Math.round(maxLineW) + padX * 2);
+  const boxH = lineTexts.length * lineH + padTop + padBot;
+  let yPct = +(opts && opts.yPercent);
+  if (!Number.isFinite(yPct)) yPct = 65;
+  yPct = Math.min(88, Math.max(12, yPct));
+  const centerY = Math.round(1920 * yPct / 100);
+  const boxY = Math.min(1920 - boxH - 20, Math.max(20, Math.round(centerY - boxH / 2)));
+  const boxX = Math.round((1080 - boxW) / 2);
+  // Path kotak sudut membulat (bezier kubik, pola sama dengan roundedRectPath
+  // kotak judul di buildAss; radius 30 @1080).
+  const roundedRectPath = (w, h) => {
+    const r = Math.max(1, Math.min(30, Math.floor(Math.min(w, h) / 2)));
+    const k = 0.45, a = Math.round(r * k), b = r - a;
+    return 'm ' + r + ' 0 l ' + (w - r) + ' 0 b ' + (w - a) + ' 0 ' + w + ' ' + a + ' ' + w + ' ' + r
+      + ' l ' + w + ' ' + (h - r) + ' b ' + w + ' ' + (h - a) + ' ' + (w - a) + ' ' + h + ' ' + (w - r) + ' ' + h
+      + ' l ' + r + ' ' + h + ' b ' + a + ' ' + h + ' 0 ' + (h - a) + ' 0 ' + (h - r)
+      + ' l 0 ' + r + ' b 0 ' + a + ' ' + a + ' 0 ' + r + ' 0 c';
+  };
+  const ev = [];
+  ev.push('Dialogue: 0,0:00:00.00,0:00:01.00,CoverBox,,0,0,0,,{\\an7\\pos(' + boxX + ',' + boxY + ')\\p1}' + roundedRectPath(boxW, boxH) + '{\\p0}');
+  lineTexts.forEach((t, i) => {
+    ev.push('Dialogue: 1,0:00:00.00,0:00:01.00,Cover,,0,0,0,,{\\an8\\pos(540,' + (boxY + padTop + i * lineH) + ')}' + t);
+  });
   return '[Script Info]\nTitle: Cover\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n'
     + '[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n'
-    + 'Style: Cover,Montserrat,118,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,10,3,8,40,40,300,1\n\n'
+    + 'Style: CoverBox,DejaVu Sans,10,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1\n'
+    + 'Style: Cover,Montserrat,' + fs + ',&H00000000,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,8,0,0,0,1\n\n'
     + '[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'
-    + 'Dialogue: 0,0:00:00.00,0:00:01.00,Cover,,0,0,0,,' + rich + '\n';
+    + ev.join('\n') + '\n';
 }
+
 function sanitizeCandidates(raw, videoDuration, targetDur, count) {
   const dur = +videoDuration || 0;
   const maxLen = (targetDur || 60) + 30;
@@ -1382,7 +1578,7 @@ function sanitizeCandidates(raw, videoDuration, targetDur, count) {
           if (hook.length >= 3) break;
         }
       }
-      list.push({ start, end, title, score, reason: cleanTitle(c.reason, 200), hook,
+      list.push({ start, end, origStart: Number.isFinite(+c.origStart) ? Math.round(+c.origStart * 100) / 100 : start, origEnd: Number.isFinite(+c.origEnd) ? Math.round(+c.origEnd * 100) / 100 : end, title, score, reason: cleanTitle(c.reason, 200), hook,
         // Caption + hashtag per klip (gaya Klipaja: caption + # siap posting).
         // AI diminta mengisinya di prompt; klip lama / tanpa AI = kosong.
         caption: cleanTitle(c.caption, 280),
@@ -1416,12 +1612,12 @@ function fallbackCandidates(videoDuration, targetDur, count) {
   if (!(dur > 0)) return [];
   const n = Math.max(1, count || 3);
   const len = Math.min(targetDur || 60, dur);
-  if (dur <= len) return [{ start: 0, end: dur, title: 'Momen terbaik video ini', score: 50, reason: 'Satu-satunya segmen (video lebih pendek dari durasi klip).', caption: '', hashtags: [] }];
+  if (dur <= len) return [{ start: 0, end: dur, origStart: 0, origEnd: dur, title: 'Momen terbaik video ini', score: 50, reason: 'Satu-satunya segmen (video lebih pendek dari durasi klip).', caption: '', hashtags: [] }];
   const step = (dur - len) / n;
   const out = [];
   for (let i = 0; i < n; i++) {
     const start = Math.round(i * step * 100) / 100;
-    out.push({ start, end: Math.round((start + len) * 100) / 100, title: 'Momen terbaik bagian ' + (i + 1), score: 50 - i, reason: 'Pembagian merata (AI tidak mengembalikan kandidat).', caption: '', hashtags: [] });
+    out.push({ start, end: Math.round((start + len) * 100) / 100, origStart: start, origEnd: Math.round((start + len) * 100) / 100, title: 'Momen terbaik bagian ' + (i + 1), score: 50 - i, reason: 'Pembagian merata (AI tidak mengembalikan kandidat).', caption: '', hashtags: [] });
   }
   return out;
 }
@@ -1643,7 +1839,24 @@ function buildFfmpegArgs(o) {
     filters.push('[0:v]format=yuv420p[v0]');
   } else if (o.podcast) {
     const ftExpr = faceTrackExpr(o.faceTrack);
-    if (ftExpr) {
+    // Framing CAMPUR per-bagian (Dzaky 23 Okt): segmen ADA MUKA (o.mixFaceSegs,
+    // detik relatif klip) tampil crop 9:16 full muka; di luar itu Landscape
+    // (blur/pad sesuai bg). Dua rantai dibangun paralel lalu digabung overlay
+    // dengan enable per segmen muka. Hanya bila ada track (ftExpr) — rantai
+    // portrait memakai ekspresi tracking yang sama.
+    const mixSegs = (ftExpr && Array.isArray(o.mixFaceSegs)) ? o.mixFaceSegs.filter(x => x && Number.isFinite(+x.start) && Number.isFinite(+x.end) && +x.end > +x.start) : [];
+    if (mixSegs.length) {
+      const enable = mixSegs.map(x => 'between(t,' + (+x.start) + ',' + (+x.end) + ')').join('+');
+      const landChain = bg === 'white'
+        ? 'scale=' + OW + ':' + OH + ':force_original_aspect_ratio=decrease,pad=' + OW + ':' + OH + ':(ow-iw)/2:(oh-ih)/2:white'
+        : bg === 'black'
+          ? 'scale=' + OW + ':' + OH + ':force_original_aspect_ratio=decrease,pad=' + OW + ':' + OH + ':(ow-iw)/2:(oh-ih)/2:black'
+          : 'split[a][b];[a]scale=' + OW + ':' + OH + ':force_original_aspect_ratio=increase,crop=' + OW + ':' + OH + ',gblur=sigma=40,eq=brightness=-0.18:contrast=1.05[mixbg];[b]scale=' + OW + ':' + OH + ':force_original_aspect_ratio=decrease[mixfg];[mixbg][mixfg]overlay=(W-w)/2:(H-h)/2';
+      filters.push('[0:v]split=2[mixP][mixL]');
+      filters.push("[mixP]crop=w='min(iw,ih*9/16)':h='min(ih,iw*16/9)':x='min(max((" + ftExpr + "),0),iw-ow)':y='(ih-oh)/2',scale=" + OW + ":" + OH + ",format=yuv420p[vport]");
+      filters.push('[mixL]' + landChain + ',format=yuv420p[vland]');
+      filters.push("[vland][vport]overlay=0:0:enable='" + enable + "',format=yuv420p[v0]");
+    } else if (ftExpr) {
       // Crop time-varying STEP (model Klipaja): x dari face_track.py SUDAH
       // per-segmen (median segmen pembicara) -> faceTrackExpr membuat
       // fungsi tangga: crop DIAM sepanjang segmen, HARD CUT di batas
@@ -1820,10 +2033,10 @@ function buildFfmpegArgs(o) {
 module.exports = {
   isYoutubeUrl, clampInt, cleanTitle, escapeDrawtext, escapeFilterValue, ffmpegFilterPath,
   CLIP_FONT_FAMILIES, clipFontOk,
-  parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, sanitizeCandidates, fallbackCandidates,
+  parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, clipDuoInfo, clipTrackQuality, clipPresenceSegs, sanitizeCandidates, fallbackCandidates,
   chunkTranscript, fmtClock, buildFfmpegArgs, wrapTitle, faceTrackExpr,
   gameplayTopH,
   distributeWords, cueWords, normalizeCueWords, dedupeTranscriptCues,
   dewindowCues, chunkSubtitleWords, stripDisplayPunct,
-  SUB_PRESETS, HOOK_PRESETS, animTag, subWordAnimInner,
+  SUB_PRESETS, HOOK_PRESETS, animTag, subWordAnimInner, sanitizeStyleOv,
 };
