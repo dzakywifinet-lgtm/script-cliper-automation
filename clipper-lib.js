@@ -4,6 +4,7 @@
 'use strict';
 
 const YT_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be']);
+const TT_HOSTS = new Set(['tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vt.tiktok.com', 'vm.tiktok.com']);
 
 // Validasi URL: hanya youtube.com / youtu.be (dengan atau tanpa skema).
 function isYoutubeUrl(raw) {
@@ -14,6 +15,18 @@ function isYoutubeUrl(raw) {
     const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'https://' + s);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
     return YT_HOSTS.has(u.hostname.toLowerCase());
+  } catch { return false; }
+}
+
+// Validasi URL TikTok: tiktok.com / vt.tiktok.com / vm.tiktok.com.
+function isTiktokUrl(raw) {
+  if (typeof raw !== 'string') return false;
+  const s = raw.trim();
+  if (!s || s.length > 2000) return false;
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'https://' + s);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    return TT_HOSTS.has(u.hostname.toLowerCase());
   } catch { return false; }
 }
 
@@ -819,7 +832,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
   };
   // WrapStyle: 0 = smart wrapping (libass membungkus teks jadi beberapa baris).
   // Sebelumnya WrapStyle: 2 (no wrapping) → subtitle 1 baris raksasa kepotong layar.
-  const header = '[Script Info]\nTitle: Auto Clipper\nScriptType: v4.00+\nPlayResX: ' + OUT_W + '\nPlayResY: ' + OUT_H + '\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,' + font + ',' + size + ',' + primary + ',' + karaokeSec + ',' + subOutlineColor + ',' + subBack + ',' + bold + ',' + subItalic + ',0,0,100,100,' + subSpacing + ',0,' + subBorder + ',' + subOutline + ',' + subShadow + ',' + subAlign + ',' + subMarginLR + ',' + subMarginLR + ',' + marginV + ',1\nStyle: Title1,' + tFont + ',' + tEffSize + ',' + tP1 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Title2,' + tFont + ',' + tEffSize + ',' + tP2 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Cta,' + tFont + ',' + ctaSize + ',' + ctaP + ',&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,8,10,10,' + ctaY + ',1\nStyle: Hook,' + tFont + ',' + Math.round(tSize * 1.3) + ',&H00FFFFFF,&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,5,10,10,0,1\nStyle: Watermark,' + tFont + ',' + Math.round(24 * S) + ',&H80FFFFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n' + boxStyles + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+  const header = '[Script Info]\nTitle: Auto Clipper\nScriptType: v4.00+\nPlayResX: ' + OUT_W + '\nPlayResY: ' + OUT_H + '\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,' + font + ',' + size + ',' + primary + ',' + karaokeSec + ',' + subOutlineColor + ',' + subBack + ',' + bold + ',' + subItalic + ',0,0,100,100,' + subSpacing + ',0,' + subBorder + ',' + subOutline + ',' + subShadow + ',' + subAlign + ',' + subMarginLR + ',' + subMarginLR + ',' + marginV + ',1\nStyle: Title1,' + tFont + ',' + tEffSize + ',' + tP1 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Title2,' + tFont + ',' + tEffSize + ',' + tP2 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Cta,' + tFont + ',' + ctaSize + ',' + ctaP + ',&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,8,10,10,' + ctaY + ',1\nStyle: Hook,Montserrat,' + Math.round(71 * S) + ',&H0000FFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,5,10,10,0,1\nStyle: Watermark,' + tFont + ',' + Math.round(24 * S) + ',&H80FFFFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n' + boxStyles + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
   const out = [header];
   const clipDur = Math.max(0.2, (end || 0) - (start || 0));
   // Durasi judul (gaya Klipaja): 'default' = 4 detik (judul hook cuma di awal),
@@ -841,10 +854,25 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // hookAtSource (khusus trek pratinjau hook di editor): event hook ditaruh
   // di waktu SUMBER-nya (tiap teks di atas potongannya sendiri), bukan di
   // garis waktu gabungan — pemutar pratinjau melompat antar-potongan.
+  // Beast (Dzaky 25 Okt 09:52-09:56, konfirmasi 10:47): teks hook BUKAN
+  // satu Dialogue putih polos per potongan, tapi kata-per-kata ala
+  // preset kinetik (singleWord): tiap kata tampil sendiri, kapital,
+  // kuning (warna utama style Hook = #FFFF00), fly-in via animTag.
+  // Tanpa pil gelap (style Hook BorderStyle 1, BackColour transparan).
+  // Tanpa hook = nol event Hook (kontrak lama dipertahankan).
+  // hookAtSource (trek pratinjau hook di editor): kata ditaruh di waktu
+  // SUMBER-nya, bukan garis waktu gabungan — pemutar melompat antar-potongan.
   for (const ht of hookTimeline) {
     if (!ht.text) continue;
-    const hs = ov.hookAtSource ? ht.srcStart : ht.pos, he = ov.hookAtSource ? (ht.srcStart + ht.dur) : (ht.pos + ht.dur);
-    out.push('Dialogue: 0,' + fmtAss(hs) + ',' + fmtAss(he) + ',Hook,,0,0,0,,' + escapeAssText(ht.text) + '\n');
+    const words = ht.text.toUpperCase().split(/\s+/).filter(Boolean);
+    if (!words.length) continue;
+    const base = ov.hookAtSource ? ht.srcStart : ht.pos;
+    const totalCs = Math.max(1, Math.round(ht.dur * 100));
+    words.forEach((w, i) => {
+      const ws = base + Math.round(totalCs * i / words.length) / 100;
+      const we = base + Math.round(totalCs * (i + 1) / words.length) / 100;
+      out.push('Dialogue: 0,' + fmtAss(ws) + ',' + fmtAss(we) + ',Hook,,0,0,0,,' + animTag('flyin') + escapeAssText(w) + '\n');
+    });
   }
   // --- Judul + CTA: tampil sepanjang KLIP UTAMA (hookTotal → hookTotal + clipDur).
   // (bagian 1 = warna 1, bagian 2+ = warna 2), tiap baris jadi Dialogue sendiri
@@ -2088,6 +2116,31 @@ function buildFfmpegArgs(o) {
       last = 'vcov';
     }
   }
+  // Watermark LOGO per-akun (Dzaky 25 Okt): SATU logo + setelan untuk SEMUA
+  // klip di akun itu (file + setelan disimpan server per akun, bukan per klip).
+  // Render Final saja (bukan plainOnly) — overlay PALING ATAS setelah subtitle/
+  // cover, selama jendela klip utama saja [hookTotal, hookTotal+len] (sama
+  // seperti watermark teks ASS) — tidak selama hook replay / cover.
+  const wmLogoRaw = (!o.plainOnly && o.wmLogo && typeof o.wmLogo === 'object' && o.wmLogo.path) ? o.wmLogo : null;
+  if (wmLogoRaw) {
+    const logoIdx = 1 + (broll ? 1 : 0) + (musicIdx >= 0 ? 1 : 0) + ((o.coverPath && !o.plainOnly) ? 1 : 0);
+    args.push('-i', String(wmLogoRaw.path));
+    const wmPct = Math.min(40, Math.max(5, Number.isFinite(+wmLogoRaw.size) ? +wmLogoRaw.size : 15));
+    const wmOp = Math.min(1, Math.max(0.1, (Number.isFinite(+wmLogoRaw.opacity) ? +wmLogoRaw.opacity : 80) / 100));
+    // Durasi klip utama: server mengirim wmLogo.dur (overlayOnly tidak punya
+    // start/end — len di sini = 1, bukan durasi klip). Fallback len bila dur tak ada.
+    const wmDur = (Number.isFinite(+wmLogoRaw.dur) && +wmLogoRaw.dur > 0) ? +wmLogoRaw.dur : len;
+    const M = 20;
+    const wmPosExpr = wmLogoRaw.pos === 'tl' ? M + ':' + M
+      : wmLogoRaw.pos === 'tr' ? 'W-w-' + M + ':' + M
+      : wmLogoRaw.pos === 'bl' ? M + ':H-h-' + M
+      : wmLogoRaw.pos === 'c' ? '(W-w)/2:(H-h)/2'
+      : 'W-w-' + M + ':H-h-' + M;
+    filters.push('[' + logoIdx + ':v][' + last + ']scale2ref=w=\'main_w*' + wmPct + '/100\':h=-1[wmL][wmMain]');
+    filters.push('[wmL]format=rgba,colorchannelmixer=aa=' + wmOp + '[wmA]');
+    filters.push('[wmMain][wmA]overlay=' + wmPosExpr + ':enable=\'between(t,' + hookTotal + ',' + (hookTotal + wmDur) + ')\',format=yuv420p[wmV]');
+    last = 'wmV';
+  }
   args.push('-filter_complex', filters.join(';'));
   args.push('-map', '[' + last + ']');
   // o.hasAudio === false (input tanpa stream audio) -> output tanpa audio
@@ -2118,7 +2171,7 @@ function buildFfmpegArgs(o) {
 }
 
 module.exports = {
-  isYoutubeUrl, clampInt, cleanTitle, escapeDrawtext, escapeFilterValue, ffmpegFilterPath,
+  isYoutubeUrl, isTiktokUrl, clampInt, cleanTitle, escapeDrawtext, escapeFilterValue, ffmpegFilterPath,
   CLIP_FONT_FAMILIES, clipFontOk,
   parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, clipDuoInfo, clipTrackQuality, clipPresenceSegs, clipTalkerSegs, sanitizeCandidates, fallbackCandidates,
   chunkTranscript, fmtClock, buildFfmpegArgs, wrapTitle, faceTrackExpr,

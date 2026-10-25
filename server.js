@@ -597,6 +597,38 @@ function clipMusicPath(jobId, clipIdx) {
   }
   return path.join(dir, base + '.mp3');
 }
+// Watermark LOGO per-akun (Dzaky 25 Okt): SATU logo + setelan untuk SEMUA
+// klip di akun itu. File di folder akun sendiri (clipUserDir), bukan folder
+// proyek — path selalu diturunkan dari sessUser, jadi akun lain tidak bisa
+// mengakses logo akun ini. Setelan di wm-logo.json (folder akun yang sama).
+function clipWmLogoFile(user) {
+  const dir = clipUserDir(user);
+  for (const ext of ['png', 'jpg', 'jpeg', 'webp']) { const p = path.join(dir, 'wm-logo.' + ext); if (fs.existsSync(p)) return p; }
+  return null;
+}
+function clipWmLogoSettingsPath(user) { return path.join(clipUserDir(user), 'wm-logo.json'); }
+function clipWmLogoSettings(user) {
+  let s = {};
+  try { s = JSON.parse(fs.readFileSync(clipWmLogoSettingsPath(user), 'utf8')); } catch {}
+  return {
+    enabled: !!s.enabled,
+    opacity: Number.isFinite(+s.opacity) ? Math.min(100, Math.max(10, +s.opacity)) : 80,
+    pos: ['bl', 'br', 'tl', 'tr', 'c'].includes(s.pos) ? s.pos : 'br',
+    size: Number.isFinite(+s.size) ? Math.min(40, Math.max(5, +s.size)) : 15,
+  };
+}
+function clipWmLogoSave(user, s) {
+  if (!s || typeof s !== 'object') return null;
+  const cur = clipWmLogoSettings(user);
+  const next = {
+    enabled: s.enabled !== undefined ? !!s.enabled : cur.enabled,
+    opacity: Number.isFinite(+s.opacity) ? Math.min(100, Math.max(10, +s.opacity)) : cur.opacity,
+    pos: ['bl', 'br', 'tl', 'tr', 'c'].includes(s.pos) ? s.pos : cur.pos,
+    size: Number.isFinite(+s.size) ? Math.min(40, Math.max(5, +s.size)) : cur.size,
+  };
+  try { fs.mkdirSync(clipUserDir(user), { recursive: true }); fs.writeFileSync(clipWmLogoSettingsPath(user), JSON.stringify(next)); } catch {}
+  return next;
+}
 // (clipProbeDuration sudah ada di bawah — dipakai hitung loop B-roll;
 // return 0 bila gagal, caller pakai fallback loop 1000.)
 // Parse body multipart/form-data (satu field file). Return
@@ -670,6 +702,9 @@ function clipRestoreJobs() {
             job.status = 'error'; job.error = 'Server restart saat proses jalan — klik Analisis lagi (video tetap tersimpan kalau sudah tersimpan).';
             job.log.push({ t: clipLogTime(), msg: 'Server restart — proses terputus.' });
           }
+          // Entri render 'running' tidak bisa dilanjutkan setelah restart —
+          // bersihkan juga (kalau tidak, kartu klip gantung 'Rendering…').
+          for (const r of (job.renders || [])) if (r.status === 'running') { r.status = 'error'; r.error = 'Dihentikan'; }
           // Source hilang dari disk (dihapus manual) -> jangan klaim tersimpan.
           if (job.sourceReady && (!job.source || !fs.existsSync(job.source))) { job.sourceReady = false; job.source = null; }
           clipperJobs.set(job.id, job);
@@ -720,6 +755,38 @@ function clipYtCookies() {
   const f = String(E.YT_COOKIES_FILE || '/opt/hermes-vo/cookies.txt').trim();
   try { return f && fs.existsSync(f) ? ['--cookies', f] : []; } catch { return []; }
 }
+// Cookies YouTube PER-AKUN (Dzaky 25 Okt): tiap akun upload cookies.txt-nya
+// sendiri (panel Settings) -> clipper-work/<akun>/cookies.txt. Download klip
+// akun itu pakai file akun itu; bila akun belum upload, fallback ke file
+// GLOBAL lama (clipYtCookies di atas — TIDAK diubah, cookies yang sudah
+// jalan tetap jalan persis seperti sebelumnya). Akun tanpa upload = perilaku
+// lama 100%, jadi fitur ini tidak bisa merusak cookies yang sudah ada.
+// Nanti fitur posting (YouTube/TikTok/dll) pakai helper yang sama:
+// clipCookiesPath(user) adalah satu-satunya sumber path cookies per akun.
+// KEAMANAN: tidak ada endpoint yang mengembalikan ISI cookies ke browser
+// (status hanya hitung baris/entri) — isi = sesi login, jangan pernah bocor
+// ke chat, git, atau akun lain (path selalu dari sessUser).
+function clipCookiesPath(user) { return user ? path.join(clipUserDir(user), 'cookies.txt') : null; }
+function clipYtCookiesFor(user) {
+  try { const p = clipCookiesPath(user); if (p && fs.existsSync(p)) return ['--cookies', p]; } catch {}
+  return clipYtCookies();
+}
+function clipCookiesFileInfo(p) {
+  try {
+    const txt = fs.readFileSync(p, 'utf8');
+    const lines = txt.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
+    return { lines: lines.length, yt: lines.filter(l => l.includes('.youtube.com')).length, size: Buffer.byteLength(txt), mtimeMs: fs.statSync(p).mtimeMs };
+  } catch { return null; }
+}
+// Status cookies akun (untuk panel Settings; tanpa isi file):
+// source 'akun' (file akun sendiri) | 'global' (file global lama) | 'tidak ada'.
+function clipCookiesStatus(user) {
+  const a = clipCookiesFileInfo(clipCookiesPath(user));
+  if (a) return { source: 'akun', ...a };
+  const g = clipYtCookies();
+  if (g.length) { const gi = clipCookiesFileInfo(g[1]); return { source: 'global', ...(gi || { lines: 0, yt: 0, size: 0, mtimeMs: 0 }) }; }
+  return { source: 'tidak ada', lines: 0, yt: 0, size: 0, mtimeMs: 0 };
+}
 // Rantai fallback klien yt-dlp Clipper (info + download + heatmap).
 // YouTube kini minta PO token (Proof of Origin) untuk klien web — cookies
 // saja tidak cukup — sehingga klien web gagal "The page needs to be reloaded"
@@ -754,28 +821,28 @@ const CLIP_YT_DL_ATTEMPTS = [
 ];
 // Argumen yt-dlp untuk satu percobaan: extractor-args per klien +
 // cookies bila percobaan memakai cookies. Murni (bisa dites).
-function clipYtClientArgs(a) {
+function clipYtClientArgs(a, user) {
   return {
     extra: a.client === 'web' ? [] : ['--extractor-args', 'youtube:player_client=' + a.client],
-    cookies: a.cookies ? clipYtCookies() : [],
+    cookies: a.cookies ? clipYtCookiesFor(user) : [],
   };
 }
 // Rencana percobaan: salinan attempts dengan cookies ter-resolve di
 // `resolvedCookies` (array argumen `--cookies <file>` / [] bila tidak ada
 // file cookies / percobaan tanpa cookies).
-function clipYtPlan(attempts) {
-  return attempts.map(a => ({ ...a, resolvedCookies: a.cookies ? clipYtCookies() : [] }));
+function clipYtPlan(attempts, user) {
+  return attempts.map(a => ({ ...a, resolvedCookies: a.cookies ? clipYtCookiesFor(user) : [] }));
 }
 // Fetch info YouTube (yt-dlp -J) dengan fallback klien + retry (lihat
 // CLIP_YT_INFO_ATTEMPTS). Setiap percobaan di-log: nama klien + cookies /
 // tanpa cookies + hasil. Sukses -> log label + format maks dari -J.
 async function clipFetchYoutubeInfo(job, url) {
   let lastErr = '';
-  for (const a of clipYtPlan(CLIP_YT_INFO_ATTEMPTS)) {
+  for (const a of clipYtPlan(CLIP_YT_INFO_ATTEMPTS, job.user)) {
     if (job.cancelled) return null;
     if (a.label === 'web') clipLog(job, 'Info YouTube (web)…');
     else clipLog(job, 'Info YouTube (' + a.label + ') — coba lagi…');
-    const { extra } = clipYtClientArgs(a);
+    const { extra } = clipYtClientArgs(a, job.user);
     const cookies = a.resolvedCookies || [];
     let info;
     try {
@@ -797,16 +864,32 @@ async function clipFetchYoutubeInfo(job, url) {
   }
   throw fail('YouTube lambat / cookies basi — refresh cookies.txt di PC lalu Coba Lagi. (yt-dlp info: ' + lastErr + ')', 'yt-dlp');
 }
+// Fetch info TikTok (yt-dlp -J polos, tanpa extractor-args / cookies YouTube).
+async function clipFetchTiktokInfo(job, url) {
+  if (job.cancelled) return null;
+  clipLog(job, 'Info TikTok…');
+  let info;
+  try {
+    info = await clipRun('yt-dlp', ['-J', '--no-playlist', '--no-warnings', '--socket-timeout', '30', url], { timeout: 120000, maxOut: 5000000, signal: job.abortCtrl.signal });
+  } catch (e) {
+    if (job.cancelled || e.name === 'AbortError') throw e;
+    throw fail('TikTok lambat / gagal mengambil info — coba link lain / Coba Lagi. (yt-dlp info: ' + (e.message || 'timeout').replace(/\s+/g, ' ').slice(-300) + ')', 'yt-dlp');
+  }
+  if (info.code === 0) { clipLog(job, 'Info TikTok berhasil.'); return info; }
+  throw fail('TikTok lambat / gagal mengambil info — coba link lain / Coba Lagi. (yt-dlp info: ' + (info.stderr || '').replace(/\s+/g, ' ').slice(-300) + ')', 'yt-dlp');
+}
+
 async function clipInputYoutube(job, url) {
   const dir = job.dir;
+  const isTT = clipperLib.isTiktokUrl(url);
   try {
     job.phase = 'info'; clipLog(job, 'Mengambil info video…');
-    const info = await clipFetchYoutubeInfo(job, url);
+    const info = isTT ? await clipFetchTiktokInfo(job, url) : await clipFetchYoutubeInfo(job, url);
     if (job.cancelled) return;
-    if (!info || info.code !== 0) throw fail('YouTube lambat / cookies basi — refresh cookies.txt di PC lalu Coba Lagi.', 'yt-dlp');
+    if (!info || info.code !== 0) throw fail(isTT ? 'TikTok lambat / gagal mengambil info — coba link lain / Coba Lagi.' : 'YouTube lambat / cookies basi — refresh cookies.txt di PC lalu Coba Lagi.', 'yt-dlp');
     let meta = {};
     try { meta = JSON.parse(info.stdout || ''); } catch {}
-    job.videoTitle = meta.title || 'Video YouTube';
+    job.videoTitle = meta.title || (isTT ? 'Video TikTok' : 'Video YouTube');
     job.duration = +meta.duration || 0;
     job.metaDesc = String(meta.description || '');
     job.metaUploader = String(meta.uploader || '');
@@ -841,7 +924,7 @@ async function clipInputYoutube(job, url) {
         // Jangan sampai DASH VP9/AV1 dipilih padahal ada H.264 gabungan yang bisa di-decode.
         // Cap 1080p (bukan 720p): crop Podcast dari sumber 1080p jauh lebih
         // tajam (tidak di-upscale 1,78x seperti dari 720p). Output tetap 720x1280.
-        '-f', 'bv[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/b[height<=1080][ext=mp4][vcodec^=avc1]/bv[height<=1080][ext=mp4]+ba[ext=m4a]/bv[height<=1080]+ba/b[height<=1080]',
+        '-f', isTT ? 'bv[height<=1080]+ba/b[height<=1080]' : 'bv[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/b[height<=1080][ext=mp4][vcodec^=avc1]/bv[height<=1080][ext=mp4]+ba[ext=m4a]/bv[height<=1080]+ba/b[height<=1080]',
         '--remux-video', 'mp4',
         '-o', src, url];
       const dlOpts = { timeout: 30 * 60 * 1000, onStdout: onDl, onStderr: onDl, signal: job.abortCtrl.signal };
@@ -849,9 +932,9 @@ async function clipInputYoutube(job, url) {
       // supaya retry download jalan (bukan langsung throw "terlalu lama").
       const runDl = async (args) => { try { return await clipRun('yt-dlp', args, dlOpts); } catch (e) { if (job.cancelled || e.name === 'AbortError') throw e; return { code: -1, stdout: '', stderr: e.message || 'timeout' }; } };
       let dl = null; dlClient = '';
-      for (const a of clipYtPlan(CLIP_YT_DL_ATTEMPTS)) {
+      for (const a of (isTT ? [{ label: 'tiktok' }] : clipYtPlan(CLIP_YT_DL_ATTEMPTS, job.user))) {
         if (job.cancelled) return;
-        const { extra } = clipYtClientArgs(a);
+        const extra = isTT ? [] : clipYtClientArgs(a, job.user).extra;
         if (dl !== null) clipLog(job, 'Download (' + a.label + ') — coba lagi…');
         dl = await runDl([...extra, ...dlArgsBase, ...(a.resolvedCookies || [])]);
         if (dl.code === 0) { dlClient = a.label; break; }
@@ -865,7 +948,7 @@ async function clipInputYoutube(job, url) {
         const dlErr = (dl.stderr || '').replace(/\s+/g, ' ').slice(-300);
         clipLog(job, 'Download gagal (percobaan ' + (dlTry + 1) + '/2): ' + dlErr);
         if (dlTry === 0) { try { fs.unlinkSync(src); } catch {} continue; }
-        throw fail('YouTube lambat / cookies basi — refresh cookies.txt di PC lalu Coba Lagi. (download: ' + dlErr + ')', 'download');
+        throw fail(isTT ? 'TikTok lambat / gagal download — coba link lain / Coba Lagi. (download: ' + dlErr + ')' : 'YouTube lambat / cookies basi — refresh cookies.txt di PC lalu Coba Lagi. (download: ' + dlErr + ')', 'download');
       }
       savedDur = await clipProbeDuration(src);
       if (savedDur >= job.duration * 0.95) break;
@@ -1340,8 +1423,8 @@ async function clipFetchHeatmap(job, infoJson) {
     const ytAuthRetry = /needs to be reloaded|Sign in to confirm|not a bot|PO token|player response/i;
     let info = null;
     for (const a of [{ client: 'web', label: 'web' }, { client: 'ios', label: 'iOS' }, { client: 'android', label: 'Android' }]) {
-      const { extra } = clipYtClientArgs(a);
-      info = await clipRun('yt-dlp', ['-J', '--no-playlist', '--no-warnings', '--socket-timeout', '30', ...extra, ...clipYtCookies(), job.sourceUrl], { timeout: 120000, maxOut: 5000000, signal: job.abortCtrl ? job.abortCtrl.signal : undefined });
+      const { extra } = clipYtClientArgs(a, job.user);
+      info = await clipRun('yt-dlp', ['-J', '--no-playlist', '--no-warnings', '--socket-timeout', '30', ...extra, ...clipYtCookiesFor(job.user), job.sourceUrl], { timeout: 120000, maxOut: 5000000, signal: job.abortCtrl ? job.abortCtrl.signal : undefined });
       if (info.code === 0 || job.cancelled || !ytAuthRetry.test(info.stderr || '')) break;
     }
     if (info.code !== 0) return null;
@@ -1509,7 +1592,7 @@ async function clipFetchYoutubeCaptions(job, dir) {
     for (const fmt of ['srv1', 'vtt']) {
       try {
         cleanSubs();
-        const args = ['--skip-download', '--no-playlist', '--no-warnings', '--write-subs', '--write-auto-subs', ...clipYtCookies(),
+        const args = ['--skip-download', '--no-playlist', '--no-warnings', '--write-subs', '--write-auto-subs', ...clipYtCookiesFor(job.user),
           '--sub-langs', subLang];
         if (fmt === 'srv1') args.push('--sub-format', 'srv1');
         else args.push('--sub-format', 'vtt/best', '--convert-subs', 'vtt');
@@ -2156,6 +2239,13 @@ async function clipRender(job, selected, opts) {
       text: sel.watermark && typeof sel.watermark === 'object' && typeof sel.watermark.text === 'string' ? String(sel.watermark.text).replace(/\s+/g, ' ').trim().slice(0, 60) : (cand.watermarkText || ''),
       pos: sel.watermark && typeof sel.watermark === 'object' && ['bl', 'br', 'tl', 'tr'].includes(sel.watermark.pos) ? sel.watermark.pos : (cand.watermarkPos || 'bl'),
     };
+    // Watermark LOGO per-akun (Dzaky 25 Okt): SATU logo + setelan untuk
+    // semua klip akun ini. Logo aktif = GANTI watermark teks (bukan dobel);
+    // file hilang = fallback teks + log (satu baris per klip).
+    const wmLogoSet = clipWmLogoSettings(job.user);
+    const wmLogoFile = wmLogoSet.enabled ? clipWmLogoFile(job.user) : null;
+    const wmLogoArg = wmLogoFile ? { path: wmLogoFile, opacity: wmLogoSet.opacity, pos: wmLogoSet.pos, size: wmLogoSet.size } : null;
+    if (wmLogoSet.enabled && !wmLogoFile) clipLog(job, 'Logo watermark akun aktif tapi filenya tidak ditemukan — memakai watermark teks (bila ada).');
     // Musik Latar (Edit, tab Video): sel > kandidat > off. File di
     // clipper-work/music/<jobId>-<idx>.* (upload terpisah), volume 0-1.
     if (sel.music && typeof sel.music === 'object') {
@@ -2375,7 +2465,7 @@ async function clipRender(job, selected, opts) {
           pillColor, kinetikTextColor, kinetikBigColor,
           titleAnim, // false = judul statis (tanpa animasi masuk)
           styleOv: clipperLib.sanitizeStyleOv(sel.styleOv || cand.styleOv), // override gaya per-klip (Fase 13 Item 7-10)
-          watermark: watermark.enabled && watermark.text ? { text: watermark.text, pos: watermark.pos } : null,
+          watermark: wmLogoArg ? null : (watermark.enabled && watermark.text ? { text: watermark.text, pos: watermark.pos } : null),
           cta: { enabled: false }, // CTA dihapus 2026-10-20 — tidak di-render.
           hook: useHook ? hookRel : [],
         });
@@ -2534,6 +2624,7 @@ async function clipRender(job, selected, opts) {
           sensor: sensorRel, // kata yang di-sensor -> audio dibisukan di rentang itu
           broll: brollArg, // B-roll ter-upload (Final saja) — null = tanpa B-roll
           music: musicArg, // Musik Latar ter-upload (Final saja) — null = tanpa musik
+          wmLogo: wmLogoArg ? { ...wmLogoArg, dur: len } : null, // Watermark LOGO per-akun (Final saja) — null = tanpa logo (teks berlaku)
           outputDur: brollOutputDur, // jaring pengaman -t (hanya bila B-roll)
           // Resolusi output (Kualitas Render): WAJIB dikirim — tanpa ini
           // buildFfmpegArgs default 720x1280 sehingga B-roll 1080p di-scale
@@ -3304,14 +3395,14 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { send(res, 400, { error: e.message }); }
     return;
   }
-  // Tahap 1 — Input YouTube: simpan video ke server (info + download). Tombol
+  // Tahap 1 — Input YouTube / TikTok: simpan video ke server (info + download). Tombol
   // "Simpan video ke server". Video baru = ganti video lama (job + folder dihapus).
   if (req.method === 'POST' && p === '/api/clipper/input') {
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e5) break; }
     let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
     const user = sessUser(req);
     const url = String(b.url || '').trim();
-    if (!clipperLib.isYoutubeUrl(url)) return send(res, 400, { error: 'Link harus URL YouTube (youtube.com / youtu.be).' });
+    if (!clipperLib.isYoutubeUrl(url) && !clipperLib.isTiktokUrl(url)) return send(res, 400, { error: 'Link harus URL YouTube atau TikTok.' });
     for (const j of clipperJobs.values()) if (j.user === user && (j.status === 'running' || j.status === 'rendering')) return send(res, 409, { error: 'Masih ada proses clipper berjalan. Tunggu selesai atau hapus dulu.' });
     // Proyek baru = job baru (folder sendiri). Proyek lama TIDAK dihapus —
     // hanya hapus manual (tombol Hapus di daftar proyek / Hapus Semua) yang menghapus.
@@ -3510,6 +3601,10 @@ const server = http.createServer(async (req, res) => {
         clipLog(job, 'Dihentikan oleh pengguna.');
       }
     }
+    // Entri render yang nyangkut 'running' ikut dibersihkan (kasus Klip 1 Amanda:
+    // Stop tidak mengubah entri render -> kartu gantung 'Rendering…').
+    for (const r of (job.renders || [])) if (r.status === 'running') { r.status = 'error'; r.error = 'Dihentikan'; }
+    clipSaveJob(job);
     return send(res, 200, { ok: true });
   }
   // ===== Pengaturan Clipper per akun (tersimpan di state/<user>.json,
@@ -3627,6 +3722,11 @@ const server = http.createServer(async (req, res) => {
     let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
     const job = clipperJobs.get(String(b.id || b.jobId || ''));
     if (!job || job.user !== sessUser(req)) return send(res, 404, { error: 'Pekerjaan clipper tidak ditemukan' });
+    // Watermark LOGO per-akun: setelan ikut tersimpan dari panel Studio
+    // (bukan per kandidat) — berlaku semua klip akun ini. Disimpan DI SINI
+    // (sebelum validasi kandidat) agar setelan logo tidak gagal hanya
+    // karena payload kandidat kosong/tidak valid.
+    if (b.wmLogo && typeof b.wmLogo === 'object') clipWmLogoSave(job.user, b.wmLogo);
     if (!Array.isArray(b.candidates) || !b.candidates.length) return send(res, 400, { error: 'candidates kosong.' });
     // Gabung per index dengan whitelist field yang boleh diedit editor
     // (JANGAN sanitizeCandidates di sini: fungsi itu membuang field gaya +
@@ -3639,7 +3739,7 @@ const server = http.createServer(async (req, res) => {
       if (!cur) continue;
       for (const k of EDITABLE) if (inc[k] !== undefined) cur[k] = inc[k];
       const st = +inc.start, en = +inc.end; // Geser Momen dari editor (berpenjaga)
-      if (Number.isFinite(st) && Number.isFinite(en) && st >= 0 && en > st && (!job.duration || en <= job.duration + 1)) { cur.start = st; cur.end = en; }
+      if (Number.isFinite(st) && Number.isFinite(en) && st >= 0 && en > st && (!job.duration || en <= job.duration + 1)) { const od = (Number.isFinite(+cur.origStart) && Number.isFinite(+cur.origEnd) && +cur.origEnd > +cur.origStart) ? (+cur.origEnd - +cur.origStart) : 0; cur.start = st; cur.end = en; if (od > 0) { const nd = en - st; if (nd > od * 2 || nd < od * 0.5 || Math.abs(nd - od) > 120) clipLog(job, '⚠️ Klip ' + (+inc.index + 1) + ' In/Out berubah drastis: ' + clipFmtDur(od) + ' → ' + clipFmtDur(nd) + ' (dari potongan awal).'); } }
       n++;
     }
     if (!n) return send(res, 400, { error: 'candidates tidak valid.' });
@@ -3725,6 +3825,106 @@ const server = http.createServer(async (req, res) => {
     clipSaveJob(job);
     clipLog(job, 'Kandidat Klip ' + (idx + 1) + ' dihapus.');
     return send(res, 200, { ok: true, candidates: job.candidates });
+  }
+  // Watermark LOGO per-akun (Dzaky 25 Okt): SATU logo + setelan untuk SEMUA
+  // klip akun ini. Upload (multipart, field `logo`, PNG/JPG/WEBP maks 2MB)
+  // -> clipper-work/<akun>/wm-logo.<ext> (timpa logo lama; ekstensi lama dihapus).
+  if (req.method === 'POST' && p === '/api/clipper/wmlogo/upload') {
+    const user = sessUser(req);
+    const ct = req.headers['content-type'] || '';
+    if (!/multipart\/form-data/i.test(ct)) return send(res, 400, { error: 'Content-Type harus multipart/form-data' });
+    const MAX = 2 * 1024 * 1024;
+    const chunks = []; let total = 0, tooBig = false;
+    for await (const c of req) { if (tooBig) continue; total += c.length; if (total > MAX + 1024 * 1024) { tooBig = true; continue; } chunks.push(c); }
+    if (tooBig) return send(res, 413, { error: 'File logo maksimal 2MB.' });
+    const parsed = clipParseMultipart(Buffer.concat(chunks), ct);
+    if (!parsed || parsed.field !== 'logo' || !parsed.data || !parsed.data.length) return send(res, 400, { error: 'Field `logo` tidak ditemukan.' });
+    const ext = String(parsed.filename || '').split('.').pop().toLowerCase();
+    if (!['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return send(res, 400, { error: 'Format logo harus PNG/JPG/WEBP.' });
+    if (parsed.data.length > MAX) return send(res, 413, { error: 'File logo maksimal 2MB.' });
+    const dir = clipUserDir(user);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      for (const e of ['png', 'jpg', 'jpeg', 'webp']) { const old = path.join(dir, 'wm-logo.' + e); if (fs.existsSync(old)) fs.unlinkSync(old); }
+      fs.writeFileSync(path.join(dir, 'wm-logo.' + ext), parsed.data);
+      fs.writeFileSync(path.join(dir, 'wm-logo-file.json'), JSON.stringify({ name: parsed.filename, size: parsed.data.length, uploadedAt: Date.now() }));
+    } catch { return send(res, 500, { error: 'Gagal menyimpan file logo.' }); }
+    return send(res, 200, { ok: true, name: parsed.filename, size: parsed.data.length });
+  }
+  // Status logo akun: GET /api/clipper/wmlogo/status
+  if (req.method === 'GET' && p === '/api/clipper/wmlogo/status') {
+    const user = sessUser(req);
+    const file = clipWmLogoFile(user);
+    let size = 0, name = '';
+    if (file) { try { size = fs.statSync(file).size; } catch {} try { const meta = JSON.parse(fs.readFileSync(path.join(clipUserDir(user), 'wm-logo-file.json'), 'utf8')); name = String(meta.name || ''); } catch {} }
+    return send(res, 200, { hasLogo: !!file, size, name, settings: clipWmLogoSettings(user) });
+  }
+  // File logo akun (pratinjau panel): GET /api/clipper/wmlogo/file — hanya
+  // file akun sendiri (path dari sessUser, tanpa input user di path).
+  if (req.method === 'GET' && p === '/api/clipper/wmlogo/file') {
+    const file = clipWmLogoFile(sessUser(req));
+    if (!file) { res.writeHead(404); return res.end('Tidak ditemukan'); }
+    const ext = file.split('.').pop().toLowerCase();
+    const type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    try { const buf = fs.readFileSync(file); res.writeHead(200, { 'content-type': type, 'cache-control': 'no-cache' }); return res.end(buf); }
+    catch { res.writeHead(404); return res.end('Tidak ditemukan'); }
+  }
+  // Hapus logo akun: POST /api/clipper/wmlogo/delete -> hapus file + setelan.
+  if (req.method === 'POST' && p === '/api/clipper/wmlogo/delete') {
+    const user = sessUser(req);
+    const dir = clipUserDir(user);
+    try {
+      for (const e of ['png', 'jpg', 'jpeg', 'webp']) { const f = path.join(dir, 'wm-logo.' + e); if (fs.existsSync(f)) fs.unlinkSync(f); }
+      for (const f of ['wm-logo-file.json', 'wm-logo.json']) { const fp = path.join(dir, f); if (fs.existsSync(fp)) fs.unlinkSync(fp); }
+    } catch {}
+    return send(res, 200, { ok: true });
+  }
+  // Cookies YouTube per-akun (Dzaky 25 Okt): upload (multipart, field
+  // `cookies`, file teks maks 2MB, tidak kosong) -> clipper-work/<akun>/
+  // cookies.txt (timpa). Nama file bebas (yang penting isinya); file kosong
+  // ditolak. File GLOBAL lama TIDAK disentuh — akun tanpa upload tetap
+  // pakai global. Sidecar cookies-file.json simpan nama + waktu upload.
+  // TIDAK ADA endpoint pengunduh isi cookies (status hanya hitungan).
+  if (req.method === 'POST' && p === '/api/clipper/cookies/upload') {
+    const user = sessUser(req);
+    const ct = req.headers['content-type'] || '';
+    if (!/multipart\/form-data/i.test(ct)) return send(res, 400, { error: 'Content-Type harus multipart/form-data' });
+    const MAX = 2 * 1024 * 1024;
+    const chunks = []; let total = 0, tooBig = false;
+    for await (const c of req) { if (tooBig) continue; total += c.length; if (total > MAX + 1024 * 1024) { tooBig = true; continue; } chunks.push(c); }
+    if (tooBig) return send(res, 413, { error: 'File cookies maksimal 2MB.' });
+    const parsed = clipParseMultipart(Buffer.concat(chunks), ct);
+    if (!parsed || parsed.field !== 'cookies' || !parsed.data || !parsed.data.length) return send(res, 400, { error: 'Field `cookies` tidak ditemukan / file kosong.' });
+    if (parsed.data.length > MAX) return send(res, 413, { error: 'File cookies maksimal 2MB.' });
+    const dir = clipUserDir(user);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'cookies.txt'), parsed.data);
+      fs.writeFileSync(path.join(dir, 'cookies-file.json'), JSON.stringify({ name: parsed.filename || 'cookies.txt', size: parsed.data.length, uploadedAt: Date.now() }));
+    } catch { return send(res, 500, { error: 'Gagal menyimpan file cookies.' }); }
+    return send(res, 200, { ok: true, name: parsed.filename || 'cookies.txt', size: parsed.data.length });
+  }
+  // Status cookies akun: GET /api/clipper/cookies/status -> { source, lines,
+  // yt, size, name, uploadedAt } — TANPA isi file. source 'akun' = file akun
+  // sendiri; 'global' = file global lama (fallback); 'tidak ada' = keduanya
+  // tidak ada (video butuh login bisa gagal).
+  if (req.method === 'GET' && p === '/api/clipper/cookies/status') {
+    const user = sessUser(req);
+    const st = clipCookiesStatus(user);
+    let name = '';
+    if (st.source === 'akun') { try { const meta = JSON.parse(fs.readFileSync(path.join(clipUserDir(user), 'cookies-file.json'), 'utf8')); name = String(meta.name || 'cookies.txt'); } catch { name = 'cookies.txt'; } }
+    return send(res, 200, { source: st.source, lines: st.lines, yt: st.yt, size: st.size, name, uploadedAt: st.source === 'akun' ? st.mtimeMs : 0 });
+  }
+  // Hapus cookies akun: POST /api/clipper/cookies/delete -> hapus file akun
+  // + sidecar SAJA (file global tidak disentuh); download akun itu kembali
+  // ke cookies global.
+  if (req.method === 'POST' && p === '/api/clipper/cookies/delete') {
+    const user = sessUser(req);
+    const dir = clipUserDir(user);
+    try {
+      for (const f of ['cookies.txt', 'cookies-file.json']) { const fp = path.join(dir, f); if (fs.existsSync(fp)) fs.unlinkSync(fp); }
+    } catch {}
+    return send(res, 200, { ok: true });
   }
   // B-roll upload manual (ganti Pexels): POST /api/clipper/broll/upload
   // (multipart, field `video`, query id + clip) -> simpan ke
@@ -4262,4 +4462,4 @@ const server = http.createServer(async (req, res) => {
 });
 if (require.main === module) server.listen(PORT, () => console.log('Script VO Agent berjalan di http://localhost:' + PORT));
 // Ekspor helper (untuk tes unit): require() tidak menyalakan server.
-module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan };
+module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan, clipYtCookiesFor, clipCookiesPath, clipCookiesStatus };

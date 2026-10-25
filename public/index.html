@@ -298,6 +298,7 @@ yang lain = jeda (IntersectionObserver). */
 .clip-edpills button{background:#171d29;border:1px solid #263042;color:#e8edf7;border-radius:99px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .clip-edpills button.on{background:rgba(139,92,246,.16);border-color:#8b5cf6;color:#a78bfa}
 .clip-laypills{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#clipDetailBox .clip-laypills{display:none}/* Pil layout disembunyikan tampilannya (Dzaky 25 Okt 13:37: duplikat dropdown Layout Klip; HP sudah disembunyikan sejak lama) — markup + handler klik tetap jalan tersembunyi, mode tetap diatur lewat dropdown Layout Klip di panel Video. */
 .clip-laypills button{flex:1;background:#171d29;border:1px solid #263042;color:#e8edf7;border-radius:10px;padding:8px 6px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .clip-laypills button.on{background:rgba(139,92,246,.16);border-color:#8b5cf6;color:#a78bfa}
 #clipDetailBox.ass-on [data-clipoverlay]{display:none!important}
@@ -425,6 +426,10 @@ yang lain = jeda (IntersectionObserver). */
 #clipDetailBox .clip-studio-midcol .clip-timeline{margin-top:14px}
 /* Timeline studio DIHAPUS tampilannya (Dzaky 24 Okt: "gak berfungsi, nyempitin editing") — sesuai aturan hapus=tampilan saja: markup, data peaks & fungsi seek tetap jalan tersembunyi; kontrol Posisi preview tetap jadi alat loncat posisi. */
 #clipDetailBox .clip-studio-midcol .clip-timeline{display:none}
+/* Preview desktop muat satu layar (Dzaky 25 Okt 13:28): tinggi preview dikunci
+   ke viewport supaya kontrol Posisi preview + pills kelihatan tanpa scroll;
+   HP/tablet (<=1100px) tidak kena aturan ini. */
+@media (min-width:1101px){#clipDetailBox .clip-studio-midcol #clipPreviewBox{height:min(604px,calc(100dvh - 220px))!important;width:auto!important;max-width:100%}}
 .clip-studio-tabbar{display:none;flex:none;border-top:1px solid #263042;background:#0d1117;padding:6px 4px calc(6px + env(safe-area-inset-bottom));gap:2px}
 .clip-studio-tabbar button{flex:1;background:none;border:0;border-top:2px solid transparent;color:#8b94a7;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 0 3px;cursor:pointer}
 .clip-studio-tabbar button span{font-size:17px;line-height:1}
@@ -448,7 +453,7 @@ yang lain = jeda (IntersectionObserver). */
 .clip-acc>[data-clippanel]{display:none;padding:10px}
 .clip-acc.open>[data-clippanel]{display:block}
 @media (max-width:1100px){#clipDetailBox .clip-studio-cols{display:flex;flex-direction:column;overflow-y:auto}#clipDetailBox .clip-studio-cols>*{flex:none!important}#clipDetailBox .clip-studio-cols>div:nth-child(2){overflow:visible}#clipDetailBox .clip-studio-cols .clip-tpl-panel{overflow:visible}#clipDetailBox .clip-studio-midcol #clipPreviewBox{width:min(64vw,340px)!important;height:auto!important;max-height:none!important}.clip-studio-list{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden}.clip-studio-item{flex:0 0 210px}.clip-studio-listhead{display:none}}
-@media (max-width:1100px){#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols{overflow:hidden}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-list{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-studio-list{display:flex;flex:none!important;max-height:118px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-midcol{flex:none!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols .clip-tpl-panel{flex:1 1 auto!important;min-height:0;overflow-y:auto}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-midcol #clipPreviewBox{height:min(30dvh,430px)!important;width:auto!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-head{margin-bottom:6px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-actions .btn{padding:7px 12px;font-size:13px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols>div:nth-child(2){padding-bottom:6px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-timeline{padding:6px;margin-top:8px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-row{margin-top:2px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-lane{height:22px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-thumbs canvas{height:16px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-sub{height:16px;top:3px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-clipbar{top:4px;bottom:4px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-laypills{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-timeline{display:none}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-hookrow span:last-of-type{display:none}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-hookrow{display:none!important}#clipDetailBox .clip-studio-inner[data-mtab="judul"] .clip-studio-hookrow{display:flex!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-acc{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-acc[data-mgroup="klip"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="judul"] .clip-acc[data-mgroup="judul"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="sub"] .clip-acc[data-mgroup="sub"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="cover"] .clip-acc[data-mgroup="cover"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="render"] .clip-acc[data-mgroup="render"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-tabbar{display:flex}}
+@media (max-width:1100px){#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols{overflow:hidden}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-list{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-studio-list{display:flex;flex:none!important;max-height:118px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-midcol{flex:none!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols .clip-tpl-panel{flex:1 1 auto!important;min-height:0;overflow-y:auto}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-midcol #clipPreviewBox{height:min(30dvh,430px)!important;width:auto!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-head{margin-bottom:6px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-actions{flex:1 1 100%;flex-wrap:nowrap}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-actions .btn{flex:1 1 0;min-width:0;padding:3px 2px;font-size:10px;white-space:nowrap;text-align:center;justify-content:center}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols>div:nth-child(2){padding-bottom:6px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-timeline{padding:6px;margin-top:8px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-row{margin-top:2px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-lane{height:22px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-thumbs canvas{height:16px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-sub{height:16px;top:3px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-clipbar{top:4px;bottom:4px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-laypills{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-timeline{display:none}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-hookrow span:last-of-type{display:none}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-hookrow{display:none!important}#clipDetailBox .clip-studio-inner[data-mtab="judul"] .clip-studio-hookrow{display:flex!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-acc{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-acc[data-mgroup="klip"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="judul"] .clip-acc[data-mgroup="judul"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="sub"] .clip-acc[data-mgroup="sub"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="cover"] .clip-acc[data-mgroup="cover"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="render"] .clip-acc[data-mgroup="render"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-tabbar{display:flex}}
 @media (max-width:1100px){.clip-studio-list{display:none!important}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-studio-select{display:block}#clipDetailBox .clip-studio-inner:not([data-mtab]) .clip-studio-select{display:block}}
 
 /* ---------- Preview = render (Detail): pop karaoke, kartu judul, B-roll ---------- */
@@ -738,7 +743,7 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
         <div class="clip-card"><h3>Buat Klip</h3>
           <p class="hint" style="margin:0 0 10px">Tempel link YouTube — video langsung diunduh. Atau upload video di bawah.</p>
           <label for="clipUrl">Link YouTube</label>
-          <div class="row" style="margin-top:4px"><input id="clipUrl" type="url" placeholder="https://youtu.be/... atau https://www.youtube.com/watch?v=..." style="flex:1"><button type="button" class="btn ghost" id="clipLinkHelpBtn" title="Syarat link YouTube" style="flex:none">?</button><button type="button" class="btn ghost" id="clipPasteBtn" style="flex:none">📋 Tempel</button></div>
+          <div class="row" style="margin-top:4px"><input id="clipUrl" type="url" placeholder="https://youtu.be/... / https://www.youtube.com/watch?v=... / https://www.tiktok.com/@user/video/..." style="flex:1"><button type="button" class="btn ghost" id="clipLinkHelpBtn" title="Syarat link (YouTube / TikTok)" style="flex:none">?</button><button type="button" class="btn ghost" id="clipPasteBtn" style="flex:none">📋 Tempel</button></div>
           <p class="hint" id="clipUrlMsg" hidden style="margin:6px 0 0;color:#f87171"></p>
           <p class="hint" id="clipLowResNote" hidden style="margin:10px 0 0;color:#facc15">Sumber &lt;720p — hasil tidak akan HD; refresh cookies YouTube lalu tempel link lagi.</p>
           <div class="upload-drop" id="clipDropZone"><div class="big">☁️</div><b>Upload Video</b><p class="hint" style="margin:4px 0">Drag &amp; drop video atau klik untuk memilih file</p><p class="hint" style="margin:0">MP4, MOV, AVI, MKV · Max 2GB</p></div>
@@ -878,6 +883,11 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
     <p id="restartMsg" class="hint" style="margin-top:8px"></p>
   </div>
   </div>
+  <div class="aicard"><h3 style="margin:0 0 8px">🍪 Cookies YouTube (per akun)</h3><p class="hint" style="margin:0 0 12px">Dipakai download klip akun ini — dan nanti bisa dipakai fitur posting (YouTube/TikTok/dll) dari akun yang sama. Export cookies.txt dari browser yang sudah login YouTube, lalu upload di sini. Tiap akun punya file sendiri, akun lain tidak bisa pakai. Bila akun ini belum upload, download tetap pakai file cookies global lama di PC (tidak diubah).</p>
+    <div><label>File cookies.txt</label><input type="file" id="ckFile" accept=".txt,text/plain"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn" id="ckUploadBtn" style="padding:8px 16px">Upload cookies</button><button class="btn danger" id="ckDelBtn" style="padding:8px 16px">Hapus cookies akun ini</button></div>
+    <p id="ckMsg" class="hint" style="margin-top:8px"></p>
+  </div>
   <div class="aicard"><h3 style="margin:0 0 8px">💾 Penyimpanan Library</h3><p class="hint" style="margin:0 0 12px">Lokasi database Script &amp; Video Library (file JSON per akun + video Clipper tetap di folder Clipper).</p>
     <div><label>Lokasi sekarang</label><input type="text" id="libDirNow" readonly style="opacity:.7"></div>
     <div><label>Ubah lokasi (kosongkan = otomatis)</label><input type="text" id="libDirInput" placeholder="Contoh Pi: /opt/docker/hermes-vo-library · Contoh Windows: D:\ScriptClipper\library"></div>
@@ -918,9 +928,9 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
 <!-- Dialog syarat link YouTube (tombol ? di Buat Klip) -->
 <div id="clipHelpDlg" class="dlg">
   <div class="dlg-box">
-    <h3 style="margin:0 0 4px">Syarat Link YouTube</h3>
+    <h3 style="margin:0 0 4px">Syarat Link (YouTube / TikTok)</h3>
     <p class="hint" style="margin:0 0 12px">Pastikan video memenuhi ketentuan berikut:</p>
-    <p style="margin:0">Tempel link YouTube. Video harus publik atau tidak publik (unlisted) — bukan privat — punya transkrip/subtitle, dan bukan video khusus member.</p>
+    <p style="margin:0">Tempel link YouTube atau TikTok. Video harus publik atau tidak publik (unlisted) — bukan privat — punya transkrip/subtitle, dan bukan video khusus member. Link TikTok juga bisa ditempel (video publik).</p>
     <div class="row" style="margin-top:12px"><button class="btn" id="clipHelpClose">Tutup bantuan</button></div>
   </div>
 </div>
@@ -2587,7 +2597,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Caption tersalin.'); } catch (_) { toast('Gagal menyalin.'); } ta.remove(); }
   }
   const setBadge = t => { const b = $c('clipperBadge'); b.textContent = t; b.dataset.s = t; };
-  const setMsg = t => { $c('clipMsg').textContent = t || ''; };
+  const setMsg = t => { const el = $c('clipMsg'); if (!el) return; el.textContent = t || ''; el.style.color = (t && t.startsWith('Mengunduh video ke server')) ? '#4ade80' : ''; };
   // Tombol Analisis aktif hanya kalau video sudah tersimpan di server.
   const setAnalyzeEnabled = on => { const b = $c('clipAnalyzeBtn'); if (b) b.disabled = !on; };
   const setStopEnabled = on => { const b = $c('clipStopBtn'); if (b) b.disabled = !on; };
@@ -3004,10 +3014,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     box.hidden = false;
     list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">' + cands.map(c => {
       const shortT = String(c.title || ('Klip ' + (c.index + 1))); const short = shortT.length > 60 ? shortT.slice(0, 60) + '…' : shortT;
-      return '<div class="clip-cand" data-createcard="' + c.index + '" style="overflow:hidden">'
-        + '<div style="position:relative;aspect-ratio:9/16;background:#000;border-radius:8px;overflow:hidden"><video preload="none" playsinline style="width:100%;height:100%;object-fit:cover" poster="/api/clipper/thumb?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + (coverSet.has(c.index) ? '&cover=1' : (finalSet.has(c.index) ? '' : '&raw=1')) + '"' + (finalSet.has(c.index) ? ' src="/api/clipper/download?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + '"' : ' data-src="/api/clipper/source?id=' + encodeURIComponent(j.id || jobId) + '#t=' + Math.floor(c.start) + ',' + Math.ceil(c.end) + '"') + '></video><span style="position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">' + fmtT(c.end - c.start) + '</span></div>'
-        + '<div style="padding:8px 2px 2px"><b style="display:block;font-size:13px;line-height:1.3;word-break:break-word">' + esc(short) + '</b><span class="hint" style="font-size:11px">' + clipScore10(c) + ' · ' + fmtT(c.end - c.start) + '</span>'
-        + '<div class="clip-card-actions">' + (clipBatchLabel(c) || '<span></span>') + '<button class="btn clip-hbtn primary clip-dl-icon" data-jobdl="' + c.index + '" title="Unduh" aria-label="Unduh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/><path d="M4 20h16"/></svg></button></div>'
+      return '<div class="clip-cand" data-createcard="' + c.index + '" style="overflow:hidden;display:flex;flex-direction:column">'
+        + '<div style="position:relative;flex:none;aspect-ratio:9/16;background:#000;border-radius:8px;overflow:hidden"><video preload="none" playsinline style="width:100%;height:100%;object-fit:cover" poster="/api/clipper/thumb?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + (coverSet.has(c.index) ? '&cover=1' : (finalSet.has(c.index) ? '' : '&raw=1')) + '"' + (finalSet.has(c.index) ? ' src="/api/clipper/download?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + '"' : ' data-src="/api/clipper/source?id=' + encodeURIComponent(j.id || jobId) + '#t=' + Math.floor(c.start) + ',' + Math.ceil(c.end) + '"') + '></video><span style="position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">' + fmtT(c.end - c.start) + '</span></div>'
+        + '<div style="padding:8px 2px 2px;display:flex;flex-direction:column;flex:1"><span style="display:block;font-size:12px;line-height:1.35;font-weight:400;word-break:break-word">' + esc(short) + '</span><span class="hint" style="font-size:11px">' + clipScore10(c) + ' · ' + fmtT(c.end - c.start) + '</span>'
+        + '<div class="clip-card-actions" style="margin-top:auto;padding-top:6px">' + (clipBatchLabel(c) || '<span></span>') + '<button class="btn clip-hbtn primary clip-dl-icon" data-jobdl="' + c.index + '" title="Unduh" aria-label="Unduh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/><path d="M4 20h16"/></svg></button></div>'
         + '</div></div>';
     }).join('') + '</div>';
     // Klik video kartu Buat Klip (Fase 22, KOREKSI Dzaky 24 Okt 11:41):
@@ -3431,6 +3441,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     const clipDur = Math.max(0.1, (cand.end - cand.start));
     const studioRows = (candCache || []).map(c => { const rc = (rendersCache || []).find(r => r.index === c.index); const st = rc ? rc.status : 'draft'; const dot = st === 'done' ? '#22c55e' : st === 'error' ? '#ef4444' : st === 'running' ? '#3b82f6' : '#666'; const scN = +c.score || 0; const scTxt = (Number.isFinite(scN) && scN > 0) ? (scN / 10).toFixed(1).replace('.', ',') : ''; return '<button type="button" class="clip-studio-item' + (c.index === idx ? ' on' : '') + '" data-studio-open="' + c.index + '"><span class="clip-studio-n">KLIP ' + (c.index + 1) + (scTxt ? ' <b style="color:#4ade80;font-weight:800;font-size:13px;margin-left:6px">' + scTxt + '</b>' : '') + '</span><span class="clip-studio-tt">' + esc(String(c.title || ('Klip ' + (c.index + 1)))) + '</span><span class="clip-studio-tm"><i style="background:' + dot + '"></i>' + fmtT(c.start) + ' \u2192 ' + fmtT(c.end) + ' \u00b7 ' + fmtT(c.end - c.start) + '</span></button>'; }).join('');
     box.innerHTML = '<div class="clip-modal-inner clip-studio-inner"><div class="clip-studio-head"><button class="btn ghost" id="clipDetailClose" title="Kembali" style="font-size:12px">\u2190 Kembali</button><div class="clip-studio-title">\u2702\uFE0F Editor Studio<span>Klip ' + (idx + 1) + ' dari ' + (candCache || []).length + ' klip \u00b7 ' + esc(String(cand.title || '')) + '</span></div><div class="clip-studio-actions"><button type="button" class="btn ghost" id="clipTplPreview" style="font-weight:800" title="Putar preview klip ini dari awal">👁️ Preview</button><button type="button" class="btn" id="clipTplSave" style="font-weight:800;background:#8b5cf6;color:#fff">\uD83D\uDCBE Simpan</button><button type="button" class="btn" id="clipTplRenderOne" style="font-weight:800;background:#8b5cf6;color:#fff">\uD83C\uDFAC Render Klip Ini</button></div></div>'
+      + '<div id="clipTplNotice" style="display:none;margin:0 0 10px;padding:8px 10px;border-radius:8px;background:#0f2c1a;color:#4ade80;font-size:12px;font-weight:700"></div>'
       + '<div class="clip-studio-hookrow" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:12px;flex-wrap:wrap"><span style="font-weight:700">⚡ Hook teaser</span><button type="button" class="btn" data-hookon="1" style="font-size:12px;padding:5px 12px">Ada</button><button type="button" class="btn ghost" data-hookon="0" style="font-size:12px;padding:5px 12px">Nggak usah</button><span style="color:#8b94a7">Teks hook tampil di awal preview</span></div>'
       + '<div class="clip-detail-cols clip-studio-cols">'
       + '<select class="clip-studio-select" aria-label="Pilih klip">' + (candCache || []).map(c => '<option value="' + c.index + '"' + (c.index === idx ? ' selected' : '') + '>KLIP ' + (c.index + 1) + ' - ' + esc(String(c.title || ('Klip ' + (c.index + 1)))) + '</option>').join('') + '</select>'
@@ -3440,6 +3451,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '<div data-clippreview id="clipPreviewBox" style="position:relative;line-height:0;aspect-ratio:9/16;overflow:hidden;background:#000;border-radius:10px;width:340px;max-width:100%"><video preload="metadata" playsinline data-clipmodalvideo' + videoPoster + ' style="display:block;width:100%;height:100%;object-fit:contain;background:#000" src="' + videoSrc + '"></video>' + '<div id="clipRenderBadge" hidden style="position:absolute;top:8px;left:8px;z-index:6;background:rgba(0,0,0,.72);color:#fbbf24;font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;line-height:1.3">⏳ Rendering…</div>'
       + '<div data-clipoverlay="title" data-candidx="' + idx + '" title="Seret untuk pindah posisi judul" style="position:absolute;left:0;right:0;top:5%;text-align:center;cursor:grab;pointer-events:auto;line-height:1.2;font-weight:700;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;background:rgba(0,0,0,.45);padding:4px 6px"></div>'
       + '<div data-clipoverlay="sub" data-candidx="' + idx + '" title="Seret untuk pindah posisi subtitle" style="position:absolute;left:0;right:0;bottom:23%;text-align:center;cursor:grab;pointer-events:auto;line-height:1.2;font-weight:700;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;background:rgba(0,0,0,.35);padding:4px 6px"></div>'
+      + '<div id="clipWmPreview" style="display:none;position:absolute;z-index:5;pointer-events:none;line-height:1.2"><span id="clipWmPreviewText" style="display:none;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;font-weight:700;white-space:nowrap"></span><img id="clipWmPreviewImg" style="display:none;width:100%;height:auto"></div>'
             + '<div data-brollph class="clip-broll-ph"><b>🎞️ B-ROLL</b><span data-brollph-name></span></div>'
       + '</div>'
       + '<div style="display:flex;gap:6px;align-items:center;margin-top:8px"><button type="button" class="btn ghost" id="clipPreviewPlay" style="flex:none;width:32px;height:28px;padding:0;font-size:13px" title="Putar/Jeda">▶</button><label style="flex:1;font-size:12px">▶ Posisi preview: <span id="clipPreviewT">0:00</span><input id="clipPreviewSeek" type="range" min="0" max="' + clipDur + '" step="0.1" value="0" style="width:100%;margin-top:2px"></label></div>'
@@ -3511,7 +3523,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '<div data-clippanel="video" hidden>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">📐 Kualitas Render (klip ini)</b><select id="clipTplQuality" style="margin-top:4px"><option value="720p"' + (cand.quality !== '1080p' ? ' selected' : '') + '>720p (default)</option><option value="1080p"' + (cand.quality === '1080p' ? ' selected' : '') + '>1080p (lebih tajam, render lebih lambat)</option></select><span class="hint">Disimpan per klip — dipakai saat Simpan Versi Edit.</span></div>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🖥️ Layout Klip (klip ini)</b><select id="clipTplLayout" style="margin-top:4px"><option value=""' + (!cand.mode ? ' selected' : '') + '>Ikuti Mode Proyek</option><option value="podcast"' + (cand.mode === 'podcast' ? ' selected' : '') + '>🎙️ Podcast (crop wajah 9:16)</option><option value="auto"' + (cand.mode === 'auto' ? ' selected' : '') + '>✨ Auto</option><option value="landscape"' + (cand.mode === 'landscape' ? ' selected' : '') + '>🖼️ Landscape (fit penuh)</option><option value="split"' + (cand.mode === 'split' ? ' selected' : '') + '>👥 Split (2 pembicara atas-bawah)</option><option value="crop11"' + (cand.mode === 'crop11' ? ' selected' : '') + '>▣ Crop 1:1</option><option value="gameplay"' + (cand.mode === 'gameplay' ? ' selected' : '') + '>🎮 Gameplay (game + facecam)</option></select><span class="hint">Disimpan per klip — mengalahkan Mode Proyek saat klip ini di-render.</span></div>'
-      + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">💧 Watermark</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Logo atau nama channel kamu di setiap klip. Teks kecil semi-transparan di pojok, sepanjang klip.</p><label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplWatermarkEnabled" ' + (cand.watermarkEnabled ? 'checked' : '') + '> ✅ Pakai watermark</label><label style="font-size:12px;display:block;margin-top:6px">Teks watermark<input id="clipTplWatermarkText" value="' + esc(cand.watermarkText || '') + '" style="margin-top:2px" maxlength="60" placeholder="mis. @channelkamu"></label><label style="font-size:12px;display:block;margin-top:6px">Posisi<select id="clipTplWatermarkPos" style="margin-top:2px"><option value="bl"' + (cand.watermarkPos !== 'br' && cand.watermarkPos !== 'tl' && cand.watermarkPos !== 'tr' ? ' selected' : '') + '>Kiri bawah</option><option value="br"' + (cand.watermarkPos === 'br' ? ' selected' : '') + '>Kanan bawah</option><option value="tl"' + (cand.watermarkPos === 'tl' ? ' selected' : '') + '>Kiri atas</option><option value="tr"' + (cand.watermarkPos === 'tr' ? ' selected' : '') + '>Kanan atas</option></select></label></div>'
+      + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">💧 Watermark</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Logo atau nama channel kamu di setiap klip. Logo (satu untuk semua klip akun ini) atau teks kecil semi-transparan di pojok, sepanjang klip utama.</p><label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplWatermarkEnabled" ' + (cand.watermarkEnabled ? 'checked' : '') + '> ✅ Pakai watermark</label><label style="font-size:12px;display:block;margin-top:6px">Teks watermark<input id="clipTplWatermarkText" value="' + esc(cand.watermarkText || '') + '" style="margin-top:2px" maxlength="60" placeholder="mis. @channelkamu"></label><label style="font-size:12px;display:block;margin-top:6px">Posisi<select id="clipTplWatermarkPos" style="margin-top:2px"><option value="bl"' + (cand.watermarkPos !== 'br' && cand.watermarkPos !== 'tl' && cand.watermarkPos !== 'tr' ? ' selected' : '') + '>Kiri bawah</option><option value="br"' + (cand.watermarkPos === 'br' ? ' selected' : '') + '>Kanan bawah</option><option value="tl"' + (cand.watermarkPos === 'tl' ? ' selected' : '') + '>Kiri atas</option><option value="tr"' + (cand.watermarkPos === 'tr' ? ' selected' : '') + '>Kanan atas</option></select></label><label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-top:10px;border-top:1px dashed #444;padding-top:8px"><input type="checkbox" id="clipTplWmLogoEnabled"> 🖼️ Pakai LOGO (berlaku semua klip akun ini)</label><p class="hint" style="margin:4px 0">Satu logo untuk semua klip di akun ini. Kalau aktif, logo MENGGANTI watermark teks di semua klip. Akun lain tidak bisa pakai logo kamu.</p><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="file" id="clipTplWmLogoFile" accept="image/png,image/jpeg,image/webp" style="font-size:12px"><button type="button" class="btn" id="clipTplWmLogoDelete" style="display:none">🗑️ Hapus logo</button></div><div id="clipTplWmLogoStatus" style="font-size:12px;color:#aaa;margin-top:4px">Belum ada logo.</div><img id="clipTplWmLogoImg" style="display:none;max-width:120px;max-height:120px;margin-top:4px;border:1px solid #333;border-radius:6px"><label style="font-size:12px;display:block;margin-top:6px">Posisi logo<select id="clipTplWmLogoPos" style="margin-top:2px"><option value="br">Kanan bawah</option><option value="bl">Kiri bawah</option><option value="tl">Kiri atas</option><option value="tr">Kanan atas</option><option value="c">Tengah</option></select></label><label style="font-size:12px;display:block;margin-top:6px">Transparansi logo: <span id="clipTplWmLogoOpacityVal">80%</span><input type="range" id="clipTplWmLogoOpacity" min="10" max="100" value="80" style="width:100%"></label><label style="font-size:12px;display:block;margin-top:6px">Ukuran logo: <span id="clipTplWmLogoSizeVal">15% lebar video</span><input type="range" id="clipTplWmLogoSize" min="5" max="40" value="15" style="width:100%"></label><p class="hint" style="margin:4px 0">Setelan logo tersimpan saat kamu tekan Simpan / Render (sama seperti setelan klip lainnya).</p></div>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🎵 Musik Latar</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Lagu kamu sendiri di bawah suara klip. Upload file audio (mp3/m4a/wav/ogg/flac/aac, maks 50MB) — di-mix di bawah suara utama.</p><label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplMusicEnabled" ' + (cand.musicEnabled ? 'checked' : '') + '> ✅ Pakai musik latar</label><label style="font-size:12px;display:block;margin-top:6px">Upload file musik<input id="clipTplMusicFile" type="file" accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/flac,audio/aac,.mp3,.m4a,.wav,.ogg,.flac,.aac" style="margin-top:2px"></label><p class="hint" id="clipTplMusicStatus" style="margin:6px 0 0">Belum ada file musik.</p><button type="button" class="btn ghost" id="clipTplMusicDelete" style="font-size:12px;margin-top:6px;display:none">🗑️ Hapus musik</button><label style="font-size:12px;display:block;margin-top:6px">Volume musik <span id="clipTplMusicVolumeV">' + Math.round((cand.musicVolume !== undefined ? +cand.musicVolume : 0.2) * 100) + '%</span><input id="clipTplMusicVolume" type="range" min="0" max="100" step="5" value="' + Math.round((cand.musicVolume !== undefined ? +cand.musicVolume : 0.2) * 100) + '" style="width:100%"></label><p class="hint" id="clipTplMusicNoFileNote" style="margin:6px 0 0;display:none;color:#facc15">⚠️ Upload dulu file musiknya (di atas) — kalau tidak ada file, render jalan tanpa musik.</p></div>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🎞️ AI B-roll</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Cuplikan video 2–3 detik saat pembicara menyebut sesuatu yang bisa ditampilkan. Footage pelengkap yang menggantikan video utama selama jendela B-roll — misal pas cerita kuda, video pindah ke footage kuda (seperti referensi). Audio utama tetap jalan, B-roll dibisukan. Upload file video B-roll kamu (mp4/mov/webm/mkv, maks 200MB). B-roll diterapkan saat render; preview menampilkan placeholder B-ROLL di jendelanya.</p><label style="font-size:12px;display:block;margin-top:6px">Jumlah<select id="clipTplBrollCount" style="margin-top:2px"><option value="0"' + (!cand.brollEnabled ? ' selected' : '') + '>Mati</option><option value="1"' + (cand.brollEnabled && (cand.brollCount || 1) === 1 ? ' selected' : '') + '>1</option><option value="2"' + (cand.brollEnabled && cand.brollCount === 2 ? ' selected' : '') + '>2</option><option value="3"' + (cand.brollEnabled && cand.brollCount === 3 ? ' selected' : '') + '>3</option><option value="4"' + (cand.brollEnabled && cand.brollCount === 4 ? ' selected' : '') + '>4</option><option value="5"' + (cand.brollEnabled && cand.brollCount === 5 ? ' selected' : '') + '>5</option></select></label><label style="font-size:12px;display:block;margin-top:6px">Upload video B-roll<input id="clipTplBrollFile" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.mov,.webm,.mkv" style="margin-top:2px"></label><p class="hint" id="clipTplBrollStatus" style="margin:6px 0 0">Belum ada file B-roll.</p><button type="button" class="btn ghost" id="clipTplBrollDelete" style="font-size:12px;margin-top:6px;display:none">🗑️ Hapus B-roll</button><div style="display:flex;gap:6px;margin-top:6px"><label style="font-size:12px;flex:1">Mulai (detik)<input id="clipTplBrollStart" type="number" min="0" step="0.5" value="' + (cand.brollStart !== undefined ? +cand.brollStart : Math.round(((cand.end - cand.start) / 2) * 10) / 10) + '" style="margin-top:2px"></label><label style="font-size:12px;flex:1">Durasi (detik)<input id="clipTplBrollDur" type="number" min="0.5" max="60" step="0.5" value="' + (cand.brollDur !== undefined ? +cand.brollDur : 4) + '" style="margin-top:2px"></label></div><p class="hint" id="clipTplBrollNoFileNote" style="margin:6px 0 0;display:none;color:#facc15">⚠️ Upload dulu video B-roll-nya (di atas) — kalau tidak ada file, render jalan tanpa B-roll.</p></div>'
       + '<hr style="border:none;border-top:1px solid var(--line);margin:10px 0">'
@@ -3546,6 +3558,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
         // ===== Tab bar HP (Fase 15, ACC Dzaky 24 Okt): grup akordeon per tab =====
         const MGROUP = { klip: 'klip', judul: 'judul', kata: 'judul', subtitle: 'sub', teks: 'sub', kataucap: 'sub', outline: 'sub', tampilan: 'sub', cover: 'cover', render: 'render', video: 'render' };
         panel.querySelectorAll('.clip-acc').forEach(w => { const p = w.querySelector('[data-clippanel]'); if (p) w.dataset.mgroup = MGROUP[p.dataset.clippanel] || 'klip'; });
+        // Hook teaser pindah ke dalam settingan Judul (Dzaky 11:23): baris hook dari header dipindah ke panel grup Judul — desktop muncul saat accordion Judul dibuka, HP saat tab Judul aktif. Node dipindah (listener tetap); fallback tetap di header bila grup Judul tidak ada.
+        { const hr = box.querySelector('.clip-studio-hookrow'); const jp = panel.querySelector('.clip-acc[data-mgroup="judul"] [data-clippanel]'); if (hr && jp) jp.insertBefore(hr, jp.firstChild); }
         const inner = box.querySelector('.clip-studio-inner');
         if (inner) { inner.dataset.mtab = 'klip';
           const bar = document.createElement('div'); bar.className = 'clip-studio-tabbar';
@@ -3766,8 +3780,132 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       const en = $c('clipTplWatermarkEnabled'); if (en) cand.watermarkEnabled = en.checked;
       const tx = $c('clipTplWatermarkText'); if (tx) cand.watermarkText = String(tx.value || '').replace(/\s+/g, ' ').trim().slice(0, 60);
       const ps = $c('clipTplWatermarkPos'); if (ps && ['bl', 'br', 'tl', 'tr'].includes(ps.value)) cand.watermarkPos = ps.value;
+      paintWmPreview();
     };
     ['clipTplWatermarkEnabled', 'clipTplWatermarkText', 'clipTplWatermarkPos'].forEach(id => { const el = $c(id); if (el) el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', syncWatermarkCand); });
+    // Watermark LOGO per-akun (Dzaky 25 Okt): SATU logo + setelan untuk
+    // semua klip akun ini. File + setelan hidup di server per akun (bukan
+    // per kandidat) — status diambil dari server, setelan ikut tersimpan
+    // lewat clipSaveCandidates (body.wmLogo). Nilai kontrol hanya diisi
+    // dari server saat panel pertama dibuka (refresh berikutnya tidak
+    // menimpa editan user yang belum disimpan).
+    let wmLogoHasFile = false, wmLogoInitDone = false;
+    const refreshWmLogoStatus = async () => {
+      const st = $c('clipTplWmLogoStatus'), del = $c('clipTplWmLogoDelete'), img = $c('clipTplWmLogoImg');
+      try {
+        const r = await fetch('/api/clipper/wmlogo/status');
+        const j = await r.json().catch(() => ({}));
+        const s = (j && j.settings) || {};
+        wmLogoHasFile = !!(j && j.hasLogo);
+        if (!wmLogoInitDone) {
+          const en = $c('clipTplWmLogoEnabled'); if (en) en.checked = !!s.enabled;
+          const ps = $c('clipTplWmLogoPos'); if (ps && ['bl', 'br', 'tl', 'tr', 'c'].includes(s.pos)) ps.value = s.pos;
+          const op = $c('clipTplWmLogoOpacity'); if (op) op.value = (Number.isFinite(+s.opacity) ? Math.min(100, Math.max(10, +s.opacity)) : 80);
+          const sz = $c('clipTplWmLogoSize'); if (sz) sz.value = (Number.isFinite(+s.size) ? Math.min(40, Math.max(5, +s.size)) : 15);
+          wmLogoInitDone = true;
+        }
+        const opv = $c('clipTplWmLogoOpacityVal'), op = $c('clipTplWmLogoOpacity');
+        if (opv) opv.textContent = (op ? op.value : 80) + '%';
+        const szv = $c('clipTplWmLogoSizeVal'), sz = $c('clipTplWmLogoSize');
+        if (szv) szv.textContent = (sz ? sz.value : 15) + '% lebar video';
+        if (st) st.textContent = wmLogoHasFile ? ('Logo terpasang: ' + (j.name || 'wm-logo') + ' (' + fmtMB(j.size || 0) + ')') : 'Belum ada logo.';
+        if (del) del.style.display = wmLogoHasFile ? '' : 'none';
+        if (img) { if (wmLogoHasFile) { img.src = '/api/clipper/wmlogo/file?ts=' + Date.now(); img.style.display = ''; } else img.style.display = 'none'; }
+      } catch { if (st) st.textContent = 'Gagal cek status logo.'; }
+      const pimg = $c('clipWmPreviewImg'); if (pimg) pimg.src = '';
+      paintWmPreview();
+    };
+    refreshWmLogoStatus();
+    const syncWmLogoVals = () => {
+      const op = $c('clipTplWmLogoOpacity'), opv = $c('clipTplWmLogoOpacityVal');
+      if (op && opv) opv.textContent = op.value + '%';
+      const sz = $c('clipTplWmLogoSize'), szv = $c('clipTplWmLogoSizeVal');
+      if (sz && szv) szv.textContent = sz.value + '% lebar video';
+      paintWmPreview();
+    };
+    ['clipTplWmLogoOpacity', 'clipTplWmLogoSize'].forEach(id => { const el = $c(id); if (el) el.addEventListener('input', syncWmLogoVals); });
+    ['clipTplWmLogoEnabled', 'clipTplWmLogoPos'].forEach(id => { const el = $c(id); if (el) el.addEventListener('change', paintWmPreview); });
+    const wf = $c('clipTplWmLogoFile');
+    if (wf) wf.addEventListener('change', async () => {
+      const f = wf.files && wf.files[0]; if (!f) return;
+      const st = $c('clipTplWmLogoStatus'); if (st) st.textContent = 'Upload logo…';
+      try {
+        const fd = new FormData(); fd.append('logo', f);
+        const r = await fetch('/api/clipper/wmlogo/upload', { method: 'POST', body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Upload logo gagal');
+        wf.value = '';
+        await refreshWmLogoStatus();
+        setMsg('Logo watermark terpasang: ' + (j.name || f.name) + ' — tekan Simpan / Render agar setelan tersimpan.');
+      } catch (e) { if (st) st.textContent = 'Upload gagal: ' + e.message; setMsg('Upload logo gagal: ' + e.message); }
+    });
+    const wd = $c('clipTplWmLogoDelete');
+    if (wd) wd.addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/clipper/wmlogo/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+        if (!r.ok) throw new Error('Hapus logo gagal');
+        const en = $c('clipTplWmLogoEnabled'); if (en) en.checked = false;
+        await refreshWmLogoStatus();
+        setMsg('Logo watermark dihapus — tekan Simpan agar setelan tersimpan.');
+      } catch (e) { setMsg(e.message); }
+    });
+    // __WM_PREVIEW_START__
+    // Pratinjau watermark di klip preview (Dzaky 25 Okt 14:07): teks/logo
+    // HARUS kelihatan SEBELUM save/render biar posisinya ketahuan. Baca
+    // kontrol panel SAAT INI (editan belum tersimpan ikut tampil). Logo
+    // aktif + file ada = logo ganti teks (sama seperti render); logo aktif
+    // tapi file belum ada = fallback teks (sama seperti render).
+    function paintWmPreview() {
+      const box = $c('clipPreviewBox'), el = $c('clipWmPreview');
+      if (!box || !el) return;
+      const txt = $c('clipWmPreviewText'), img = $c('clipWmPreviewImg');
+      const logoEn = $c('clipTplWmLogoEnabled');
+      const logoOn = !!(logoEn && logoEn.checked);
+      const wmEn = $c('clipTplWatermarkEnabled');
+      const wmOn = !!(wmEn && wmEn.checked);
+      const wmTx = $c('clipTplWatermarkText');
+      const wmText = wmTx ? String(wmTx.value || '').trim() : '';
+      const wmPs = $c('clipTplWatermarkPos');
+      const wmPos = wmPs && ['bl', 'br', 'tl', 'tr'].includes(wmPs.value) ? wmPs.value : 'bl';
+      const lgPs = $c('clipTplWmLogoPos');
+      const lgPos = lgPs && ['bl', 'br', 'tl', 'tr', 'c'].includes(lgPs.value) ? lgPs.value : 'br';
+      const lgOp = $c('clipTplWmLogoOpacity');
+      const lgOpV = lgOp && Number.isFinite(+lgOp.value) ? Math.min(100, Math.max(10, +lgOp.value)) : 80;
+      const lgSz = $c('clipTplWmLogoSize');
+      const lgSzV = lgSz && Number.isFinite(+lgSz.value) ? Math.min(40, Math.max(5, +lgSz.value)) : 15;
+      const boxW = box.clientWidth || 340;
+      const mg = Math.max(6, Math.round(20 * boxW / 720));
+      el.style.display = 'none';
+      el.style.width = '';
+      if (txt) { txt.style.display = 'none'; txt.textContent = ''; }
+      if (img) img.style.display = 'none';
+      const place = pos => {
+        el.style.left = ''; el.style.right = ''; el.style.top = ''; el.style.bottom = ''; el.style.transform = '';
+        if (pos === 'tl') { el.style.left = mg + 'px'; el.style.top = mg + 'px'; }
+        else if (pos === 'tr') { el.style.right = mg + 'px'; el.style.top = mg + 'px'; }
+        else if (pos === 'bl') { el.style.left = mg + 'px'; el.style.bottom = mg + 'px'; }
+        else if (pos === 'c') { el.style.left = '50%'; el.style.top = '50%'; el.style.transform = 'translate(-50%,-50%)'; }
+        else { el.style.right = mg + 'px'; el.style.bottom = mg + 'px'; }
+      };
+      if (logoOn && wmLogoHasFile) {
+        if (!img) return;
+        if (!img.src || img.src.indexOf('/api/clipper/wmlogo/file') === -1) img.src = '/api/clipper/wmlogo/file?ts=' + Date.now();
+        el.style.width = lgSzV + '%';
+        img.style.display = 'block';
+        img.style.opacity = String(lgOpV / 100);
+        place(lgPos);
+        el.style.display = 'block';
+      } else if (wmOn && wmText) {
+        if (!txt) return;
+        txt.textContent = wmText;
+        txt.style.display = 'block';
+        txt.style.fontSize = Math.max(9, Math.round(24 * boxW / 720)) + 'px';
+        txt.style.opacity = '0.5';
+        place(wmPos);
+        el.style.display = 'block';
+      }
+    }
+    // __WM_PREVIEW_END__
     // Musik Latar (tab Video, GRATIS): upload file + hapus + switch + volume.
     // Status file dari server (GET status) — file hidup di folder music server.
     let musicHasFile = false;
@@ -3880,7 +4018,7 @@ const renderSubPresetSettings = () => {
       clipPendingThumb = null; // thumbnail manual dihapus — auto-thumbnail server tetap jalan.
       applyTplDraft();
       const okSave = await clipSaveCandidates();
-      closeClipModal();
+      { const nt = $c('clipTplNotice'); if (nt) { nt.textContent = okSave ? '💾 Save selesai, silahkan render — editan klip ' + (idx + 1) + ' tersimpan (tanpa render).' : '⚠️ Gagal menyimpan ke server — editan masih ada di halaman ini, coba Simpan lagi.'; nt.style.display = 'block'; } }
       setMsg(okSave ? '💾 Editan klip ' + (idx + 1) + ' tersimpan (tanpa render). Render kapan aja dari tab Render di Edit klip.' : '⚠️ Gagal menyimpan ke server — editan masih ada di halaman ini, coba Simpan lagi.');
     });
     { const sa = $c('clipTplSaveAll'); if (sa) sa.addEventListener('click', async () => {
@@ -3889,17 +4027,17 @@ const renderSubPresetSettings = () => {
       let n = 0;
       for (const c of (candCache || [])) { if (!c || c.index === liveCand.index) continue; for (const k of STYLE_FIELDS) { if (liveCand[k] !== undefined) c[k] = (k === 'styleOv' && liveCand[k]) ? JSON.parse(JSON.stringify(liveCand[k])) : liveCand[k]; else delete c[k]; } n++; }
       const okSave = await clipSaveCandidates();
-      closeClipModal();
+      { const nt = $c('clipTplNotice'); if (nt) { nt.textContent = okSave ? '💾 Save selesai, silahkan render — gaya judul + subtitle diterapkan ke ' + n + ' klip lain + tersimpan.' : '⚠️ Gagal menyimpan ke server — coba lagi.'; nt.style.display = 'block'; } }
       setMsg(okSave ? '💾 Gaya judul + subtitle klip ini diterapkan ke ' + n + ' klip lain + tersimpan. Teks judul & isi subtitle tiap klip tetap miliknya sendiri.' : '⚠️ Gagal menyimpan ke server — coba lagi.');
     }); }
     { const ro = $c('clipTplRenderOne'); if (ro) ro.addEventListener('click', async () => {
       applyTplDraft(); await clipSaveCandidates();
-      closeClipModal(); clipArmLibSave(idx); clipRenderOne(idx);
+      closeClipModal(); { const lg = $c('clipLog'); if (lg) { lg.hidden = false; lg.scrollIntoView({ behavior: 'smooth', block: 'start' }); } } clipArmLibSave(idx); clipRenderOne(idx);
     }); }
     { const ra = $c('clipTplRenderAll2'); if (ra) ra.addEventListener('click', async () => {
       applyTplDraft(); await clipSaveCandidates();
       const allIdx = (candCache || []).map(c => c.index);
-      closeClipModal();
+      closeClipModal(); { const lg = $c('clipLog'); if (lg) { lg.hidden = false; lg.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
       if (allIdx.length) { setMsg('Render semua klip (' + allIdx.length + ') dimulai — memakai settingan tersimpan tiap klip.'); for (const i of allIdx) clipArmLibSave(i); clipRenderSelected(allIdx); }
     }); }
     // Durasi judul (gaya referensi): Default 4 detik / Sampai akhir / Manual.
@@ -4071,7 +4209,45 @@ const renderSubPresetSettings = () => {
   function clipArmLibSave(idx) { if (!jobId) return; clipLibArmed.add(jobId + ':' + idx); clipLibArmSave(); }
   // Simpan editan kandidat ke server TANPA render (alur Dzaky 23 Okt:
   // Simpan terpisah dari Render). Mengembalikan true bila server menerima.
-  async function clipSaveCandidates() { if (!jobId) return false; try { const r = await fetch('/api/clipper/candidates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: jobId, candidates: candCache || [] }) }); return !!(r && r.ok); } catch { return false; } }
+  // Pengaman durasi (Dzaky 12:24): cegah In/Out keseret jauh lalu ke-Simpan diam-diam
+  // (kasus Klip 1 Amanda: 90 dtk -> 32:41). Bila durasi klip berubah drastis dari
+  // potongan awal (origStart/origEnd) dan nilai ini belum dikonfirmasi, minta
+  // konfirmasi; batal = simpan dibatalkan (server tetap pakai batas lama, jadi
+  // render yang ikut jalan sesudahnya pun pakai batas lama).
+  const clipDurWarned = new Set();
+  async function clipSaveCandidates() {
+    if (!jobId) return false;
+    try {
+      const changed = [];
+      for (const c of (candCache || [])) {
+        if (!c || !Number.isFinite(+c.origStart) || !Number.isFinite(+c.origEnd) || +c.origEnd <= +c.origStart) continue;
+        if (!Number.isFinite(+c.start) || !Number.isFinite(+c.end) || +c.end <= +c.start) continue;
+        const od = +c.origEnd - +c.origStart, nd = +c.end - +c.start;
+        const sig = c.index + '|' + c.start + '|' + c.end;
+        if (clipDurWarned.has(sig)) continue;
+        if (nd > od * 2 || nd < od * 0.5 || Math.abs(nd - od) > 120) changed.push({ c, od, nd, sig });
+      }
+      if (changed.length) {
+        const lines = changed.map(x => 'Klip ' + (x.c.index + 1) + ': ' + fmtT(x.od) + ' → ' + fmtT(x.nd)).join('\n');
+        if (!confirm('⚠️ Durasi klip berubah drastis dari potongan awal:\n' + lines + '\nLanjutkan simpan?')) return false;
+        changed.forEach(x => clipDurWarned.add(x.sig));
+      }
+      const wmLogoBody = (() => {
+        const en = $c('clipTplWmLogoEnabled'), ps = $c('clipTplWmLogoPos'), op = $c('clipTplWmLogoOpacity'), sz = $c('clipTplWmLogoSize');
+        if (!en && !ps && !op && !sz) return undefined;
+        return {
+          enabled: en ? !!en.checked : undefined,
+          pos: ps && ['bl', 'br', 'tl', 'tr', 'c'].includes(ps.value) ? ps.value : undefined,
+          opacity: op && Number.isFinite(+op.value) ? Math.min(100, Math.max(10, +op.value)) : undefined,
+          size: sz && Number.isFinite(+sz.value) ? Math.min(40, Math.max(5, +sz.value)) : undefined,
+        };
+      })();
+      const wmBody = { id: jobId, candidates: candCache || [] };
+      if (wmLogoBody) wmBody.wmLogo = wmLogoBody;
+      const r = await fetch('/api/clipper/candidates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wmBody) });
+      return !!(r && r.ok);
+    } catch { return false; }
+  }
   // Render status IN-PLACE (speck Auto Clipper AI): status + aksi di-update
   // LANGSUNG di kartu klip yang sama (Draft -> Rendering -> Selesai -> Download),
   // TANPA membuat kartu baru / section hasil terpisah. Poll tiap 2 detik panggil
@@ -4605,7 +4781,7 @@ const renderSubPresetSettings = () => {
   // auto-analisis, user klik Render sendiri.
   let clipAutoAnalyze = false; let clipAutoAnalyzeJobId = null;
   let clipUrlTimer = null, clipUrlSubmitting = false, clipLastUrlSubmitted = '';
-  const clipYtUrlRe = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i;
+  const clipYtUrlRe = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\//i;
   function clipUrlMsgShow(msg) { const m = $c('clipUrlMsg'); if (m) { m.textContent = msg || ''; m.hidden = !msg; } }
   // Guard unduh ganda: link yang sama + job unduh aktif (job itu, bukan job lain) -> abaikan.
   function clipUrlBusy(url) {
@@ -4616,7 +4792,7 @@ const renderSubPresetSettings = () => {
   }
   async function clipStartDownloadFromUrl(rawUrl) {
     const url = (rawUrl || '').trim();
-    if (!clipYtUrlRe.test(url)) { clipUrlMsgShow('Link harus URL YouTube (youtube.com / youtu.be).'); return; }
+    if (!clipYtUrlRe.test(url)) { clipUrlMsgShow('Link harus URL YouTube atau TikTok.'); return; }
     clipUrlMsgShow('');
     if (clipUrlBusy(url)) return;
     clipUrlSubmitting = true; clipLastUrlSubmitted = url;
@@ -4635,7 +4811,7 @@ const renderSubPresetSettings = () => {
   }
   // Validasi link saat ketik/tempel (TIDAK auto-download — unduh hanya via
   // tombol Buat Klip / Enter). Debounce 400ms biar tidak berkedip tiap huruf.
-  function clipValidateUrl() { try { clearTimeout(clipUrlTimer); } catch (e) {} clipUrlTimer = setTimeout(() => { const v = ($c('clipUrl').value || '').trim(); clipUrlMsgShow(v && !clipYtUrlRe.test(v) ? 'Link harus URL YouTube (youtube.com / youtu.be).' : ''); }, 400); }
+  function clipValidateUrl() { try { clearTimeout(clipUrlTimer); } catch (e) {} clipUrlTimer = setTimeout(() => { const v = ($c('clipUrl').value || '').trim(); clipUrlMsgShow(v && !clipYtUrlRe.test(v) ? 'Link harus URL YouTube atau TikTok.' : ''); }, 400); }
   $c('clipUrl').addEventListener('input', (e) => {
     clipValidateUrl(); // validasi debounce tetap jalan.
     // Auto-download balik (model referensi): tempel link -> LANGSUNG unduh.
@@ -5351,6 +5527,7 @@ const renderSubPresetSettings = () => {
     if(page==='settings'){ // Isi email akun saat halaman Settings dibuka.
       fetch('/api/account').then(r=>r.json()).then(a=>{ const em=document.getElementById('accEmail'); if(em) em.value=a.email||''; }).catch(()=>{});
       fetch('/api/library-dir').then(r=>r.json()).then(d=>{ const now=document.getElementById('libDirNow'); if(now) now.value=d.dir||''; const inp=document.getElementById('libDirInput'); if(inp) inp.value=d.custom?d.dir:''; }).catch(()=>{});
+      refreshCkStatus();
     }
     document.querySelectorAll('.navbtn[data-page]').forEach(b=>b.classList.toggle('on', b.dataset.page===page));
     var sb=document.getElementById('sidebar'); if(sb) sb.classList.remove('open');
@@ -5358,6 +5535,45 @@ const renderSubPresetSettings = () => {
     window.scrollTo({top:0, behavior:'auto'});
   }
   window.switchPage = switchPage;
+  // ===== Cookies YouTube per-akun (Dzaky 25 Okt) — panel Settings =====
+  // Status dibaca tiap halaman Settings dibuka; upload/hapus via endpoint
+  // akun sendiri. Isi cookies tidak pernah ditampilkan (status = hitungan).
+  async function refreshCkStatus(){
+    const msg = document.getElementById('ckMsg'); if (!msg) return;
+    try {
+      const r = await fetch('/api/clipper/cookies/status'); const j = await r.json();
+      if (j.source === 'akun') {
+        const ds = j.uploadedAt ? new Date(j.uploadedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        msg.textContent = '✅ Cookies akun ini aktif' + (j.name ? ' (' + j.name + ')' : '') + ' — ' + j.lines + ' baris, ' + j.yt + ' entri youtube.com' + (ds ? ', upload ' + ds : '') + '.' + (j.yt === 0 ? ' ⚠️ Tidak ada entri youtube.com — periksa file exportnya.' : '');
+      } else if (j.source === 'global') msg.textContent = 'ℹ️ Belum upload cookies akun ini — download memakai file cookies global lama di PC.';
+      else msg.textContent = '⚠️ Belum ada cookies (akun maupun global) — video yang butuh login bisa gagal diunduh.';
+    } catch { msg.textContent = 'Status cookies tidak bisa dibaca.'; }
+  }
+  (function ckWire(){
+    const up = document.getElementById('ckUploadBtn'); if (!up || up.dataset.wired) return; up.dataset.wired = '1';
+    up.addEventListener('click', async () => {
+      const f = document.getElementById('ckFile'); const msg = document.getElementById('ckMsg');
+      if (!f || !f.files || !f.files[0]) { if (msg) msg.textContent = 'Pilih file cookies.txt dulu.'; return; }
+      if (msg) msg.textContent = 'Mengupload…';
+      try {
+        const fd = new FormData(); fd.append('cookies', f.files[0]);
+        const r = await fetch('/api/clipper/cookies/upload', { method: 'POST', body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Gagal upload');
+        if (msg) msg.textContent = 'Tersimpan: ' + (j.name || 'cookies.txt') + ' (' + j.size + ' byte).';
+        f.value = '';
+      } catch (e) { if (msg) msg.textContent = 'Gagal: ' + e.message; }
+      refreshCkStatus();
+    });
+    const del = document.getElementById('ckDelBtn');
+    if (del) del.addEventListener('click', async () => {
+      const msg = document.getElementById('ckMsg');
+      if (!confirm('Hapus cookies akun ini? Download kembali memakai cookies global PC.')) return;
+      try { const r = await fetch('/api/clipper/cookies/delete', { method: 'POST' }); if (!r.ok) throw new Error('Gagal'); if (msg) msg.textContent = 'Cookies akun ini dihapus — kembali ke cookies global.'; }
+      catch (e) { if (msg) msg.textContent = 'Gagal: ' + e.message; }
+      refreshCkStatus();
+    });
+  })();
   // ===== Hasil (Dashboard) — data dari /api/library (backend tetap) =====
   const LIB_LABEL={long:'📄 Script Long',short:'📄 Script Short',riset:'🔍 Riset',seo:'🏷️ SEO',clipper:'✂️ Video Clipper'};
   const LIB_STAT={baru:'🆕 Baru',dipakai:'✅ Dipakai',diupload:'📤 Diupload'};
@@ -5432,9 +5648,11 @@ const renderSubPresetSettings = () => {
       return `<div class="aicard" style="padding:10px 12px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><b data-libfolder="${encodeURIComponent(f)}" style="flex:1;font-size:14px;line-height:1.35;word-break:break-word;cursor:pointer" title="Klik buat buka / tutup folder">${isOpen?'▾':'▸'} 📁 ${esc(f)}</b><button class="btn ghost" data-librename="${encodeURIComponent(f)}" style="padding:4px 8px;font-size:12px" title="Ganti nama folder — isi sama persis dengan nama folder lain untuk menggabungkan">✏</button><button class="btn" data-libfolder="${encodeURIComponent(f)}" style="padding:6px 14px;font-size:12px">Buka</button></div><small class="hint" style="display:block;margin:6px 0 0">${arr.length} hasil${ds?' · terakhir '+ds:''}</small>${isOpen?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${chips}</div>`:''}</div>`;}).join('');
     scriptList.innerHTML=folderHtml||'<div class="empty-page"><b>Belum ada folder hasil</b>Isi Judul proyek di Brief Script VO lalu jalankan tahapnya — hasil otomatis tersimpan ke folder judul di sini.</div>';
     // ---- Hasil Akhir Render (Fase 25, mockup Dzaky): BARIS per klip:
-    // thumb 16:9 + judul + meta + tombol Unduh LANGSUNG di baris (dulu
-    // Download cuma di modal). Klik baris/judul tetap buka modal Lihat;
-    // tombol hapus tetap ada. Video kecil tetap bisa diputar inline.
+    // thumb PORTRAIT 9:16 (Dzaky 25 Okt: kayak klip yang barusan diedit di
+    // Studio — dulu 16:9, poster Final portrait jadi kepotong) + judul +
+    // meta + tombol Unduh LANGSUNG di baris (dulu Download cuma di modal).
+    // Klik baris/judul tetap buka modal Lihat; tombol hapus tetap ada.
+    // Video kecil tetap bisa diputar inline.
     const arr=byType.clipper||[];
     if(!arr.length){
       renderList.innerHTML='<div class="empty-page"><b>Hasil Akhir Render masih kosong</b>Render Final dari Auto Clipper (Simpan di Detail kandidat) lalu muncul di sini.</div>';
@@ -5443,7 +5661,7 @@ const renderSubPresetSettings = () => {
         const dt=new Date(it.createdAt||0);const ds=isNaN(dt)?'':dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
         const vid='/api/clipper/download?id='+encodeURIComponent(it.jobId||'')+'&clip='+(it.renderIdx||0);
         const poster=libPoster(it);
-        return `<div class="aicard" data-libview="${it.id}" style="display:flex;gap:10px;align-items:center;padding:8px;margin-bottom:8px;cursor:pointer"><div style="width:92px;height:52px;flex:none;border-radius:8px;overflow:hidden;background:#000;position:relative"><video preload="none" playsinline data-libvideo="${it.id}"${poster} src="${vid}" style="display:block;width:100%;height:100%;object-fit:cover"></video>${it.duration?`<span style="position:absolute;right:4px;bottom:3px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:1px 5px;border-radius:4px">${fmtDur(it.duration)}</span>`:''}</div><div style="flex:1;min-width:0"><b style="display:block;font-size:13px;line-height:1.3;word-break:break-word">${esc(it.title||'Tanpa judul')}</b><small class="hint" style="display:block;margin-top:2px">${ds}${it.duration?' · '+fmtDur(it.duration):''} · Final</small></div><a class="btn" data-libdirectdl href="${vid}" download style="flex:none;padding:7px 12px;font-size:12px;text-decoration:none">⬇ Unduh</a><button class="btn danger" data-libdel="${it.id}" style="flex:none;padding:7px 9px;font-size:12px">🗑</button></div>`;}).join('');
+        return `<div class="aicard" data-libview="${it.id}" style="display:flex;gap:10px;align-items:center;padding:8px;margin-bottom:8px;cursor:pointer"><div style="width:64px;height:114px;flex:none;border-radius:8px;overflow:hidden;background:#000;position:relative"><video preload="none" playsinline data-libvideo="${it.id}"${poster} src="${vid}" style="display:block;width:100%;height:100%;object-fit:cover"></video>${it.duration?`<span style="position:absolute;right:4px;bottom:3px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:1px 5px;border-radius:4px">${fmtDur(it.duration)}</span>`:''}</div><div style="flex:1;min-width:0"><b style="display:block;font-size:13px;line-height:1.3;word-break:break-word">${esc(it.title||'Tanpa judul')}</b><small class="hint" style="display:block;margin-top:2px">${ds}${it.duration?' · '+fmtDur(it.duration):''} · Final</small></div><a class="btn" data-libdirectdl href="${vid}" download style="flex:none;padding:7px 12px;font-size:12px;text-decoration:none">⬇ Unduh</a><button class="btn danger" data-libdel="${it.id}" style="flex:none;padding:7px 9px;font-size:12px">🗑</button></div>`;}).join('');
     }
   }
   // Refresh Hasil saat buka Dashboard.
