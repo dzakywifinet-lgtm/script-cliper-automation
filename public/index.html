@@ -931,6 +931,13 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
     <button class="btn" id="libDirBtn" style="padding:8px 16px">Simpan lokasi</button>
     <p id="libDirMsg" class="hint" style="margin-top:8px">Otomatis: Pi → /opt/docker/hermes-vo-library (partisi gede). Linux lain / Windows / macOS / Docker → folder <b>library</b> di sebelah server.js. Lokasi baru langsung aktif, tapi file lama TIDAK dipindahkan otomatis — pindahkan manual folder lama ke lokasi baru kalau mau data lama ikut.</p>
   </div>
+  <div class="aicard"><h3 style="margin:0 0 8px">📣 Notifikasi Telegram (per akun)</h3><p class="hint" style="margin:0 0 12px">Kirim notif ke Telegram akun ini tiap render Clipper selesai ("🎬 Video sudah jadi!"). Token + Chat ID tersimpan di folder akun ini saja (bukan .env global) dan tidak pernah ditampilkan kembali. Kosongkan keduanya = tidak diubah.</p>
+    <div><label>Bot Token (dari @BotFather)</label><input type="password" id="tgToken" placeholder="123456789:AA…" autocomplete="off"></div>
+    <div><label>Chat ID (dari @userinfobot)</label><input type="text" id="tgChatId" placeholder="mis. 123456789" autocomplete="off"></div>
+    <label style="display:flex;gap:6px;align-items:center;margin:10px 0"><input type="checkbox" id="tgSendVideo"> Kirim juga videonya ke Telegram tiap render selesai (maks 50 MB per video)</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="tgSaveBtn" style="padding:8px 16px">Simpan Telegram</button><button class="btn ghost" id="tgDisableBtn" style="padding:8px 16px">Nonaktifkan</button></div>
+    <p id="tgMsg" class="hint" style="margin-top:8px"></p>
+  </div>
 </div>
 
 </div></div></div>
@@ -5608,6 +5615,7 @@ const renderSubPresetSettings = () => {
       fetch('/api/account').then(r=>r.json()).then(a=>{ const em=document.getElementById('accEmail'); if(em) em.value=a.email||''; }).catch(()=>{});
       fetch('/api/library-dir').then(r=>r.json()).then(d=>{ const now=document.getElementById('libDirNow'); if(now) now.value=d.dir||''; const inp=document.getElementById('libDirInput'); if(inp) inp.value=d.custom?d.dir:''; }).catch(()=>{});
       refreshCkStatus();
+      refreshTgStatus();
     }
     if(page==='post'){ refreshPostList(); refreshPostConn(); }
     document.querySelectorAll('.navbtn[data-page]').forEach(b=>b.classList.toggle('on', b.dataset.page===page));
@@ -5630,6 +5638,49 @@ const renderSubPresetSettings = () => {
       else msg.textContent = '⚠️ Belum ada cookies (akun maupun global) — video yang butuh login bisa gagal diunduh.';
     } catch { msg.textContent = 'Status cookies tidak bisa dibaca.'; }
   }
+  async function refreshTgStatus(){
+    const msg = document.getElementById('tgMsg'); if (!msg) return;
+    try {
+      const r = await fetch('/api/clipper/telegram'); const j = await r.json();
+      const cb = document.getElementById('tgSendVideo'); if (cb) cb.checked = !!j.sendVideo;
+      if (j.accountSet) msg.textContent = '✅ Notifikasi Telegram akun ini AKTIF (token + chat ID tersimpan)' + (j.sendVideo ? ' — video ikut dikirim tiap render selesai.' : ' — notif teks saja.');
+      else if (j.envSet) msg.textContent = 'ℹ️ Akun ini belum isi — notif memakai .env global bila ada (teks saja).';
+      else msg.textContent = '⚠️ Notifikasi Telegram belum diatur — isi token + chat ID di atas.';
+    } catch { msg.textContent = 'Status Telegram tidak bisa dibaca.'; }
+  }
+  (function tgWire(){
+    const btn = document.getElementById('tgSaveBtn'); if (!btn || btn.dataset.wired) return; btn.dataset.wired = '1';
+    btn.addEventListener('click', async () => {
+      const msg = document.getElementById('tgMsg');
+      const token = (document.getElementById('tgToken') || {}).value || '';
+      const chatId = (document.getElementById('tgChatId') || {}).value || '';
+      const sendVideo = !!((document.getElementById('tgSendVideo') || {}).checked);
+      if (msg) msg.textContent = 'Menyimpan…';
+      try {
+        const r = await fetch('/api/clipper/telegram', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, chatId, sendVideo }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Gagal');
+        const tk = document.getElementById('tgToken'); if (tk) tk.value = '';
+        const ci = document.getElementById('tgChatId'); if (ci) ci.value = '';
+        if (msg) msg.textContent = j.configured ? '✅ Tersimpan — notif Telegram langsung aktif (tanpa restart).' : '✅ Dinonaktifkan — file config akun dihapus.';
+      } catch (e) { if (msg) msg.textContent = 'Gagal: ' + e.message; }
+    });
+    const dis = document.getElementById('tgDisableBtn'); if (dis && !dis.dataset.wired) { dis.dataset.wired = '1';
+      dis.addEventListener('click', async () => {
+        const msg = document.getElementById('tgMsg');
+        if (msg) msg.textContent = 'Menonaktifkan…';
+        try {
+          const r = await fetch('/api/clipper/telegram', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disable: true }) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || 'Gagal');
+          const tk = document.getElementById('tgToken'); if (tk) tk.value = '';
+          const ci = document.getElementById('tgChatId'); if (ci) ci.value = '';
+          const cb = document.getElementById('tgSendVideo'); if (cb) cb.checked = false;
+          if (msg) msg.textContent = '✅ Dinonaktifkan — file config akun dihapus.';
+        } catch (e) { if (msg) msg.textContent = 'Gagal: ' + e.message; }
+      });
+    }
+  })();
   (function ckWire(){
     const up = document.getElementById('ckUploadBtn'); if (!up || up.dataset.wired) return; up.dataset.wired = '1';
     up.addEventListener('click', async () => {
@@ -5703,13 +5754,13 @@ const renderSubPresetSettings = () => {
         if (p.results && p.results.youtube && p.results.youtube.thumbnail && p.results.youtube.thumbnail.status === 'ok') resHtml += '<small class="hint" style="display:block;margin-top:4px">🖼️ Thumbnail cover terpasang.</small>';
         if (p.results && p.results.tiktok) resHtml += '<small class="hint" style="display:block;margin-top:4px">🎵 TikTok: menyusul setelah YouTube stabil.</small>';
         if (p.results && p.results.error) resHtml += '<small style="display:block;margin-top:4px;color:#f87171">Gagal: ' + esc(p.results.error) + '</small>';
-        return '<div class="aicard" style="padding:10px 12px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1;word-break:break-word">' + esc(p.title || 'Tanpa judul') + '</b><span class="badge">' + (stLabel[p.status] || p.status) + '</span></div><small class="hint" style="display:block;margin-top:4px">' + esc(plats) + ' · ' + privTxt + ' · ' + thumbTxt + ' · ' + esc(sch) + (ds ? ' · dibuat ' + ds : '') + '</small>' + resHtml + (p.status !== 'terkirim' ? '<button class="btn danger" data-postdel="' + esc(p.id) + '" style="padding:4px 10px;font-size:12px;margin-top:8px">🗑 Hapus antrean</button>' : '') + (p.status === 'gagal' ? '<button class="btn" data-postretry="' + esc(p.id) + '" style="padding:4px 10px;font-size:12px;margin-top:8px;margin-left:6px">🔄 Kirim ulang</button>' : '') + '</div>';
+        return '<div class="aicard" style="padding:10px 12px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1;word-break:break-word">' + esc(p.title || 'Tanpa judul') + '</b><span class="badge">' + (stLabel[p.status] || p.status) + '</span></div><small class="hint" style="display:block;margin-top:4px">' + esc(plats) + ' · ' + privTxt + ' · ' + thumbTxt + ' · ' + esc(sch) + (ds ? ' · dibuat ' + ds : '') + '</small>' + resHtml + '<button class="btn danger" data-postdel="' + esc(p.id) + '" style="padding:4px 10px;font-size:12px;margin-top:8px">🗑 Hapus antrean</button>' + (p.status === 'gagal' ? '<button class="btn" data-postretry="' + esc(p.id) + '" style="padding:4px 10px;font-size:12px;margin-top:8px;margin-left:6px">🔄 Kirim ulang</button>' : '') + '</div>';
       }).join('');
     } catch { box.innerHTML = '<p class="hint" style="margin:0">Gagal memuat antrean.</p>'; }
   }
   document.addEventListener('click', e => {
     const d = e.target.closest && e.target.closest('[data-postdel]');
-    if (d) { (async () => { if (!confirm('Hapus antrean ini?')) return; const r = await fetch('/api/clipper/posts/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: d.dataset.postdel }) }); if (r.ok) { toast('Antrean dihapus.'); refreshPostList(); } else toast('Gagal menghapus.'); })(); }
+    if (d) { (async () => { if (!confirm('Hapus antrean ini dari daftar? Video yang sudah ter-upload di YouTube TIDAK ikut terhapus.')) return; const r = await fetch('/api/clipper/posts/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: d.dataset.postdel }) }); if (r.ok) { toast('Antrean dihapus.'); refreshPostList(); } else toast('Gagal menghapus.'); })(); }
   });
   let postModalSrc = null;
   window.openPostModal = function(src){
@@ -5765,11 +5816,16 @@ const renderSubPresetSettings = () => {
   // thumbnail Final on-demand (endpoint /api/clipper/thumb — generate frame
   // terang bila belum ada). Tanpa poster, kartu HITAM total karena
   // preload="none" tidak memuat frame apa pun (bug: entri lama tanpa thumb).
-  function libPoster(it){
-    // Final yang diselamatkan (post-cleanup) > thumbnail kustom > thumb job lama.
-    const u = (it && it.finalThumb ? '/api/library/clipper-file?id=' + encodeURIComponent(it.id) + '&kind=thumb' : null)
+  // URL poster mentah (untuk <img> kartu): dipakai libPoster + fallback
+  // cover kartu Hasil (Dzaky 25 Okt: kartu tampil poster cover diam).
+  function libPosterUrl(it){
+    return (it && it.finalThumb ? '/api/library/clipper-file?id=' + encodeURIComponent(it.id) + '&kind=thumb' : null)
       || (it && it.thumb)
       || (it && it.jobId ? '/api/clipper/thumb?id=' + encodeURIComponent(it.jobId) + '&clip=' + (it.renderIdx || 0) : '');
+  }
+  function libPoster(it){
+    // Final yang diselamatkan (post-cleanup) > thumbnail kustom > thumb job lama.
+    const u = libPosterUrl(it);
     return u ? ' poster="' + esc(u) + '"' : '';
   }
   async function fetchLibrary(){try{const r=await fetch('/api/library');if(!r.ok)throw 0;return await r.json()}catch(e){return{items:[],counts:{}}}}
@@ -5802,7 +5858,9 @@ const renderSubPresetSettings = () => {
     box.hidden=false;box.classList.add('clip-modal');
     // Kontrol video modal Hasil (klik video / tombol ▶/⏸ / seek) —
     // tanpa tombol play besar di tengah yang menutupi muka.
-    if (it.type === 'clipper') { const v = box.querySelector('[data-libmodalvideo]'), pb = box.querySelector('[data-libmodalplay]'), sk = box.querySelector('[data-libmodalseek]'), tm = box.querySelector('[data-libmodaltime]'); if (v) { const tog = () => { if (v.paused) { try { const p = v.play(); if (p && p.catch) p.catch(() => {}); } catch {} } else { try { v.pause(); } catch {} } }; v.addEventListener('click', tog); if (pb) pb.addEventListener('click', tog); if (sk) sk.addEventListener('input', () => { try { v.currentTime = +sk.value; } catch {} }); v.addEventListener('play', () => { if (pb) pb.textContent = '⏸'; }); v.addEventListener('pause', () => { if (pb) pb.textContent = '▶'; }); v.addEventListener('timeupdate', () => { const rel = v.currentTime || 0; if (sk && document.activeElement !== sk) sk.value = rel; if (tm) tm.textContent = Math.floor(rel / 60) + ':' + String(Math.floor(rel % 60)).padStart(2, '0'); }); } }
+    if (it.type === 'clipper') { const v = box.querySelector('[data-libmodalvideo]'), pb = box.querySelector('[data-libmodalplay]'), sk = box.querySelector('[data-libmodalseek]'), tm = box.querySelector('[data-libmodaltime]'); if (v) { const tog = () => { if (v.paused) { try { const p = v.play(); if (p && p.catch) p.catch(() => {}); } catch {} } else { try { v.pause(); } catch {} } }; v.addEventListener('click', tog); if (pb) pb.addEventListener('click', tog); if (sk) sk.addEventListener('input', () => { try { v.currentTime = +sk.value; } catch {} }); v.addEventListener('play', () => { if (pb) pb.textContent = '⏸'; }); v.addEventListener('pause', () => { if (pb) pb.textContent = '▶'; }); v.addEventListener('timeupdate', () => { const rel = v.currentTime || 0; if (sk && document.activeElement !== sk) sk.value = rel; if (tm) tm.textContent = Math.floor(rel / 60) + ':' + String(Math.floor(rel % 60)).padStart(2, '0'); }); // Pop-up dibuka dari tap kartu (gesture user) -> langsung play di
+      // pop-up (Dzaky 25 Okt: play di pop-up, bukan inline).
+      try { const ap = v.play(); if (ap && ap.catch) ap.catch(() => {}); } catch {} } }
   }
   // ===== Hasil (Dashboard): Script VO + Final Clipper =====
   // Dulu dirender di halaman Library; kini langsung di Dashboard
@@ -5845,8 +5903,14 @@ const renderSubPresetSettings = () => {
       renderList.innerHTML=arr.map(it=>{
         const dt=new Date(it.createdAt||0);const ds=isNaN(dt)?'':dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
         const vid='/api/clipper/download?id='+encodeURIComponent(it.jobId||'')+'&clip='+(it.renderIdx||0);
-        const poster=libPoster(it);
-        return `<div class="aicard" data-libview="${it.id}" style="padding:8px;cursor:pointer;display:flex;flex-direction:column"><div style="position:relative;aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#000;flex:none"><video preload="none" playsinline data-libvideo="${it.id}"${poster} src="${vid}" style="display:block;width:100%;height:100%;object-fit:cover"></video>${it.duration?`<span style="position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">${fmtDur(it.duration)}</span>`:''}<button class="btn" data-libpost="${it.id}" style="position:absolute;right:6px;bottom:6px;z-index:5;width:34px;height:34px;padding:0;border-radius:50%;justify-content:center" title="Post"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg></button></div><div style="flex:1;min-width:0;padding:8px 2px 2px"><b style="display:block;font-size:13px;line-height:1.3;word-break:break-word">${esc(it.title||'Tanpa judul')}</b><small class="hint" style="display:block;margin-top:2px">${ds}${it.duration?' · '+fmtDur(it.duration):''} · Final</small></div><div style="display:flex;gap:6px;margin-top:auto;padding-top:6px"><a class="btn" data-libdirectdl href="${vid}" download style="flex:1;padding:7px 12px;font-size:12px;text-decoration:none;text-align:center">⬇ Unduh</a><button class="btn danger" data-libdel="${it.id}" style="flex:none;padding:7px 9px;font-size:12px">🗑</button></div></div>`;}).join('');
+        // Kartu Hasil = poster Smart Cover DIAM (Dzaky 25 Okt): gambar cover
+        // (endpoint cover=1; 404 bila belum ada -> onerror jatuh ke poster
+        // Final/thumb lama). BUKAN <video> lagi — tap kartu buka pop-up
+        // modal (openLibDetail), video baru play di dalam pop-up itu.
+        const coverUrl=(it.jobId ? '/api/clipper/thumb?id='+encodeURIComponent(it.jobId)+'&clip='+(it.renderIdx||0)+'&cover=1' : '');
+        const fbPoster=libPosterUrl(it);
+        const imgTag=coverUrl ? '<img src="'+coverUrl+'" onerror="this.onerror=null;'+(fbPoster ? 'this.src=\''+fbPoster.replace(/'/g, '%27')+'\';' : '')+'" alt="" style="display:block;width:100%;height:100%;object-fit:cover">' : (fbPoster ? '<img src="'+fbPoster+'" alt="" style="display:block;width:100%;height:100%;object-fit:cover">' : '<div style="width:100%;height:100%;background:#000"></div>');
+        return `<div class="aicard" data-libview="${it.id}" style="padding:8px;cursor:pointer;display:flex;flex-direction:column"><div style="position:relative;aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#000;flex:none">${imgTag}<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:52px;height:52px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;pointer-events:none">▶</span>${it.duration?`<span style="position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">${fmtDur(it.duration)}</span>`:''}<button class="btn" data-libpost="${it.id}" style="position:absolute;right:6px;bottom:6px;z-index:5;width:34px;height:34px;padding:0;border-radius:50%;justify-content:center" title="Post"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg></button></div><div style="flex:1;min-width:0;padding:8px 2px 2px"><b style="display:block;font-size:13px;line-height:1.3;word-break:break-word">${esc(it.title||'Tanpa judul')}</b><small class="hint" style="display:block;margin-top:2px">${ds}${it.duration?' · '+fmtDur(it.duration):''} · Final</small></div><div style="display:flex;gap:6px;margin-top:auto;padding-top:6px"><a class="btn" data-libdirectdl href="${vid}" download style="flex:1;padding:7px 12px;font-size:12px;text-decoration:none;text-align:center">⬇ Unduh</a><button class="btn danger" data-libdel="${it.id}" style="flex:none;padding:7px 9px;font-size:12px">🗑</button></div></div>`;}).join('');
     }
   }
   // Refresh Hasil saat buka Dashboard.

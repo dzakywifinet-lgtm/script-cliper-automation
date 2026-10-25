@@ -335,13 +335,35 @@ const TELEGRAM_BOT_TOKEN = (E.TELEGRAM_BOT_TOKEN || '').trim();
 const TELEGRAM_CHAT_ID = (E.TELEGRAM_CHAT_ID || '').trim();
 const TELEGRAM_API_BASE = (E.TELEGRAM_API_BASE || 'https://api.telegram.org').replace(/\/+$/, '');
 const TELEGRAM_ENABLED = !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID);
-async function sendTelegram(text) {
-  if (!TELEGRAM_ENABLED) return;
+// Config Telegram PER AKUN (Dzaky 25 Okt): file telegram.json di folder
+// akun (pola sama seperti cookies/wm-logo per akun). Dibaca dari disk
+// tiap kirim -> simpan lewat dashboard langsung aktif tanpa restart.
+// Fallback: .env global (TELEGRAM_BOT_TOKEN/CHAT_ID) bila akun belum isi.
+function clipTelegramCfg(user) {
   try {
-    const r = await fetch(TELEGRAM_API_BASE + '/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage', {
+    if (!user) return null;
+    const j = JSON.parse(fs.readFileSync(path.join(clipUserDir(user), 'telegram.json'), 'utf8'));
+    const token = String(j.token || '').trim(), chatId = String(j.chatId || '').trim();
+    if (token && chatId) return { token, chatId, sendVideo: j.sendVideo === true };
+  } catch {}
+  return null;
+}
+function clipTelegramSave(user, cfg) {
+  try {
+    if (!user) return false;
+    fs.mkdirSync(clipUserDir(user), { recursive: true });
+    fs.writeFileSync(path.join(clipUserDir(user), 'telegram.json'), JSON.stringify({ token: String(cfg.token || ''), chatId: String(cfg.chatId || ''), sendVideo: cfg.sendVideo === true }));
+    return true;
+  } catch { return false; }
+}
+async function sendTelegram(text, user) {
+  const cfg = clipTelegramCfg(user) || (TELEGRAM_ENABLED ? { token: TELEGRAM_BOT_TOKEN, chatId: TELEGRAM_CHAT_ID } : null);
+  if (!cfg) return;
+  try {
+    const r = await fetch(TELEGRAM_API_BASE + '/bot' + cfg.token + '/sendMessage', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: String(text).slice(0, 4096) }),
+      body: JSON.stringify({ chat_id: cfg.chatId, text: String(text).slice(0, 4096) }),
       signal: AbortSignal.timeout(10000),
     });
     if (!r.ok) console.log('[telegram] gagal kirim (HTTP ' + r.status + ')');
@@ -349,8 +371,32 @@ async function sendTelegram(text) {
     console.log('[telegram] gagal kirim: ' + (e && e.message ? e.message : String(e)).slice(0, 200));
   }
 }
-// Satu-satunya pintu notif Clipper (biar jelas: hanya job Clipper yang notif).
-const clipNotify = (job, text) => { if (job) sendTelegram(text); };
+// Kirim video Final ke Telegram (Dzaky 21:56, opt-in per akun).
+// Batas Bot API: 50 MB/video (lebih -> diskip, teks tetap jalan).
+// Caption video maks 1024 char. Fire-and-forget: gagal kirim tidak
+// pernah menggagalkan render. Upload bisa lama (koneksi rumah) -> timeout 10 mnt.
+const TELEGRAM_VIDEO_MAX = 50 * 1024 * 1024;
+async function clipTelegramSendVideo(user, file, caption) {
+  const cfg = clipTelegramCfg(user) || (TELEGRAM_ENABLED ? { token: TELEGRAM_BOT_TOKEN, chatId: TELEGRAM_CHAT_ID } : null);
+  if (!cfg || !cfg.sendVideo) return false;
+  let size = 0;
+  try { size = fs.statSync(file).size; } catch { return false; }
+  if (size > TELEGRAM_VIDEO_MAX) { console.log('[telegram] video diskip (>50 MB): ' + file); return 'skipped-big'; }
+  try {
+    const buf = fs.readFileSync(file);
+    const fd = new FormData();
+    fd.append('chat_id', cfg.chatId);
+    fd.append('caption', String(caption || '').slice(0, 1024));
+    fd.append('video', new Blob([buf], { type: 'video/mp4' }), 'clip.mp4');
+    const r = await fetch(TELEGRAM_API_BASE + '/bot' + cfg.token + '/sendVideo', { method: 'POST', body: fd, signal: AbortSignal.timeout(600000) });
+    if (!r.ok) console.log('[telegram] gagal kirim video (HTTP ' + r.status + ')');
+    return r.ok;
+  } catch (e) {
+    console.log('[telegram] gagal kirim video: ' + (e && e.message ? e.message : String(e)).slice(0, 200));
+    return false;
+  }
+}
+const clipNotify = (job, text) => { if (job) sendTelegram(text, job.user); };
 const clipFmtDur = s => { s = Math.max(0, Math.round(+s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const clipTrunc = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) : s; };
 // Nama file cache video POLOS. Kuncinya index + mode + [start, end] kandidat
@@ -366,7 +412,7 @@ function clipNotifyFail(job) {
   if (!job || job.cancelled) return;
   let reason = clipTrunc(job.error || 'Tidak diketahui', 120).replace(/\.+$/, '');
   if (!reason) reason = 'Tidak diketahui';
-  sendTelegram('❌ Gagal: ' + reason + '.');
+  sendTelegram('❌ Gagal: ' + reason + '.', job.user);
 }
 function clipRenderDoneText(job, done, opts) {
   const raw = opts && opts.raw ? ' (RAW)' : '';
@@ -374,6 +420,16 @@ function clipRenderDoneText(job, done, opts) {
   for (const r of done) {
     const cand = (job.candidates || []).find(c => c.index === r.index);
     const line = '\n• Klip ' + (r.index + 1) + ' — dari ' + clipFmtDur(cand ? cand.start : 0) + ' — ' + clipTrunc(r.title || (cand && cand.title) || '(tanpa judul)', 60);
+    if ((text + line).length > 3500) { text += '\n…'; break; }
+    text += line;
+  }
+  return text;
+}
+function clipRenderFailText(job, failed) {
+  let text = '❌ Render gagal: ' + failed.length + ' klip:';
+  for (const r of failed) {
+    const cand = (job.candidates || []).find(c => c.index === r.index);
+    const line = '\n• Klip ' + (r.index + 1) + ' — ' + clipTrunc(r.title || (cand && cand.title) || '(tanpa judul)', 60) + ' — ' + clipTrunc(r.error || 'Tidak diketahui', 80);
     if ((text + line).length > 3500) { text += '\n…'; break; }
     text += line;
   }
@@ -1979,6 +2035,7 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
       const final = clipperLib.sanitizeCandidates(candidates, job.duration, targetDur);
       const newCands = clipAppendCandidates(job, final.length ? final : fallbackCandidates(job.duration, targetDur, count), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset, fx: job.enhanceFx ? 'cerah' : undefined });
       if (job.hookPreset) for (const c of newCands) c.hookPreset = job.hookPreset; // Kartu Buat Klip → default semua kandidat baru
+      clipHookFallbackForCands(job, newCands); // Opsi B (heatmap/paling keras: kandidat tanpa hook -> fallback cue)
       if (!newCands.length) throw new Error('Tidak bisa membuat kandidat klip dari video ini.');
       job.status = 'done'; job.progress = 100;
       clipLog(job, 'Analisis selesai: ' + newCands.length + ' kandidat baru (' + (usedFallback ? 'Paling Keras — heatmap tidak tersedia' : 'Most Replayed') + ') — total ' + job.candidates.length + ' klip.');
@@ -1994,6 +2051,7 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
       cand = clipperLib.sanitizeCandidates(cand, job.duration, targetDur, count);
       if (!cand.length) { cand = clipperLib.fallbackCandidates(job.duration, targetDur, count); clipLog(job, 'Deteksi suara tidak menemukan kandidat — memakai pembagian merata.'); }
       const newCands = clipAppendCandidates(job, cand.map(c => ({ ...c, hookPreset: job.hookPreset || c.hookPreset || 'kartu' })), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset, fx: job.enhanceFx ? 'cerah' : undefined });
+      clipHookFallbackForCands(job, newCands); // Opsi B (paling keras: kandidat tanpa hook -> fallback cue)
       job.phase = 'done'; job.progress = 100; job.status = 'done';
       clipLog(job, 'Analisis selesai: ' + newCands.length + ' kandidat klip baru (tanpa AI) — total ' + job.candidates.length + ' klip.');
       clipNotify(job, '🎯 Analisis selesai: ' + newCands.length + ' kandidat klip baru (total ' + job.candidates.length + ').');
@@ -2134,8 +2192,13 @@ async function clipAnalyzeSaved(job, targetDur, count, provider, model, route) {
       }
     }
     let cand = clipperLib.sanitizeCandidates(allCand, job.duration, targetDur, count);
+    // Opsi A (analisis): bedakan 'AI memberi 0' vs 'AI memberi tapi terbuang
+    // validasi' — dulu keduanya sama-sama diam. Log hanya bila ada yang
+    // hilang atau tidak ada yang lolos (kasus sehat tidak menambah log).
+    { const rawHook = allCand.reduce((a, c) => a + (Array.isArray(c.hook) ? c.hook.length : 0), 0); const keptHook = cand.reduce((a, c) => a + (Array.isArray(c.hook) ? c.hook.length : 0), 0); if (keptHook === 0 || keptHook < rawHook) clipLog(job, 'Hook AI: ' + rawHook + ' potongan diterima, ' + keptHook + ' lolos validasi (0,5–2,5 dtk, di dalam klip).'); }
     if (!cand.length) { cand = clipperLib.fallbackCandidates(job.duration, targetDur, count); clipLog(job, 'AI tidak mengembalikan kandidat valid — memakai pembagian merata.'); }
     const newCands = clipAppendCandidates(job, cand.map(c => ({ ...c, hookPreset: job.hookPreset || c.hookPreset || 'kartu' })), { mode: job.mode, dur: targetDur, quality: job.quality, hookPreset: job.hookPreset, fx: job.enhanceFx ? 'cerah' : undefined });
+    clipHookFallbackForCands(job, newCands); // Opsi B (AI: kandidat tanpa hook -> fallback cue)
     if (job.cancelled) return;
     job.phase = 'done'; job.progress = 100; job.status = 'done';
     clipLog(job, 'Analisis selesai: ' + newCands.length + ' kandidat klip baru — total ' + job.candidates.length + ' klip.');
@@ -2321,6 +2384,37 @@ async function clipFaceTrackSplit(job, sel, cand) {
 
 // Hook multi-hook: validasi + ubah waktu absolut (sumber) -> relatif ke
 // awal klip. Dipakai render (clipRender) + endpoint ASS pratinjau hook.
+// Hook fallback (opsi B/C): 1 potongan otomatis dari cue transkrip
+// terpanjang yang sepenuhnya di dalam klip. Dipotong maks 2 dtk, teks =
+// 5 kata pertama cue (huruf besar, gaya teks hook). Kembalikan potongan
+// ABSOLUT {start,end,text} atau null (tanpa cue layak -> tanpa fallback).
+function clipHookFallback(cues, clipStart, clipEnd) {
+  let best = null;
+  for (const cu of Array.isArray(cues) ? cues : []) {
+    if (!cu) continue;
+    const s = +cu.start, e = +cu.end;
+    if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
+    if (s < clipStart || e > clipEnd) continue;
+    if (e - s < 0.5) continue;
+    if (!best || (e - s) > (best.end - best.start)) best = { start: s, end: e, text: String(cu.text || '') };
+  }
+  if (!best) return null;
+  const e2 = Math.min(best.end, best.start + 2);
+  const words = String(best.text || '').trim().split(/\s+/).filter(Boolean).slice(0, 5);
+  return { start: Math.round(best.start * 100) / 100, end: Math.round(e2 * 100) / 100, text: words.join(' ').toUpperCase() };
+}
+// Opsi B: isi hook kosong kandidat baru dengan 1 potongan fallback dari
+// cue terpanjang di dalam klip (dipakai semua jalur analisis: AI,
+// heatmap, paling keras). Log per klip biar jelas mana hook AI, mana
+// fallback. Objek cands adalah referensi yang sama dengan entri
+// job.candidates, jadi mutasi ini tersimpan (clipLog ikut menyimpan job).
+function clipHookFallbackForCands(job, cands) {
+  for (const nc of Array.isArray(cands) ? cands : []) {
+    if (Array.isArray(nc.hook) && nc.hook.length) continue;
+    const fb = clipHookFallback(job.cues || [], nc.start, nc.end);
+    if (fb) { nc.hook = [fb]; clipLog(job, 'Hook otomatis (fallback analisis) untuk klip ' + (nc.index + 1) + ' — AI tidak memberi potongan.'); }
+  }
+}
 function clipHookRel(cand, rawHook) {
   const out = [];
   for (const h of Array.isArray(rawHook) ? rawHook : []) {
@@ -2339,10 +2433,11 @@ async function clipRender(job, selected, opts) {
   job.status = 'rendering'; job.phase = 'render'; job.progress = 0;
   const total = selected.length;
   let done = 0;
+  const batchDone = [], batchFailed = []; // notif batch ini saja (bukan semua done kumulatif di job.renders)
   for (const sel of selected) {
     if (job.cancelled) return;
     const cand = job.candidates.find(c => c.index === sel.index);
-    if (!cand) { job.renders.push({ index: sel.index, title: sel.title || '', status: 'error', error: 'Kandidat tidak ditemukan' }); done++; continue; }
+    if (!cand) { const er = { index: sel.index, title: sel.title || '', status: 'error', error: 'Kandidat tidak ditemukan' }; job.renders.push(er); batchFailed.push(er); done++; continue; }
     const title = clipperLib.cleanTitle(sel.title, 120) || cand.title || ('Klip ' + (sel.index + 1)); // judul TIDAK PERNAH kosong
     const titleText = String(sel.hookText || cand.hookText || '').trim() || title; // Teks Hook (panel Cover): teks judul yang tampil di video; kosong = judul klip
     // Geser Momen (Detail: tombol ⏪ Geser −5 dtk / ⏩ Geser +5 dtk): sel.start /
@@ -2503,6 +2598,19 @@ async function clipRender(job, selected, opts) {
     let hookRel = [];
     if (opts.hookEnabled !== false && sel.hook !== false && cand.hookOn !== false) {
       hookRel = clipHookRel(cand, Array.isArray(sel.hook) ? sel.hook : (cand.hook || []));
+    }
+    // Hook fallback saat RENDER (opsi C) + diagnostik buangan (opsi A).
+    // C: hook AKTIF tapi potongan kosong TOTAL (AI tidak memberi + tidak
+    // ada ketikan manual) -> 1 potongan fallback dari cue. TIDAK PERNAH
+    // mengganti potongan AI: kalau AI memberi tapi tak lolos validasi,
+    // hanya dicatat (opsi A), render tetap tanpa hook.
+    const hookOnForClip = opts.hookEnabled !== false && sel.hook !== false && cand.hookOn !== false;
+    const storedHook = Array.isArray(sel.hook) ? sel.hook : (cand.hook || []);
+    if (hookOnForClip && !hookRel.length && !storedHook.length) {
+      const fb = clipHookFallback(job.cues || [], cand.start, cand.end);
+      if (fb) { hookRel = clipHookRel(cand, [fb]); if (hookRel.length) clipLog(job, 'Hook otomatis (fallback render) untuk klip ' + (sel.index + 1) + ' — AI tidak memberi potongan.'); }
+    } else if (hookOnForClip && !hookRel.length && storedHook.length) {
+      clipLog(job, 'Hook klip ' + (sel.index + 1) + ': ' + storedHook.length + ' potongan tersimpan tidak lolos validasi (0,5–2,5 dtk, di dalam klip) — render tanpa hook.');
     }
     // Sensor kata (Koreksi Kata): kata yang di-sensor di rentang klip ini ->
     // rentang bisu (waktu RELATIF output = relatif klip + hookTotal, karena
@@ -2931,13 +3039,21 @@ async function clipRender(job, selected, opts) {
       if (job.cancelled) { rec.error = 'Dihentikan'; }
       else { rec.error = (e.message || String(e)).slice(0, 300); clipLog(job, 'Klip ' + (done + 1) + ' gagal: ' + rec.error); }
     }
+    if (rec.status === 'done') batchDone.push(rec);
+    else if (!job.cancelled) batchFailed.push(rec);
     done++;
     job.progress = Math.round((done / total) * 100);
   }
   if (!job.cancelled) { job.status = 'done'; job.phase = 'done'; job.progress = 100; clipLog(job, 'Render selesai.'); }
   if (!job.cancelled) {
-    const done = (job.renders || []).filter(r => r.status === 'done');
-    if (done.length) clipNotify(job, clipRenderDoneText(job, done, opts));
+    if (batchDone.length) clipNotify(job, clipRenderDoneText(job, batchDone, opts));
+    // Kirim video Final per klip batch ini (opt-in per akun, maks 50 MB/video).
+    if (batchDone.length) for (const r of batchDone) {
+      const cand = (job.candidates || []).find(c => c.index === r.index);
+      const caption = '🎬 Klip ' + (r.index + 1) + ' — dari ' + clipFmtDur(cand ? cand.start : 0) + ' — ' + clipTrunc(r.title || (cand && cand.title) || '(tanpa judul)', 60);
+      clipTelegramSendVideo(job.user, path.join(job.dir, 'clip_' + r.index + '.mp4'), caption);
+    }
+    if (batchFailed.length) clipNotify(job, clipRenderFailText(job, batchFailed));
   }
 }
 // Muat ulang proyek Clipper yang tersimpan di disk (dari deploy/restart sebelumnya).
@@ -3143,6 +3259,35 @@ const server = http.createServer(async (req, res) => {
     try { setEnvVar('LIBRARY_DIR', dir); } catch { return send(res, 500, { error: 'Gagal menyimpan .env' }); }
     process.env.LIBRARY_DIR = dir; E.LIBRARY_DIR = dir;
     return send(res, 200, { ok: true, dir: dir || libDir(), note: 'Lokasi baru langsung aktif. File lama TIDAK dipindahkan otomatis — pindahkan manual folder lama ke lokasi baru kalau mau data lama ikut.' });
+  }
+  // Notifikasi Telegram PER AKUN (Dzaky 25 Okt): token + chat ID disimpan
+  // di folder akun (telegram.json) — BUKAN .env global. GET hanya status
+  // terpasang (tidak pernah nilainya). POST kosongkan keduanya = hapus
+  // (nonaktifkan). Langsung aktif tanpa restart (dibaca tiap kirim).
+  if (req.method === 'GET' && p === '/api/clipper/telegram') {
+    const user = sessUser(req);
+    const cfg = clipTelegramCfg(user);
+    return send(res, 200, { ok: true, accountSet: !!cfg, envSet: TELEGRAM_ENABLED, sendVideo: !!(cfg && cfg.sendVideo) });
+  }
+  if (req.method === 'POST' && p === '/api/clipper/telegram') {
+    const user = sessUser(req);
+    if (!user) return send(res, 401, { error: 'Belum login.' });
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e4) break; }
+    let b = {}; try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'Body JSON tidak valid' }); }
+    const token = String(b.token || '').trim(), chatId = String(b.chatId || '').trim();
+    if (/[\r\n]/.test(token) || /[\r\n]/.test(chatId) || token.length > 300 || chatId.length > 100) return send(res, 400, { error: 'Nilai tidak valid' });
+    if (b.disable === true || b.disable === 1 || b.disable === 'true') { try { fs.unlinkSync(path.join(clipUserDir(user), 'telegram.json')); } catch {} return send(res, 200, { ok: true, configured: false }); }
+    const sendVideo = b.sendVideo === true || b.sendVideo === 1 || b.sendVideo === 'true';
+    if (!token && !chatId) {
+      // Kosong = tidak diubah (pola keyDlg): hanya update centang video.
+      const existing = clipTelegramCfg(user);
+      if (!existing) return send(res, 400, { error: 'Isi Token dan Chat ID dulu (akun ini belum punya config).' });
+      if (!clipTelegramSave(user, { token: existing.token, chatId: existing.chatId, sendVideo })) return send(res, 500, { error: 'Gagal menyimpan.' });
+      return send(res, 200, { ok: true, configured: true });
+    }
+    if (!token || !chatId) return send(res, 400, { error: 'Token dan Chat ID harus diisi keduanya (atau kosongkan keduanya bila tidak diubah).' });
+    if (!clipTelegramSave(user, { token, chatId, sendVideo })) return send(res, 500, { error: 'Gagal menyimpan.' });
+    return send(res, 200, { ok: true, configured: true });
   }
   const libFile = u => path.join(libDir(), encodeURIComponent(u) + '.json');
   const libLoad = u => { try { const a = JSON.parse(fs.readFileSync(libFile(u), 'utf8')); return Array.isArray(a) ? a : []; } catch { return []; } };
@@ -4218,8 +4363,10 @@ const server = http.createServer(async (req, res) => {
     if (!clipPostsSave(user, posts)) return send(res, 500, { error: 'Gagal menyimpan antrean.' });
     return send(res, 200, { ok: true, post });
   }
-  // Hapus antrean posting (hanya milik akun; riwayat 'terkirim' tidak bisa
-  // dihapus — itu arsip video apa yang sudah di-upload).
+  // Hapus antrean posting (hanya milik akun; SEMUA status boleh dihapus —
+  // Dzaky 25 Okt: biar antrean tidak menumpuk. Yang dihapus HANYA record
+  // antrean di posts.json; video yang sudah ter-upload di YouTube TIDAK
+  // ikut terhapus).
   if (req.method === 'POST' && p === '/api/clipper/posts/delete') {
     const user = sessUser(req);
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e6) break; }
@@ -4228,7 +4375,6 @@ const server = http.createServer(async (req, res) => {
     const posts = clipPostsLoad(user);
     const it = posts.find(x => x.id === String(b.id || ''));
     if (!it) return send(res, 404, { error: 'Antrean tidak ditemukan.' });
-    if (it.status === 'terkirim') return send(res, 400, { error: 'Riwayat terkirim tidak bisa dihapus.' });
     if (!clipPostsSave(user, posts.filter(x => x.id !== it.id))) return send(res, 500, { error: 'Gagal menghapus.' });
     return send(res, 200, { ok: true });
   }
@@ -4837,4 +4983,4 @@ const server = http.createServer(async (req, res) => {
 });
 if (require.main === module) { server.listen(PORT, () => console.log('Script VO Agent berjalan di http://localhost:' + PORT)); clipPostStartTicker(); }
 // Ekspor helper (untuk tes unit): require() tidak menyalakan server.
-module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipPlainCacheValid, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan, clipYtCookiesFor, clipCookiesPath, clipCookiesStatus, clipPostsLoad, clipPostsSave, clipYtOAuthCfg, clipYtOAuthStartUrl, clipYtTokenLoad, clipYtTokenSave, clipYtTokenDelete, clipYtExchangeCode, clipYtRefreshToken, clipYtAccessToken, clipYtChannel, clipYtChannelSafe, clipYtUploadVideo, clipYtPrivacyFor, clipYtThumbFromFinal, clipYtSetThumbnail, clipPostFinalFile, clipPostExecuteOne, clipPostRunDue };
+module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipRenderFailText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipPlainCacheValid, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan, clipYtCookiesFor, clipCookiesPath, clipCookiesStatus, clipPostsLoad, clipPostsSave, clipYtOAuthCfg, clipYtOAuthStartUrl, clipYtTokenLoad, clipYtTokenSave, clipYtTokenDelete, clipYtExchangeCode, clipYtRefreshToken, clipYtAccessToken, clipYtChannel, clipYtChannelSafe, clipYtUploadVideo, clipYtPrivacyFor, clipYtThumbFromFinal, clipYtSetThumbnail, clipPostFinalFile, clipPostExecuteOne, clipPostRunDue, clipHookFallback, clipHookFallbackForCands, clipTelegramCfg, clipTelegramSave, clipTelegramSendVideo };
