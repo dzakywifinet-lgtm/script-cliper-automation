@@ -868,7 +868,7 @@ function clipSaveJob(job) {
       renders: job.renders, cues: job.cues, videoTitle: job.videoTitle, duration: job.duration,
       dir: job.dir, source: job.source, sourceReady: job.sourceReady, sourceUrl: job.sourceUrl,
       metaDesc: job.metaDesc, metaUploader: job.metaUploader, speakers: job.speakers, sourceCleaned: job.sourceCleaned,
-      downloadPct: job.downloadPct, transcribeVia: job.transcribeVia, transcriptLang: job.transcriptLang };
+      downloadPct: job.downloadPct, transcribeVia: job.transcribeVia, transcriptLang: job.transcriptLang, smartCover: job.smartCover };
     fs.writeFileSync(path.join(job.dir, 'job.json'), JSON.stringify(data));
   } catch {}
 }
@@ -2370,6 +2370,11 @@ async function clipRender(job, selected, opts) {
     if (sel.showSub !== undefined) cand.showSub = !!sel.showSub;
     if (sel.subSet !== undefined) cand.subSet = !!sel.subSet; // toggle subtitle disentuh user (persist biar OFF yang disengaja tetap OFF)
     if (sel.mode !== undefined && ['podcast', 'auto', 'landscape', 'split', 'crop11', 'gameplay'].includes(String(sel.mode))) cand.mode = String(sel.mode); // Layout per-klip (Detail tab Video) — persist biar render ulang konsisten
+    // Smart Cover (Pengaturan > Skill Packs): sel (ceklis terkini) > flag proyek.
+    // Disimpan ke job biar render berikutnya + restart tidak kehilangan lagi
+    // (sebelumnya flag hanya diset saat analisis dan tidak persisten — render
+    // ulang selalu log 'nonaktif' walau ceklis tercentang).
+    if (sel.smartCover !== undefined) job.smartCover = !!sel.smartCover;
     // Preset Gaya Subtitle / Judul Hook (Detail): sel > tersimpan di kandidat >
     // default. Disimpan ke kandidat biar render ulang / render dari Hasil Klip
     // tetap pakai preset yang dipilih (tidak reset ke Default).
@@ -2852,6 +2857,7 @@ async function clipRender(job, selected, opts) {
       // ulang oleh jalur lama sesudah render).
       let coverIntroPath = null;
       if (job.smartCover) { try { coverIntroPath = await clipMakeCover(job, cand); } catch {} }
+      if (job.smartCover && coverIntroPath) clipLog(job, '🖼️ Smart Cover: poster pembuka dibuat di Final klip ' + (sel.index + 1) + '.');
       const attempt = { simple: false, subs: !!srtPath, vcodec: 'libx264', acodec: 'aac', hook: plainHasAudio && hookRel.length > 0 };
       let r = null;
       for (let tryN = 0; tryN < 8 && !job.cancelled; tryN++) {
@@ -2902,7 +2908,7 @@ async function clipRender(job, selected, opts) {
       // Smart Cover (Fase 3): poster otomatis tiap Final selesai (bila skill-nya ON di proyek ini).
       if (fs.existsSync(path.join(job.dir, 'cover_' + sel.index + '.jpg'))) rec.cover = true; // cover lama tetap diakui walau record render baru
       if (job.smartCover && !coverIntroPath) { const cc = cand; clipMakeCover(job, cc).then(p => { if (p) clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' dibuat otomatis.'); else clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' TIDAK dibuat (sumber polos/final tidak ketemu atau ffmpeg gagal) — buat manual dari tab Cover di Edit klip.'); }).catch(() => { try { clipLog(job, '🖼️ Smart Cover: poster klip ' + (sel.index + 1) + ' gagal dibuat (error) — buat manual dari tab Cover.'); } catch {} }); }
-      else clipLog(job, '🖼️ Smart Cover nonaktif di proyek ini — poster otomatis tidak dibuat (nyalakan di Pengaturan > Skill Packs).');
+      else if (!job.smartCover) clipLog(job, '🖼️ Smart Cover nonaktif di proyek ini — poster otomatis tidak dibuat (nyalakan di Pengaturan > Skill Packs).');
       // Versi render (brief F, 22 Okt): hash dari isi ASS final + mode +
       // kualitas. ASS versi ini disimpan permanen (clip_<i>_<hash>.ass) dan
       // hash masuk nama + URL unduhan -> tidak ada unduhan versi lama.
@@ -3932,7 +3938,10 @@ const server = http.createServer(async (req, res) => {
       // Layout per-klip (Detail, tab Video): JANGAN di-drop.
       mode: s.mode,
       // B-roll per-klip (Detail, tab Video): {enabled, keyword, start, dur}.
-      broll: s.broll })), {
+      broll: s.broll,
+      // Smart Cover (Pengaturan > Skill Packs): JANGAN di-drop — sebelumnya
+      // tidak diteruskan, sehingga render ulang tidak pernah tahu ceklis terkini.
+      smartCover: s.smartCover })), {
       bg: b.bg === 'black' ? 'black' : 'blur',
       fontColor, titleColor2, italic: !!b.italic, subtitle: b.subtitle !== false,
       titleSize: clampN(b.titleSize, 20, 140, 54), titleY: clampN(b.titleY, 0, 1100, 70),
