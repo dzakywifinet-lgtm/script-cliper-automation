@@ -340,6 +340,7 @@ yang lain = jeda (IntersectionObserver). */
 #page-dashboard .dash-hasil-grid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1.35fr;gap:12px}
 #page-dashboard .dash-hasil-col{min-height:0;display:flex;flex-direction:column}
 #page-dashboard .dash-hasil-col>h3{margin:0 0 8px}
+#hasilRenderList{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 #page-dashboard #hasilScriptList,#page-dashboard #hasilRenderList{flex:1;min-height:0;overflow-y:auto;padding-right:4px;scrollbar-width:thin;scrollbar-color:#8b5cf6 #0d1117}
 #page-dashboard #hasilScriptList::-webkit-scrollbar,#page-dashboard #hasilRenderList::-webkit-scrollbar{width:8px}
 #page-dashboard #hasilScriptList::-webkit-scrollbar-thumb,#page-dashboard #hasilRenderList::-webkit-scrollbar-thumb{background:#8b5cf6;border-radius:99px}
@@ -662,6 +663,7 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
 </style>
 </head><body>
 <div class="userchip"><div class="av" id="topUserAv">D</div><b id="topUserName">Memuat…</b><a class="btn ghost" href="/logout" onclick="try{localStorage.removeItem('hvo2')}catch(e){}" style="padding:4px 10px;text-decoration:none;font-size:12px" title="Keluar dari dashboard">Keluar</a></div>
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true"><symbol id="i-plane" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.5.5 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/><path d="M2.5 12.5 5 11.5"/><path d="M2 16.5 6 15"/><path d="M3.5 20 5.5 19.2"/></symbol></svg>
 <div class="app">
 <aside class="sidebar" id="sidebar">
   <div class="logo"><div class="lg">▶</div><div><b>Script Clipper Automation</b><small>Create · Edit · Go Viral</small></div></div>
@@ -670,6 +672,7 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
   <button class="navbtn" data-page="clipper"><span class="ic">✂️</span> Auto Clipper</button>
   <button class="navbtn" data-page="voice"><span class="ic">🎤</span> Voice Generator</button>
   <button class="navbtn" data-page="aiconn"><span class="ic">🤖</span> Koneksi AI</button>
+  <button class="navbtn" data-page="post"><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg></span> Post</button>
   <button class="navbtn" data-page="settings"><span class="ic">⚙️</span> Settings</button>
   <div class="side-foot">
     <div class="credits"><span>⚡</span><div><b>AI Credits</b><small style="color:#22c55e;font-weight:700">Unlimited</small></div></div>
@@ -861,6 +864,37 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
   <div class="aicard"><h3 style="margin:0 0 8px">➕ Tambah AI</h3><p class="hint" id="addAiHint" style="margin:0 0 12px">Tambah provider AI baru (OpenAI-compatible: DeepSeek, Groq, OpenRouter, dll). API key langsung masuk ke .env dan aktif tanpa restart.</p><button class="btn" id="addAiBtn">➕ Tambah AI</button></div>
   <div class="aicard" id="ttsKeyCard" hidden><h3 style="margin:0 0 8px">🔊 API TTS (suara)</h3><p class="hint" style="margin:0 0 10px">Voice Generator untuk akunmu memakai <b>API TTS milikmu sendiri</b> (ElevenLabs). Belum punya API? Pakai <b>ElevenLabs — ada paket gratisnya</b> (10.000 karakter/bulan): daftar di elevenlabs.io, buat API key, tempel di sini. Key hanya tersimpan untuk akunmu.</p><div style="display:flex;gap:6px;flex-wrap:wrap"><input type="password" id="ttsKeyInput" placeholder="API key ElevenLabs kamu" style="flex:1;min-width:200px" autocomplete="off"><button class="btn" id="ttsKeySave">💾 Sambungkan</button></div><p class="hint" id="ttsKeyStatus" style="margin:8px 0 0"></p></div>
   <div class="aicard"><h3 style="margin:0 0 8px">💡 Cara pakai</h3><p class="hint" style="margin:0">Klik chip provider untuk atur API key-nya. Klik <b>×</b> di chip AI custom untuk menghapusnya. Pilih provider custom di dropdown Direct tiap tahap Script VO Agent (muncul saat jalur Direct aktif).</p></div>
+</div>
+
+<!-- ================= POST (menu sendiri, di bawah Koneksi AI) ================= -->
+<div id="page-post" class="page" hidden>
+  <div class="page-head"><div style="display:flex;gap:10px;align-items:center"><button class="hamburger">☰</button><div><h1><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px"><use href="#i-plane"/></svg> Post</h1><p>Posting klip ke YouTube &amp; TikTok + jadwal upload.</p></div></div></div>
+  <div class="aicard"><h3 style="margin:0 0 8px">🔗 Sambungan posting</h3><p class="hint" style="margin:0 0 12px">Posting resmi butuh sambungan OAuth per platform (bukan cookies — cookies hanya untuk download). YouTube dulu; TikTok menyusul setelah YouTube stabil.</p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><b style="flex:1">▶️ YouTube</b><span class="badge" id="postConnYt">Memeriksa…</span><button class="btn" id="postYtConnBtn" style="padding:6px 12px;font-size:12px">Sambungkan YouTube</button><button class="btn ghost" id="postYtDiscBtn" style="padding:6px 12px;font-size:12px" hidden>Putuskan</button></div>
+    <div id="postYtCfg" hidden style="border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:8px"><p class="hint" style="margin:0 0 8px">Isi sekali dari Google Cloud (gratis): buat project → aktifkan <b>YouTube Data API v3</b> → buat <b>OAuth Client ID (Web)</b> dengan Redirect URI persis <b>https://script.dzw.my.id/api/post/oauth/youtube/callback</b> → tempel Client ID + Secret di sini (tersimpan di .env server, tidak pernah ditampilkan lagi).</p><input id="postYtCid" style="width:100%;margin-bottom:6px" placeholder="Client ID Google Cloud"><input id="postYtCsec" type="password" style="width:100%;margin-bottom:8px" placeholder="Client Secret Google Cloud"><div style="display:flex;gap:8px;align-items:center"><button class="btn" id="postYtCfgBtn" style="padding:6px 12px;font-size:12px">Simpan</button><span id="postYtCfgMsg" class="hint"></span></div></div>
+    <div style="margin-bottom:8px"><button class="btn ghost" id="postYtCfgToggle" style="padding:4px 10px;font-size:12px" hidden>Ubah Client ID/Secret</button></div>
+    <div style="display:flex;gap:8px;align-items:center"><b style="flex:1">🎵 TikTok</b><span class="badge" id="postConnTt">Belum tersambung</span></div>
+  </div>
+  <div class="aicard"><h3 style="margin:0 0 8px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><use href="#i-plane"/></svg> Antrean &amp; riwayat posting</h3><p class="hint" style="margin:0 0 12px">Video apa yang di-upload ke TikTok/YouTube + jadwalnya. Posting dimulai dari logo post di kartu klip (Hasil Final / Studio).</p><div id="postList"></div></div>
+</div>
+
+<!-- Modal form posting (Langkah 1): dipakai tombol 📤 Hasil + Studio -->
+<div id="postModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90;align-items:flex-start;justify-content:center;padding:20px 12px;overflow:auto">
+  <div style="background:#12161d;border:1px solid var(--line);border-radius:16px;padding:16px;max-width:520px;width:100%">
+    <h3 style="margin:0 0 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><use href="#i-plane"/></svg> Posting klip</h3>
+    <div><label>Judul</label><input type="text" id="postTitle" style="width:100%"></div>
+    <div style="margin-top:8px"><label>Deskripsi</label><textarea id="postDesc" style="width:100%;min-height:70px"></textarea></div>
+    <div style="margin-top:8px"><label>Tag (pisah koma)</label><input type="text" id="postTags" style="width:100%" placeholder="tag1, tag2"></div>
+    <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="postYt" checked> ▶️ YouTube</label>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="postTt" checked> 🎵 TikTok</label>
+    </div>
+    <div style="margin-top:10px"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="postNow" checked> Kirim langsung (tanpa jadwal)</label></div>
+    <div style="margin-top:8px"><label>Jadwal upload</label><input type="datetime-local" id="postWhen" style="width:100%" disabled></div>
+    <p id="postMsg" class="hint" style="margin:10px 0 0"></p>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="postSubmit" style="flex:1;padding:10px;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg> Masukkan antrean</button><button class="btn ghost" id="postCancel" style="padding:10px 16px">Batal</button></div>
+    <p class="hint" style="margin:8px 0 0">Langkah 1: antrean tersimpan + tampil di tab Post. Pengiriman beneran (OAuth) menyusul di langkah 2.</p>
+  </div>
 </div>
 
 <!-- ================= SETTINGS ================= -->
@@ -2871,6 +2905,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     if (nw) { showClipView('create'); const u = $c('clipUrl'); if (u) u.focus(); return; }
     const dl = e.target.closest && e.target.closest('[data-jobdl]');
     if (dl) { clipJobDownload(+dl.dataset.jobdl); return; }
+    const ps2 = e.target.closest && e.target.closest('[data-jobpost]');
+    if (ps2) { const idx = +ps2.dataset.jobpost; const c = (candCache || []).find(x => x.index === idx); const hasFinal = ps2.dataset.postfinal === '1' || (rendersCache || []).some(r => r && r.index === idx && r.status === 'done' && !r.raw); if (!c) return; if (!hasFinal) { setMsg('Klip ini belum ada Final-nya — render dulu, baru bisa di-post.'); return; } if (window.openPostModal) window.openPostModal({ jobId: jobId, renderIdx: idx, title: c.title || '' }); return; }
     const inf = e.target.closest && e.target.closest('[data-jobinfo]');
     if (inf) { const c = (candCache || []).find(x => x.index === +inf.dataset.jobinfo); if (c) clipCopyJobInfo(c); return; }
     const fd2 = e.target.closest && e.target.closest('[data-jobfeed]');
@@ -2937,7 +2973,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
         // browser di tengah video menutupi muka + judul hook) — klik video
         // = putar/jeda, tombol ▶/⏸ kecil di bar kontrol di bawah.
         // Poster = thumbnail RAW (frame terang, tanpa teks ter-bake).
-        + '<div class="clip-hthumb" data-clippreview><video preload="none" playsinline data-clipcardvideo="' + c.index + '" poster="/api/clipper/thumb?id=' + encodeURIComponent(jobId) + '&clip=' + c.index + '&raw=1" data-src="/api/clipper/source?id=' + encodeURIComponent(jobId) + '#t=' + Math.floor(c.start) + ',' + Math.ceil(c.end) + '"></video><div data-clipoverlay="title" data-candidx="' + c.index + '" data-compact="1" style="position:absolute;left:0;right:0;top:38%;text-align:center;line-height:1.15;font-weight:900;color:#fff;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 2px 6px #000;padding:4px 6px;font-size:13px;pointer-events:none"></div><div data-clipoverlay="sub" data-candidx="' + c.index + '" data-compact="1" style="position:absolute;left:0;right:0;bottom:23%;text-align:center;line-height:1.25;font-weight:700;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;padding:2px 4px;font-size:11px;pointer-events:none"></div><span class="clip-status" data-clipstatus="' + c.index + '">Draft</span><span style="position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;pointer-events:none">' + fmtT(c.end - c.start) + '</span></div>'
+        + '<div class="clip-hthumb" data-clippreview><video preload="none" playsinline data-clipcardvideo="' + c.index + '" poster="/api/clipper/thumb?id=' + encodeURIComponent(jobId) + '&clip=' + c.index + '&raw=1" data-src="/api/clipper/source?id=' + encodeURIComponent(jobId) + '#t=' + Math.floor(c.start) + ',' + Math.ceil(c.end) + '"></video><div data-clipoverlay="title" data-candidx="' + c.index + '" data-compact="1" style="position:absolute;left:0;right:0;top:38%;text-align:center;line-height:1.15;font-weight:900;color:#fff;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 2px 6px #000;padding:4px 6px;font-size:13px;pointer-events:none"></div><div data-clipoverlay="sub" data-candidx="' + c.index + '" data-compact="1" style="position:absolute;left:0;right:0;bottom:23%;text-align:center;line-height:1.25;font-weight:700;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;padding:2px 4px;font-size:11px;pointer-events:none"></div><span class="clip-status" data-clipstatus="' + c.index + '">Draft</span><span style="position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;pointer-events:none">' + fmtT(c.end - c.start) + '</span><button class="btn" data-jobpost="' + c.index + '" style="position:absolute;right:6px;bottom:6px;z-index:5;width:34px;height:34px;padding:0;border-radius:50%;justify-content:center" title="Post"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg></button></div>'
         + '<div style="flex:1;min-width:0">'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px"><b>Klip ' + (c.index + 1) + '</b><span class="hint">' + clipScore10(c) + '</span><span class="hint">' + fmtT(c.end - c.start) + ' · Layout: ' + _lmLabel + '</span>' + clipBatchLabel(c) + ((c.hook && c.hook.length) ? '<span class="hint">⚡ Hook</span>' : '') + '</div>'
         + '<b style="display:block;font-size:14px;line-height:1.3;word-break:break-word;margin-top:4px">' + esc(short) + '</b>'
@@ -3015,7 +3051,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">' + cands.map(c => {
       const shortT = String(c.title || ('Klip ' + (c.index + 1))); const short = shortT.length > 60 ? shortT.slice(0, 60) + '…' : shortT;
       return '<div class="clip-cand" data-createcard="' + c.index + '" style="overflow:hidden;display:flex;flex-direction:column">'
-        + '<div style="position:relative;flex:none;aspect-ratio:9/16;background:#000;border-radius:8px;overflow:hidden"><video preload="none" playsinline style="width:100%;height:100%;object-fit:cover" poster="/api/clipper/thumb?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + (coverSet.has(c.index) ? '&cover=1' : (finalSet.has(c.index) ? '' : '&raw=1')) + '"' + (finalSet.has(c.index) ? ' src="/api/clipper/download?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + '"' : ' data-src="/api/clipper/source?id=' + encodeURIComponent(j.id || jobId) + '#t=' + Math.floor(c.start) + ',' + Math.ceil(c.end) + '"') + '></video><span style="position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">' + fmtT(c.end - c.start) + '</span></div>'
+        + '<div style="position:relative;flex:none;aspect-ratio:9/16;background:#000;border-radius:8px;overflow:hidden"><video preload="none" playsinline style="width:100%;height:100%;object-fit:cover" poster="/api/clipper/thumb?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + (coverSet.has(c.index) ? '&cover=1' : (finalSet.has(c.index) ? '' : '&raw=1')) + '"' + (finalSet.has(c.index) ? ' src="/api/clipper/download?id=' + encodeURIComponent(j.id || jobId) + '&clip=' + c.index + '"' : ' data-src="/api/clipper/source?id=' + encodeURIComponent(j.id || jobId) + '#t=' + Math.floor(c.start) + ',' + Math.ceil(c.end) + '"') + '></video><span style="position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">' + fmtT(c.end - c.start) + '</span>' + (finalSet.has(c.index) ? '<button class="btn" data-jobpost="' + c.index + '" data-postfinal="1" style="position:absolute;right:6px;bottom:6px;z-index:5;width:34px;height:34px;padding:0;border-radius:50%;justify-content:center" title="Post"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg></button>' : '') + '</div>'
         + '<div style="padding:8px 2px 2px;display:flex;flex-direction:column;flex:1"><span style="display:block;font-size:12px;line-height:1.35;font-weight:400;word-break:break-word">' + esc(short) + '</span><span class="hint" style="font-size:11px">' + clipScore10(c) + ' · ' + fmtT(c.end - c.start) + '</span>'
         + '<div class="clip-card-actions" style="margin-top:auto;padding-top:6px">' + (clipBatchLabel(c) || '<span></span>') + '<button class="btn clip-hbtn primary clip-dl-icon" data-jobdl="' + c.index + '" title="Unduh" aria-label="Unduh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/><path d="M4 20h16"/></svg></button></div>'
         + '</div></div>';
@@ -5529,6 +5565,7 @@ const renderSubPresetSettings = () => {
       fetch('/api/library-dir').then(r=>r.json()).then(d=>{ const now=document.getElementById('libDirNow'); if(now) now.value=d.dir||''; const inp=document.getElementById('libDirInput'); if(inp) inp.value=d.custom?d.dir:''; }).catch(()=>{});
       refreshCkStatus();
     }
+    if(page==='post'){ refreshPostList(); refreshPostConn(); }
     document.querySelectorAll('.navbtn[data-page]').forEach(b=>b.classList.toggle('on', b.dataset.page===page));
     var sb=document.getElementById('sidebar'); if(sb) sb.classList.remove('open');
     try{ localStorage.setItem('hvo-page', page); }catch(e){}
@@ -5572,6 +5609,102 @@ const renderSubPresetSettings = () => {
       try { const r = await fetch('/api/clipper/cookies/delete', { method: 'POST' }); if (!r.ok) throw new Error('Gagal'); if (msg) msg.textContent = 'Cookies akun ini dihapus — kembali ke cookies global.'; }
       catch (e) { if (msg) msg.textContent = 'Gagal: ' + e.message; }
       refreshCkStatus();
+    });
+  })();
+  // ===== Halaman Post + antrean posting (Langkah 1, Dzaky 25 Okt) =====
+  // Halaman sendiri di sidebar (di bawah Koneksi AI, di atas Settings).
+  // Riwayat dari /api/clipper/posts (akun sendiri). Modal form dipakai
+  // tombol 📤 Hasil + Studio (global lewat window.openPostModal).
+  // Pengiriman beneran = langkah 2 (OAuth).
+  // ===== Status sambungan YouTube (Langkah 2) =====
+  async function refreshPostConn(){
+    const badge = document.getElementById('postConnYt'); if (!badge) return;
+    const conn = document.getElementById('postYtConnBtn'), disc = document.getElementById('postYtDiscBtn'), cfg = document.getElementById('postYtCfg'), tog = document.getElementById('postYtCfgToggle');
+    try {
+      const r = await fetch('/api/post/oauth/youtube/status'); const j = await r.json();
+      if (!j.configured) { badge.textContent = 'Belum dikonfigurasi'; if (conn) conn.hidden = true; if (disc) disc.hidden = true; if (cfg) cfg.hidden = false; if (tog) tog.hidden = true; }
+      else if (j.connected) { badge.textContent = 'Tersambung: ' + (j.channel || 'YouTube'); if (conn) conn.hidden = true; if (disc) disc.hidden = false; if (cfg) cfg.hidden = true; if (tog) tog.hidden = false; }
+      else { badge.textContent = 'Belum tersambung'; if (conn) conn.hidden = false; if (disc) disc.hidden = true; if (cfg) cfg.hidden = true; if (tog) tog.hidden = false; }
+    } catch { badge.textContent = 'Gagal memeriksa'; }
+  }
+  document.addEventListener('click', e => {
+    const c = e.target.closest && e.target.closest('#postYtConnBtn');
+    if (c) { window.location.href = '/api/post/oauth/youtube/start'; return; }
+    const d = e.target.closest && e.target.closest('#postYtDiscBtn');
+    if (d) { (async () => { if (!confirm('Putuskan sambungan YouTube? Antrean yang belum terkirim akan gagal sampai disambungkan lagi.')) return; await fetch('/api/post/oauth/youtube/disconnect', { method: 'POST' }); toast('Sambungan YouTube diputuskan.'); refreshPostConn(); })(); return; }
+    const t = e.target.closest && e.target.closest('#postYtCfgToggle');
+    if (t) { const f = document.getElementById('postYtCfg'); if (f) f.hidden = !f.hidden; return; }
+    const s = e.target.closest && e.target.closest('#postYtCfgBtn');
+    if (s) { (async () => { const cid = document.getElementById('postYtCid'), sec = document.getElementById('postYtCsec'), msg = document.getElementById('postYtCfgMsg'); const r = await fetch('/api/post/oauth/youtube/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId: cid ? cid.value : '', clientSecret: sec ? sec.value : '' }) }); if (r.ok) { if (sec) sec.value = ''; if (msg) msg.textContent = 'Tersimpan. Sekarang klik Sambungkan YouTube.'; toast('Client ID/Secret tersimpan.'); refreshPostConn(); } else { const j = await r.json().catch(() => ({})); if (msg) msg.textContent = j.error || 'Gagal menyimpan.'; } })(); return; }
+    const rt = e.target.closest && e.target.closest('[data-postretry]');
+    if (rt) { (async () => { const r = await fetch('/api/clipper/posts/retry', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: rt.dataset.postretry }) }); if (r.ok) { toast('Antrean dikirim ulang.'); refreshPostList(); } else toast('Gagal mengirim ulang.'); })(); return; }
+  });
+  async function refreshPostList(){
+    const box = document.getElementById('postList'); if (!box) return;
+    try {
+      const r = await fetch('/api/clipper/posts'); const j = await r.json();
+      const arr = j.posts || [];
+      if (!arr.length) { box.innerHTML = '<p class="hint" style="margin:0">Belum ada antrean posting. Klik logo post di kartu klip.</p>'; return; }
+      const stLabel = { antrean: '⏳ Antrean', terjadwal: '🕒 Terjadwal', terkirim: '✅ Terkirim', gagal: '❌ Gagal' };
+      box.innerHTML = arr.map(p => {
+        const ds = p.createdAt ? new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        const sch = p.scheduleAt ? new Date(p.scheduleAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + new Date(p.scheduleAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Langsung';
+        const plats = (p.platforms || []).map(x => x === 'youtube' ? '▶️ YouTube' : '🎵 TikTok').join(' + ');
+        let resHtml = '';
+        if (p.results && p.results.youtube && p.results.youtube.url) resHtml += '<div style="margin-top:6px"><a href="' + esc(p.results.youtube.url) + '" target="_blank" rel="noopener" style="color:#a78bfa">🎬 Lihat video di YouTube</a></div>';
+        if (p.results && p.results.tiktok) resHtml += '<small class="hint" style="display:block;margin-top:4px">🎵 TikTok: menyusul setelah YouTube stabil.</small>';
+        if (p.results && p.results.error) resHtml += '<small style="display:block;margin-top:4px;color:#f87171">Gagal: ' + esc(p.results.error) + '</small>';
+        return '<div class="aicard" style="padding:10px 12px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1;word-break:break-word">' + esc(p.title || 'Tanpa judul') + '</b><span class="badge">' + (stLabel[p.status] || p.status) + '</span></div><small class="hint" style="display:block;margin-top:4px">' + esc(plats) + ' · ' + esc(sch) + (ds ? ' · dibuat ' + ds : '') + '</small>' + resHtml + (p.status !== 'terkirim' ? '<button class="btn danger" data-postdel="' + esc(p.id) + '" style="padding:4px 10px;font-size:12px;margin-top:8px">🗑 Hapus antrean</button>' : '') + (p.status === 'gagal' ? '<button class="btn" data-postretry="' + esc(p.id) + '" style="padding:4px 10px;font-size:12px;margin-top:8px;margin-left:6px">🔄 Kirim ulang</button>' : '') + '</div>';
+      }).join('');
+    } catch { box.innerHTML = '<p class="hint" style="margin:0">Gagal memuat antrean.</p>'; }
+  }
+  document.addEventListener('click', e => {
+    const d = e.target.closest && e.target.closest('[data-postdel]');
+    if (d) { (async () => { if (!confirm('Hapus antrean ini?')) return; const r = await fetch('/api/clipper/posts/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: d.dataset.postdel }) }); if (r.ok) { toast('Antrean dihapus.'); refreshPostList(); } else toast('Gagal menghapus.'); })(); }
+  });
+  let postModalSrc = null;
+  window.openPostModal = function(src){
+    postModalSrc = src || {};
+    const m = document.getElementById('postModal'); if (!m) return;
+    const t = document.getElementById('postTitle'); if (t) t.value = postModalSrc.title || '';
+    const d = document.getElementById('postDesc'); if (d) d.value = '';
+    const tg = document.getElementById('postTags'); if (tg) tg.value = '';
+    const nw = document.getElementById('postNow'); if (nw) nw.checked = true;
+    const wh = document.getElementById('postWhen'); if (wh) { wh.value = ''; wh.disabled = true; }
+    const y = document.getElementById('postYt'); if (y) y.checked = true;
+    const k = document.getElementById('postTt'); if (k) k.checked = true;
+    const msg = document.getElementById('postMsg'); if (msg) msg.textContent = '';
+    m.style.display = 'flex';
+  };
+  (function postWire(){
+    const m = document.getElementById('postModal'); if (!m || m.dataset.wired) return; m.dataset.wired = '1';
+    const close = () => { m.style.display = 'none'; };
+    const nw = document.getElementById('postNow'), wh = document.getElementById('postWhen');
+    if (nw && wh) nw.addEventListener('change', () => { wh.disabled = nw.checked; if (nw.checked) wh.value = ''; });
+    const cx = document.getElementById('postCancel'); if (cx) cx.addEventListener('click', close);
+    m.addEventListener('click', e => { if (e.target === m) close(); });
+    const sb = document.getElementById('postSubmit');
+    if (sb) sb.addEventListener('click', async () => {
+      const msg = document.getElementById('postMsg');
+      const title = (document.getElementById('postTitle') || {}).value || '';
+      const platforms = [];
+      if (document.getElementById('postYt') && document.getElementById('postYt').checked) platforms.push('youtube');
+      if (document.getElementById('postTt') && document.getElementById('postTt').checked) platforms.push('tiktok');
+      if (!title.trim()) { if (msg) msg.textContent = 'Judul wajib diisi.'; return; }
+      if (!platforms.length) { if (msg) msg.textContent = 'Pilih minimal 1 platform.'; return; }
+      let scheduleAt = null;
+      if (nw && !nw.checked) {
+        if (!wh || !wh.value) { if (msg) msg.textContent = 'Isi jadwal upload atau centang Kirim langsung.'; return; }
+        scheduleAt = new Date(wh.value).toISOString();
+      }
+      if (msg) msg.textContent = 'Menyimpan…';
+      try {
+        const r = await fetch('/api/clipper/posts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: postModalSrc.jobId || '', renderIdx: postModalSrc.renderIdx || 0, libraryId: postModalSrc.libraryId || '', title: title.trim(), description: (document.getElementById('postDesc') || {}).value || '', tags: (document.getElementById('postTags') || {}).value || '', platforms, scheduleAt }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Gagal menyimpan');
+        close(); toast('Masuk antrean posting.');
+        try { switchPage('post'); } catch {}
+      } catch (e2) { if (msg) msg.textContent = 'Gagal: ' + e2.message; }
     });
   })();
   // ===== Hasil (Dashboard) — data dari /api/library (backend tetap) =====
@@ -5647,21 +5780,22 @@ const renderSubPresetSettings = () => {
       const isOpen=libOpenFolders.has(f);
       return `<div class="aicard" style="padding:10px 12px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><b data-libfolder="${encodeURIComponent(f)}" style="flex:1;font-size:14px;line-height:1.35;word-break:break-word;cursor:pointer" title="Klik buat buka / tutup folder">${isOpen?'▾':'▸'} 📁 ${esc(f)}</b><button class="btn ghost" data-librename="${encodeURIComponent(f)}" style="padding:4px 8px;font-size:12px" title="Ganti nama folder — isi sama persis dengan nama folder lain untuk menggabungkan">✏</button><button class="btn" data-libfolder="${encodeURIComponent(f)}" style="padding:6px 14px;font-size:12px">Buka</button></div><small class="hint" style="display:block;margin:6px 0 0">${arr.length} hasil${ds?' · terakhir '+ds:''}</small>${isOpen?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${chips}</div>`:''}</div>`;}).join('');
     scriptList.innerHTML=folderHtml||'<div class="empty-page"><b>Belum ada folder hasil</b>Isi Judul proyek di Brief Script VO lalu jalankan tahapnya — hasil otomatis tersimpan ke folder judul di sini.</div>';
-    // ---- Hasil Akhir Render (Fase 25, mockup Dzaky): BARIS per klip:
-    // thumb PORTRAIT 9:16 (Dzaky 25 Okt: kayak klip yang barusan diedit di
-    // Studio — dulu 16:9, poster Final portrait jadi kepotong) + judul +
-    // meta + tombol Unduh LANGSUNG di baris (dulu Download cuma di modal).
-    // Klik baris/judul tetap buka modal Lihat; tombol hapus tetap ada.
-    // Video kecil tetap bisa diputar inline.
+    // ---- Hasil Akhir Render (Fase 25, mockup Dzaky): KARTU bejejer
+    // (grid portrait, kayak kartu Klip — koreksi Dzaky 25 Okt: baris
+    // vertikal DITOLAK, tampilannya harus bejejer). Tiap kartu: thumb
+    // portrait 9:16 + logo 📤 overlay pojok bawah-kanan thumb (SATU-SATUNYA
+    // tombol Post — tombol Post terpisah di baris DIHAPUS) + judul + meta
+    // + Unduh + hapus. Klik kartu (bukan logo) tetap buka modal Lihat;
+    // klik video tetap putar inline.
     const arr=byType.clipper||[];
     if(!arr.length){
-      renderList.innerHTML='<div class="empty-page"><b>Hasil Akhir Render masih kosong</b>Render Final dari Auto Clipper (Simpan di Detail kandidat) lalu muncul di sini.</div>';
+      renderList.innerHTML='<div class="empty-page" style="grid-column:1/-1"><b>Hasil Akhir Render masih kosong</b>Render Final dari Auto Clipper (Simpan di Detail kandidat) lalu muncul di sini.</div>';
     }else{
       renderList.innerHTML=arr.map(it=>{
         const dt=new Date(it.createdAt||0);const ds=isNaN(dt)?'':dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
         const vid='/api/clipper/download?id='+encodeURIComponent(it.jobId||'')+'&clip='+(it.renderIdx||0);
         const poster=libPoster(it);
-        return `<div class="aicard" data-libview="${it.id}" style="display:flex;gap:10px;align-items:center;padding:8px;margin-bottom:8px;cursor:pointer"><div style="width:64px;height:114px;flex:none;border-radius:8px;overflow:hidden;background:#000;position:relative"><video preload="none" playsinline data-libvideo="${it.id}"${poster} src="${vid}" style="display:block;width:100%;height:100%;object-fit:cover"></video>${it.duration?`<span style="position:absolute;right:4px;bottom:3px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:1px 5px;border-radius:4px">${fmtDur(it.duration)}</span>`:''}</div><div style="flex:1;min-width:0"><b style="display:block;font-size:13px;line-height:1.3;word-break:break-word">${esc(it.title||'Tanpa judul')}</b><small class="hint" style="display:block;margin-top:2px">${ds}${it.duration?' · '+fmtDur(it.duration):''} · Final</small></div><a class="btn" data-libdirectdl href="${vid}" download style="flex:none;padding:7px 12px;font-size:12px;text-decoration:none">⬇ Unduh</a><button class="btn danger" data-libdel="${it.id}" style="flex:none;padding:7px 9px;font-size:12px">🗑</button></div>`;}).join('');
+        return `<div class="aicard" data-libview="${it.id}" style="padding:8px;cursor:pointer;display:flex;flex-direction:column"><div style="position:relative;aspect-ratio:9/16;border-radius:8px;overflow:hidden;background:#000;flex:none"><video preload="none" playsinline data-libvideo="${it.id}"${poster} src="${vid}" style="display:block;width:100%;height:100%;object-fit:cover"></video>${it.duration?`<span style="position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">${fmtDur(it.duration)}</span>`:''}<button class="btn" data-libpost="${it.id}" style="position:absolute;right:6px;bottom:6px;z-index:5;width:34px;height:34px;padding:0;border-radius:50%;justify-content:center" title="Post"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg></button></div><div style="flex:1;min-width:0;padding:8px 2px 2px"><b style="display:block;font-size:13px;line-height:1.3;word-break:break-word">${esc(it.title||'Tanpa judul')}</b><small class="hint" style="display:block;margin-top:2px">${ds}${it.duration?' · '+fmtDur(it.duration):''} · Final</small></div><div style="display:flex;gap:6px;margin-top:auto;padding-top:6px"><a class="btn" data-libdirectdl href="${vid}" download style="flex:1;padding:7px 12px;font-size:12px;text-decoration:none;text-align:center">⬇ Unduh</a><button class="btn danger" data-libdel="${it.id}" style="flex:none;padding:7px 9px;font-size:12px">🗑</button></div></div>`;}).join('');
     }
   }
   // Refresh Hasil saat buka Dashboard.
@@ -5675,6 +5809,7 @@ const renderSubPresetSettings = () => {
     const ft2=e.target.closest('[data-libfolder]');if(ft2){const fn=decodeURIComponent(ft2.dataset.libfolder||'');if(libOpenFolders.has(fn))libOpenFolders.delete(fn);else libOpenFolders.add(fn);renderHasil();return}
     const rn=e.target.closest('[data-librename]');if(rn){(async()=>{const fname=decodeURIComponent(rn.dataset.librename||'');const nn=(prompt('Nama folder baru untuk "'+fname+'":\n(Isi sama persis dengan nama folder lain untuk MENGGABUNGKAN kedua folder.)',fname)||'').trim();if(!nn||nn===fname)return;const d=await fetchLibrary();const fo=x=>(x.topic||'').trim()||String(x.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/,'')||'Tanpa judul';const its=(d.items||[]).filter(x=>x.type!=='clipper'&&fo(x)===fname);if(!its.length)return toast('Folder tidak ditemukan');const stNum={riset:1,long:2,seo:3,short:4};let h=0;for(let i=0;i<nn.length;i++)h=((h<<5)-h+nn.charCodeAt(i))|0;let okN=0;for(const it of its){const del=await fetch('/api/library?id='+encodeURIComponent(it.id),{method:'DELETE'});if(!del.ok)continue;const suf=String(it.title||'').match(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/);const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:it.type,title:suf?nn+suf[0]:it.title,topic:nn,content:it.content,words:it.words,replaceKey:stNum[it.type]?'vo-'+stNum[it.type]+'-'+h:undefined})});if(r.ok)okN++}toast(okN+' hasil dipindah ke folder "'+nn+'"');renderHasil()})();return}
     const dl=e.target.closest('[data-libdel]');if(dl){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===dl.dataset.libdel);if(!it)return;const isClip=it.type==='clipper';if(!confirm(isClip?('Hapus "'+(it.title||'')+'" dari Hasil?\nFile video render-nya di server ikut dihapus biar lega. Proyek + video sumber tetap ada.'):('Hapus "'+(it.title||'')+'" dari Hasil?')))return;const r=await fetch('/api/library?id='+encodeURIComponent(it.id)+(isClip?'&deleteFile=1':''),{method:'DELETE'});if(r.ok){toast('Dihapus dari Hasil.');closeLibModal();renderHasil()}else toast('Gagal menghapus');})();return}
+    const ps=e.target.closest('[data-libpost]');if(ps){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===ps.dataset.libpost);if(!it)return;if(window.openPostModal)window.openPostModal({libraryId:it.id,jobId:it.jobId||'',renderIdx:it.renderIdx||0,title:it.title||''});})();return}
     const cp=e.target.closest('[data-libcopy]');if(cp){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===cp.dataset.libcopy);if(!it||!it.content)return toast('Tidak ada teks');try{await navigator.clipboard.writeText(it.content);toast('Script tersalin.')}catch{toast('Gagal salin — blokir browser.');}})();return}
     const dw=e.target.closest('[data-libdl]');if(dw){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===dw.dataset.libdl);if(!it||!it.content)return toast('Tidak ada teks');const blob=new Blob([it.content],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(String(it.title||'script').replace(/[^a-zA-Z0-9-_ ]/g,'').trim()||'script')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast('Script di-download (.txt).');})();return}
   }); // tutup listener klik Hasil (hapus/status/copy/download) — penutup ini WAJIB ada; kalau hilang, script navigasi mati total (dashboard stuck).
@@ -5685,7 +5820,7 @@ const renderSubPresetSettings = () => {
     // Klik card -> pop up detail. Tombol di dalam card (hapus/copy/download)
     // + video dilewat: sudah ditangani listener di atas / biarkan jalan
     // normal (play). Card sudah tidak punya tombol Download/Status.
-    if(e.target.closest('[data-libdel],[data-libcopy],[data-libdl],[data-libdirectdl]'))return; // Fase 25: Unduh langsung di baris jangan buka modal.
+    if(e.target.closest('[data-libdel],[data-libcopy],[data-libdl],[data-libdirectdl],[data-libpost]'))return; // Fase 25: Unduh langsung di baris jangan buka modal.
     // Putar/jeda video Hasil (klik video / tombol ▶ kecil) — tanpa tombol
     // play besar di tengah. Klik video tidak membuka pop up (return).
     const lv = e.target.closest('[data-libvideo]');

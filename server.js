@@ -629,6 +629,160 @@ function clipWmLogoSave(user, s) {
   try { fs.mkdirSync(clipUserDir(user), { recursive: true }); fs.writeFileSync(clipWmLogoSettingsPath(user), JSON.stringify(next)); } catch {}
   return next;
 }
+// Antrean posting per akun (Langkah 1): file posts.json di folder akun
+// sendiri (pola sama kayak cookies/wm-logo). Helper top-level supaya bisa
+// di-export untuk tes + dipakai langkah 2 (eksekusi upload + ticker).
+function clipPostsPath(user) { return path.join(clipUserDir(user), 'posts.json'); }
+function clipPostsLoad(user) { try { const a = JSON.parse(fs.readFileSync(clipPostsPath(user), 'utf8')); return Array.isArray(a) ? a : []; } catch { return []; } }
+function clipPostsSave(user, arr) { try { fs.mkdirSync(clipUserDir(user), { recursive: true }); fs.writeFileSync(clipPostsPath(user), JSON.stringify(arr)); return true; } catch { return false; } }
+
+// ===== Posting LANGKAH 2: OAuth YouTube + upload + ticker =====
+// Token YouTube PER AKUN (pola sama kayak cookies/posts): file
+// yt-token.json di folder akun. Token TIDAK PERNAH dikirim ke browser —
+// endpoint status hanya mengembalikan {tersambung, channel}.
+// Client ID/Secret: sekali saja, dari Google Cloud project Dzaky
+// (YouTube Data API v3 + OAuth Client ID Web). Redirect URI TETAP di
+// bawah — harus persis sama dengan yang didaftarkan di Google Cloud.
+// Upload: API resmi videos.insert (resumable, chunk 8MB, tanpa dep baru —
+// fetch bawaan Node 18+). Kuota: 1 upload ≈ 1.600 unit dari 10.000/hari.
+// Privasi: antrean langsung -> publik; terjadwal -> private + publishAt
+// (YouTube yang menerbitkan tepat di jadwal). TikTok = tahap berikutnya.
+const YT_REDIRECT_URI = 'https://script.dzw.my.id/api/post/oauth/youtube/callback';
+// Scope: upload (wajib buat videos.insert) + readonly (buat baca nama
+// channel di channels.list mine=true — upload saja TIDAK cukup, tanpa ini
+// Google balas 'insufficient authentication scopes' seperti 16:06).
+const YT_OAUTH_SCOPE = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly';
+function clipYtOAuthCfg() { return { id: process.env.YT_OAUTH_CLIENT_ID || '', secret: process.env.YT_OAUTH_CLIENT_SECRET || '' }; }
+function clipYtTokenPath(user) { return path.join(clipUserDir(user), 'yt-token.json'); }
+function clipYtTokenLoad(user) { try { const t = JSON.parse(fs.readFileSync(clipYtTokenPath(user), 'utf8')); return t && t.refresh_token ? t : null; } catch { return null; } }
+function clipYtTokenSave(user, tok) { try { fs.mkdirSync(clipUserDir(user), { recursive: true }); fs.writeFileSync(clipYtTokenPath(user), JSON.stringify(tok)); return true; } catch { return false; } }
+function clipYtTokenDelete(user) { try { fs.unlinkSync(clipYtTokenPath(user)); } catch {} }
+// State OAuth: random -> {user, exp} di memori (10 menit, sekali pakai).
+const ytOAuthStates = new Map();
+function clipYtOAuthStartUrl(user) {
+  const st = crypto.randomBytes(16).toString('hex');
+  ytOAuthStates.set(st, { user, exp: Date.now() + 10 * 60 * 1000 });
+  const q = new URLSearchParams({ client_id: clipYtOAuthCfg().id, redirect_uri: YT_REDIRECT_URI, response_type: 'code', scope: YT_OAUTH_SCOPE, access_type: 'offline', prompt: 'consent', state: st });
+  return 'https://accounts.google.com/o/oauth2/v2/auth?' + q.toString();
+}
+async function clipYtExchangeCode(code) {
+  const cfg = clipYtOAuthCfg();
+  const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code, client_id: cfg.id, client_secret: cfg.secret, redirect_uri: YT_REDIRECT_URI, grant_type: 'authorization_code' }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('Gagal tukar kode OAuth: ' + (j.error_description || j.error || r.status));
+  return j;
+}
+async function clipYtRefreshToken(tok) {
+  const cfg = clipYtOAuthCfg();
+  const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ refresh_token: tok.refresh_token, client_id: cfg.id, client_secret: cfg.secret, grant_type: 'refresh_token' }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('Token YouTube kedaluwarsa, sambungkan ulang.');
+  return { ...tok, access_token: j.access_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000 };
+}
+async function clipYtAccessToken(user) {
+  let tok = clipYtTokenLoad(user);
+  if (!tok) return null;
+  if (tok.expires_at && tok.expires_at > Date.now() + 60000) return tok;
+  try { tok = await clipYtRefreshToken(tok); clipYtTokenSave(user, tok); return tok; }
+  catch (e) { clipYtTokenDelete(user); throw e; }
+}
+async function clipYtChannel(access) {
+  const r = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', { headers: { Authorization: 'Bearer ' + access } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('Gagal baca channel: ' + ((j.error && j.error.message) || r.status));
+  const it = (j.items || [])[0];
+  return it ? { id: it.id, title: (it.snippet || {}).title || '' } : null;
+}
+// Versi aman buat callback: nama channel hanya pajangan — kalau gagal
+// dibaca (mis. scope kurang), token TETAP disimpan, upload tetap jalan.
+async function clipYtChannelSafe(access) { try { return await clipYtChannel(access); } catch { return null; } }
+async function clipYtUploadVideo(access, file, meta) {
+  const size = fs.statSync(file).size;
+  if (!size) throw new Error('File Final kosong.');
+  const body = { snippet: { title: meta.title, description: meta.description || '', tags: meta.tags || [], categoryId: '22' }, status: meta.publishAt ? { privacyStatus: 'private', publishAt: meta.publishAt } : { privacyStatus: 'public' } };
+  const init = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', { method: 'POST', headers: { Authorization: 'Bearer ' + access, 'Content-Type': 'application/json', 'X-Upload-Content-Type': 'video/mp4', 'X-Upload-Content-Length': String(size) }, body: JSON.stringify(body) });
+  if (!init.ok) { const t = await init.text().catch(() => ''); throw new Error('Gagal mulai upload YouTube (' + init.status + '): ' + t.slice(0, 200)); }
+  const session = init.headers.get('location');
+  if (!session) throw new Error('YouTube tidak memberi sesi upload.');
+  const CH = 8 * 1024 * 1024, fd = fs.openSync(file, 'r');
+  try {
+    let off = 0;
+    while (off < size) {
+      const end = Math.min(off + CH, size) - 1;
+      const buf = Buffer.alloc(end - off + 1);
+      fs.readSync(fd, buf, 0, buf.length, off);
+      const r = await fetch(session, { method: 'PUT', headers: { 'Content-Length': String(buf.length), 'Content-Range': 'bytes ' + off + '-' + end + '/' + size }, body: buf });
+      if (r.status === 308) { const rg = r.headers.get('range'); const m = rg && /(\d+)$/.exec(rg); off = m ? +m[1] + 1 : end + 1; continue; }
+      if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('Upload YouTube gagal (' + r.status + '): ' + t.slice(0, 200)); }
+      return await r.json().catch(() => ({}));
+    }
+    throw new Error('Upload selesai tanpa balasan YouTube.');
+  } finally { fs.closeSync(fd); }
+}
+// Cari file Final milik akun: (1) job di memori, (2) entri Library yang
+// diselamatkan (finalVideo relatif ke libDir), (3) pindai job.json di
+// folder akun. Null bila tidak ada (eksekusi -> gagal, bukan hang).
+function clipPostFinalFile(user, post) {
+  const idx = Number(post.renderIdx || 0);
+  try { const job = post.jobId && clipperJobs.get(post.jobId); if (job && job.user === user) { const f = path.join(job.dir, 'clip_' + idx + '.mp4'); if (fs.existsSync(f)) return f; } } catch {}
+  try {
+    const lib = libLoad(user);
+    const e = post.libraryId ? lib.find(x => x.id === post.libraryId && x.type === 'clipper') : lib.find(x => x.type === 'clipper' && String(x.jobId) === String(post.jobId) && Number(x.renderIdx || 0) === idx);
+    if (e && e.finalVideo && !e.finalVideo.includes('..') && !path.isAbsolute(e.finalVideo)) { const f = path.join(libDir(), e.finalVideo); if (f.startsWith(libDir() + path.sep) && fs.existsSync(f)) return f; }
+  } catch {}
+  try {
+    const base = clipUserDir(user);
+    for (const d of fs.readdirSync(base, { withFileTypes: true })) {
+      if (!d.isDirectory()) continue;
+      const jf = path.join(base, d.name, 'job.json');
+      if (!fs.existsSync(jf)) continue;
+      let jj = null; try { jj = JSON.parse(fs.readFileSync(jf, 'utf8')); } catch {}
+      if (jj && String(jj.id) === String(post.jobId)) { const f = path.join(base, d.name, 'clip_' + idx + '.mp4'); if (fs.existsSync(f)) return f; }
+    }
+  } catch {}
+  return null;
+}
+async function clipPostExecuteOne(user, post) {
+  if (!(post.platforms || []).includes('youtube')) { post.status = 'gagal'; post.results = { ...(post.results || {}), error: 'Platform TikTok belum didukung (menyusul setelah YouTube stabil).' }; return post; }
+  const file = clipPostFinalFile(user, post);
+  if (!file) { post.status = 'gagal'; post.results = { ...(post.results || {}), error: 'File Final tidak ditemukan — render ulang klipnya.' }; return post; }
+  let tok = null;
+  try { tok = await clipYtAccessToken(user); } catch (e) { post.status = 'gagal'; post.results = { ...(post.results || {}), error: String((e && e.message) || e) }; return post; }
+  if (!tok) { post.status = 'gagal'; post.results = { ...(post.results || {}), error: 'YouTube belum tersambung — klik Sambungkan YouTube di halaman Post.' }; return post; }
+  try {
+    const tags = String(post.tags || '').split(/[,\n]/).map(s => s.trim()).filter(Boolean).slice(0, 30);
+    const publishAt = (post.scheduleAt && new Date(post.scheduleAt).getTime() > Date.now()) ? new Date(post.scheduleAt).toISOString() : null;
+    const vid = await clipYtUploadVideo(tok.access_token, file, { title: post.title, description: post.description || '', tags, publishAt });
+    post.status = 'terkirim';
+    post.results = { ...(post.results || {}), youtube: { videoId: vid.id || '', url: vid.id ? 'https://www.youtube.com/watch?v=' + vid.id : '', publishedAt: publishAt || new Date().toISOString() } };
+    if ((post.platforms || []).includes('tiktok')) post.results.tiktok = { status: 'menyusul' };
+  } catch (e) { post.status = 'gagal'; post.results = { ...(post.results || {}), error: String((e && e.message) || e).slice(0, 300) }; }
+  return post;
+}
+// Ticker: tiap 60 dtk, eksekusi antrean yang jatuh tempo (antrean langsung
+// + terjadwal yang waktunya lewat), satu per satu, semua akun. PC harus
+// nyala — kalau PC mati, antrean jalan begitu PC + server nyala lagi.
+let clipPostBusy = false;
+async function clipPostRunDue() {
+  if (clipPostBusy) return; clipPostBusy = true;
+  try {
+    let dirs = [];
+    try { dirs = fs.readdirSync(CLIPPER_DIR, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name); } catch {}
+    for (const enc of dirs) {
+      let user = enc; try { user = decodeURIComponent(enc); } catch {}
+      const posts = clipPostsLoad(user); let changed = false;
+      for (const post of posts) {
+        const due = post.status === 'antrean' || (post.status === 'terjadwal' && post.scheduleAt && new Date(post.scheduleAt).getTime() <= Date.now());
+        if (!due) continue;
+        await clipPostExecuteOne(user, post); changed = true;
+        clipPostsSave(user, posts);
+      }
+      if (changed) clipPostsSave(user, posts);
+    }
+  } catch (e) { try { console.error('[post-ticker]', e && e.message); } catch {} }
+  clipPostBusy = false;
+}
+function clipPostStartTicker() { if (global.__clipPostTicker) return; global.__clipPostTicker = setInterval(() => { clipPostRunDue().catch(() => {}); }, 60 * 1000); }
 // (clipProbeDuration sudah ada di bawah — dipakai hitung loop B-roll;
 // return 0 bila gagal, caller pakai fallback loop 1000.)
 // Parse body multipart/form-data (satu field file). Return
@@ -3926,6 +4080,129 @@ const server = http.createServer(async (req, res) => {
     } catch {}
     return send(res, 200, { ok: true });
   }
+  // Antrean posting (Langkah 1, Dzaky 25 Okt): tab Post + tombol 📤 di klip.
+  // posts.json per akun: {id, jobId, renderIdx, libraryId, title,
+  // description, tags, platforms[], scheduleAt, status, createdAt, results}.
+  // status: 'antrean' (kirim langsung, menunggu eksekusi) | 'terjadwal'
+  // (scheduleAt di masa depan) | 'terkirim' | 'gagal'. Eksekusi upload
+  // (OAuth + kirim + ticker jadwal) = LANGKAH 2, bukan di sini — antrean
+  // ini hanya menyimpan rencana posting + riwayatnya.
+  // Daftar antrean/riwayat posting akun sendiri (terbaru dulu).
+  if (req.method === 'GET' && p === '/api/clipper/posts') {
+    const user = sessUser(req);
+    const posts = clipPostsLoad(user).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return send(res, 200, { posts });
+  }
+  // Buat antrean posting. Klip harus milik akun ini: job milik akun (di
+  // memori / restore disk) ATAU entri Library milik akun. Final belum
+  // dicek di sini — dicek saat eksekusi (langkah 2) + guard di tombol
+  // Studio (klik tanpa Final = diminta render dulu).
+  if (req.method === 'POST' && p === '/api/clipper/posts') {
+    const user = sessUser(req);
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e6) break; }
+    let b = {};
+    try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'Body JSON tidak valid' }); }
+    const title = String(b.title || '').trim();
+    const platforms = Array.isArray(b.platforms) ? [...new Set(b.platforms.filter(x => x === 'youtube' || x === 'tiktok'))] : [];
+    if (!title) return send(res, 400, { error: 'Judul wajib diisi.' });
+    if (!platforms.length) return send(res, 400, { error: 'Pilih minimal 1 platform (YouTube / TikTok).' });
+    const jobId = String(b.jobId || ''), renderIdx = Number(b.renderIdx || 0), libraryId = String(b.libraryId || '');
+    let owned = false;
+    try { const job = jobId && clipperJobs.get(jobId); if (job && job.user === user) owned = true; } catch {}
+    if (!owned && libraryId) { try { if (libLoad(user).some(x => x.id === libraryId && x.type === 'clipper')) owned = true; } catch {} }
+    if (!owned && jobId) { try { if (libLoad(user).some(x => x.type === 'clipper' && String(x.jobId) === jobId && Number(x.renderIdx || 0) === renderIdx)) owned = true; } catch {} }
+    if (!owned) return send(res, 404, { error: 'Klip tidak ditemukan / bukan milik akun ini.' });
+    let scheduleAt = null;
+    if (b.scheduleAt) { const t = new Date(b.scheduleAt).getTime(); if (!Number.isFinite(t)) return send(res, 400, { error: 'Jadwal tidak valid.' }); scheduleAt = new Date(t).toISOString(); }
+    const posts = clipPostsLoad(user);
+    const post = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), jobId, renderIdx, libraryId, title, description: String(b.description || ''), tags: String(b.tags || ''), platforms, scheduleAt, status: (scheduleAt && new Date(scheduleAt).getTime() > Date.now()) ? 'terjadwal' : 'antrean', createdAt: Date.now(), results: {} };
+    posts.push(post);
+    if (!clipPostsSave(user, posts)) return send(res, 500, { error: 'Gagal menyimpan antrean.' });
+    return send(res, 200, { ok: true, post });
+  }
+  // Hapus antrean posting (hanya milik akun; riwayat 'terkirim' tidak bisa
+  // dihapus — itu arsip video apa yang sudah di-upload).
+  if (req.method === 'POST' && p === '/api/clipper/posts/delete') {
+    const user = sessUser(req);
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e6) break; }
+    let b = {};
+    try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'Body JSON tidak valid' }); }
+    const posts = clipPostsLoad(user);
+    const it = posts.find(x => x.id === String(b.id || ''));
+    if (!it) return send(res, 404, { error: 'Antrean tidak ditemukan.' });
+    if (it.status === 'terkirim') return send(res, 400, { error: 'Riwayat terkirim tidak bisa dihapus.' });
+    if (!clipPostsSave(user, posts.filter(x => x.id !== it.id))) return send(res, 500, { error: 'Gagal menghapus.' });
+    return send(res, 200, { ok: true });
+  }
+  // ===== OAuth YouTube + kirim ulang antrean (LANGKAH 2) =====
+  // Status sambungan (token TIDAK PERNAH dikirim ke browser).
+  if (req.method === 'GET' && p === '/api/post/oauth/youtube/status') {
+    const user = sessUser(req);
+    const cfg = clipYtOAuthCfg();
+    const tok = clipYtTokenLoad(user);
+    return send(res, 200, { configured: !!(cfg.id && cfg.secret), connected: !!tok, channel: tok ? (tok.channelTitle || '') : '' });
+  }
+  // Simpan Client ID/Secret Google Cloud ke .env (login-protected, pola
+  // sama kayak simpan API key AI: nilai tidak pernah dikembalikan).
+  // Aktif langsung tanpa restart (process.env di-set juga).
+  if (req.method === 'POST' && p === '/api/post/oauth/youtube/config') {
+    const user = sessUser(req);
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e6) break; }
+    let b = {};
+    try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'Body JSON tidak valid' }); }
+    const cid = String(b.clientId || '').trim(), sec = String(b.clientSecret || '').trim();
+    if (!cid || !sec) return send(res, 400, { error: 'Client ID dan Client Secret wajib diisi.' });
+    try { setEnvVar('YT_OAUTH_CLIENT_ID', cid); setEnvVar('YT_OAUTH_CLIENT_SECRET', sec); } catch { return send(res, 500, { error: 'Gagal menyimpan .env' }); }
+    process.env.YT_OAUTH_CLIENT_ID = cid; process.env.YT_OAUTH_CLIENT_SECRET = sec;
+    return send(res, 200, { ok: true, configured: true });
+  }
+  // Mulai OAuth: redirect ke Google (consent + offline = refresh token).
+  if (req.method === 'GET' && p === '/api/post/oauth/youtube/start') {
+    const user = sessUser(req);
+    const cfg = clipYtOAuthCfg();
+    if (!cfg.id || !cfg.secret) return send(res, 400, { error: 'Client ID/Secret YouTube belum diisi — isi dulu di halaman Post (kartu Sambungan).' });
+    res.writeHead(302, { Location: clipYtOAuthStartUrl(user) }); res.end(); return;
+  }
+  // Callback Google: tukar code -> token, simpan PER AKUN, tampilkan
+  // halaman sukses (tanpa token apa pun di dalamnya).
+  if (req.method === 'GET' && p === '/api/post/oauth/youtube/callback') {
+    const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const code = u.searchParams.get('code') || '', state = u.searchParams.get('state') || '', err = u.searchParams.get('error') || '';
+    const page = (title, body) => { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="4;url=/"><title>' + esc(title) + '</title></head><body style="font-family:system-ui;background:#0f172a;color:#e2e8f0;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0"><div style="max-width:420px;text-align:center;padding:24px"><h2>' + esc(title) + '</h2><p style="color:#94a3b8">' + body + '</p><p><a href="/" style="color:#a78bfa">Kembali ke dashboard</a></p></div></body></html>'); };
+    if (err) { page('Sambungan dibatalkan', 'Google mengembalikan: ' + esc(err) + '. Coba lagi dari halaman Post.'); return; }
+    const st = ytOAuthStates.get(state);
+    if (!st || st.exp < Date.now() || !code) { page('Sesi OAuth kedaluwarsa', 'Klik Sambungkan YouTube lagi dari halaman Post.'); return; }
+    ytOAuthStates.delete(state);
+    try {
+      const tj = await clipYtExchangeCode(code);
+      const ch = await clipYtChannelSafe(tj.access_token);
+      clipYtTokenSave(st.user, { access_token: tj.access_token, refresh_token: tj.refresh_token, expires_at: Date.now() + (tj.expires_in || 3600) * 1000, channelId: ch ? ch.id : '', channelTitle: ch ? ch.title : '', scope: tj.scope || '' });
+      page(ch ? 'YouTube tersambung: ' + ch.title : 'YouTube tersambung', ch ? 'Antrean posting akun ini sekarang bisa dikirim ke YouTube. Halaman ini kembali ke dashboard sebentar lagi.' : 'Token tersimpan dan antrean sudah bisa dikirim ke YouTube (nama channel tidak terbaca, tapi upload tetap jalan). Halaman ini kembali ke dashboard sebentar lagi.');
+    } catch (e) { page('Gagal menyambungkan', esc((e && e.message) || e) + ' — periksa Client ID/Secret + redirect URI di Google Cloud, lalu coba lagi.'); }
+    return;
+  }
+  // Putuskan sambungan: revoke token (best-effort) + hapus file token.
+  if (req.method === 'POST' && p === '/api/post/oauth/youtube/disconnect') {
+    const user = sessUser(req);
+    const tok = clipYtTokenLoad(user);
+    if (tok) { try { await fetch('https://oauth2.googleapis.com/revoke', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: tok.access_token }) }); } catch {} clipYtTokenDelete(user); }
+    return send(res, 200, { ok: true });
+  }
+  // Kirim ulang antrean yang gagal (kembali jadi antrean / terjadwal).
+  if (req.method === 'POST' && p === '/api/clipper/posts/retry') {
+    const user = sessUser(req);
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e6) break; }
+    let b = {};
+    try { b = JSON.parse(raw); } catch { return send(res, 400, { error: 'Body JSON tidak valid' }); }
+    const posts = clipPostsLoad(user);
+    const it = posts.find(x => x.id === String(b.id || ''));
+    if (!it) return send(res, 404, { error: 'Antrean tidak ditemukan.' });
+    if (it.status !== 'gagal') return send(res, 400, { error: 'Hanya antrean gagal yang bisa dikirim ulang.' });
+    it.status = (it.scheduleAt && new Date(it.scheduleAt).getTime() > Date.now()) ? 'terjadwal' : 'antrean';
+    if (it.results) delete it.results.error;
+    if (!clipPostsSave(user, posts)) return send(res, 500, { error: 'Gagal menyimpan.' });
+    return send(res, 200, { ok: true, post: it });
+  }
   // B-roll upload manual (ganti Pexels): POST /api/clipper/broll/upload
   // (multipart, field `video`, query id + clip) -> simpan ke
   // clipper-work/broll/<jobId>-<clipIdx>.mp4 (timpa bila sudah ada).
@@ -4460,6 +4737,6 @@ const server = http.createServer(async (req, res) => {
   }
   res.writeHead(404); res.end('Tidak ditemukan');
 });
-if (require.main === module) server.listen(PORT, () => console.log('Script VO Agent berjalan di http://localhost:' + PORT));
+if (require.main === module) { server.listen(PORT, () => console.log('Script VO Agent berjalan di http://localhost:' + PORT)); clipPostStartTicker(); }
 // Ekspor helper (untuk tes unit): require() tidak menyalakan server.
-module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan, clipYtCookiesFor, clipCookiesPath, clipCookiesStatus };
+module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan, clipYtCookiesFor, clipCookiesPath, clipCookiesStatus, clipPostsLoad, clipPostsSave, clipYtOAuthCfg, clipYtOAuthStartUrl, clipYtTokenLoad, clipYtTokenSave, clipYtTokenDelete, clipYtExchangeCode, clipYtRefreshToken, clipYtAccessToken, clipYtChannel, clipYtChannelSafe, clipYtUploadVideo, clipPostFinalFile, clipPostExecuteOne, clipPostRunDue };
