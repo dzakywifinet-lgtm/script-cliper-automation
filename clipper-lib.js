@@ -1453,6 +1453,58 @@ function clipPresenceSegs(samples, len, width, cropW) {
   }
   return { faceSegs, track, faceRatio: arr.length ? faceSamples / arr.length : 0 };
 }
+// Auto frame per-segmen (aturan Dzaky 24 Okt — ganti putusan duo satu-klip
+// Fase 3): dari track face_track.py [{t, x, speaking, faces:[{x,w,mouth}]}]
+// bangun segmen PORTRAIT (crop 9:16 ikut pembicara) vs LANDSCAPE.
+// Per sampel: wajah "besar" = w >= 5% lebar sumber (sama seperti duo);
+// "ngomong" = mouth > 2.0 (MOUTH_THRESHOLD face_track.py). Aturan per
+// sampel: tanpa wajah besar ATAU >= 2 wajah besar ngomong -> Landscape;
+// sisanya (solo, 1 ngomong, atau pendengar diam — crop ikut kunci
+// pembicara) -> Portrait. Run < 1,5 dtk digabung ke tetangga (sama
+// seperti clipPresenceSegs) biar tidak kedip. Fungsi murni.
+function clipTalkerSegs(track, len, srcW) {
+  const W = +srcW || 0, L = Math.max(0.1, +len || 0);
+  const arr = (Array.isArray(track) ? track : []).filter(s => s && Number.isFinite(+s.t)).sort((a, b) => a.t - b.t);
+  if (!arr.length || W <= 0) return { portraitSegs: [], landscapeSegs: [], samples: 0 };
+  const runs = [];
+  for (let i = 0; i < arr.length; i++) {
+    const t0 = Math.max(0, +arr[i].t), t1 = (i + 1 < arr.length) ? +arr[i + 1].t : L;
+    if (t1 <= t0) continue;
+    const faces = Array.isArray(arr[i].faces) ? arr[i].faces.filter(f => f && (+f.w || 0) >= W * 0.05) : [];
+    const talking = faces.filter(f => (+f.mouth || 0) > 2.0).length;
+    const kind = (faces.length === 0 || talking >= 2) ? 'land' : 'port';
+    if (runs.length && runs[runs.length - 1].kind === kind) runs[runs.length - 1].end = Math.min(L, t1);
+    else runs.push({ start: t0, end: Math.min(L, t1), kind });
+  }
+  // minRun 1,0 dtk (fix 24 Okt malam): ikut SpeakerLock (pindah pembicara
+  // per 2 frame @ fps 2 = 1,0 dtk). Solo 1 dtk selamat; blip 1 sampel
+  // (0,5 dtk, noise tracker) tetap digabung. Aturan 1,5 dtk tetap berlaku
+  // di clipPresenceSegs (gap tanpa-muka), bukan di sini.
+  const minRun = 1.0;
+  for (let guard = 0; guard < 24; guard++) {
+    const i = runs.findIndex(r => (r.end - r.start) < minRun && runs.length > 1);
+    if (i < 0) break;
+    const prev = runs[i - 1], next = runs[i + 1];
+    const host = (!prev) ? next : (!next) ? prev : ((prev.end - prev.start) >= (next.end - next.start) ? prev : next);
+    host.start = Math.min(host.start, runs[i].start); host.end = Math.max(host.end, runs[i].end);
+    runs.splice(i, 1);
+    runs.sort((a, b) => a.start - b.start);
+    for (let k = 1; k < runs.length; k++) if (runs[k].start < runs[k - 1].end) runs[k].start = runs[k - 1].end;
+  }
+  // Gabung run sejenis yang berdampingan (sisa dari merge run pendek).
+  const merged = [];
+  for (const r of runs) {
+    if (merged.length && merged[merged.length - 1].kind === r.kind && Math.abs(merged[merged.length - 1].end - r.start) < 0.01) merged[merged.length - 1].end = r.end;
+    else merged.push({ start: r.start, end: r.end, kind: r.kind });
+  }
+  runs.length = 0; runs.push(...merged);
+  const round = r => ({ start: Math.round(r.start * 100) / 100, end: Math.round(r.end * 100) / 100 });
+  return {
+    portraitSegs: runs.filter(r => r.kind === 'port' && r.end > r.start).map(round),
+    landscapeSegs: runs.filter(r => r.kind === 'land' && r.end > r.start).map(round),
+    samples: arr.length,
+  };
+}
 function resolveTitleDurMode(titleDur, hookDurAi, clipDur) {
   if (titleDur === 'full') return 'full';
   if (titleDur === 'manual') return 'manual';
@@ -2068,7 +2120,7 @@ function buildFfmpegArgs(o) {
 module.exports = {
   isYoutubeUrl, clampInt, cleanTitle, escapeDrawtext, escapeFilterValue, ffmpegFilterPath,
   CLIP_FONT_FAMILIES, clipFontOk,
-  parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, clipDuoInfo, clipTrackQuality, clipPresenceSegs, sanitizeCandidates, fallbackCandidates,
+  parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, clipDuoInfo, clipTrackQuality, clipPresenceSegs, clipTalkerSegs, sanitizeCandidates, fallbackCandidates,
   chunkTranscript, fmtClock, buildFfmpegArgs, wrapTitle, faceTrackExpr,
   gameplayTopH,
   distributeWords, cueWords, normalizeCueWords, dedupeTranscriptCues,

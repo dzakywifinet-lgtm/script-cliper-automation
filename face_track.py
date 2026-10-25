@@ -464,6 +464,123 @@ def guard_empty_segments(track, crop_w, width):
     return track
 
 
+def _speaker_face(sample, win_cx):
+    """Wajah pembicara per sampel (rekonstruksi target SpeakerLock).
+
+    Mouth terbesar bila > 2.0 (ikut SpeakerLock); bila tidak ada yang
+    dominan, wajah terdekat pusat jendela (ikut presence_face). Sampel
+    tanpa wajah -> None (tidak ada bukti, dilewati). Fungsi murni.
+    """
+    faces = [f for f in (sample.get("faces") or []) if f is not None]
+    if not faces:
+        return None
+    try:
+        best = max(faces, key=lambda f: float(f.get("mouth") or 0))
+        if float(best.get("mouth") or 0) > 2.0:
+            return best
+    except Exception:
+        pass
+    try:
+        return min(faces, key=lambda f: abs((float(f["x"]) + float(f["w"]) / 2.0) - win_cx))
+    except Exception:
+        return None
+
+
+def refine_segment_windows(track, crop_w, width, margin_frac=0.10):
+    """Jamin muka pembicara UTUH di dalam jendela crop tiap segmen statis.
+
+    Setelah segmentasi (median per segmen), jendela crop DIAM sepanjang
+    segmen — tapi kepala pembicara BERGERAK di dalam segmen (mencondong,
+    ketawa, menoleh). Bila geraknya cukup jauh dari median, muka keluar
+    jendela dan KEPOTONG di tepi frame (kasus Final Klip 1 detik 73: awal
+    segmen portrait, muka Radit keiris tepi kanan; hook detik 2 = potongan
+    video polos dari momen yang sama). Drift-split (12% lebar) tidak
+    menangkap gerak 100-200px — padahal muka ~200px sudah bisa kepotong
+    setengah.
+
+    Per run x-sama (satu segmen statis):
+      - Rentang yang harus muat = [min(fx-margin), max(fx+fw+margin)]
+        muka pembicara semua sampel; margin = max(8px, margin_frac*w).
+      - Rentang <= crop_w: geser x agar rentang muat (pusatkan rentang di
+        jendela, clamp [0, W-crop_w]). Muka dijamin utuh + ada napas.
+      - Rentang > crop_w (pembicara bergerak lebih dari satu jendela):
+        pecah run di lompatan cx pembicara terbesar, ulangi per sub-run
+        (maks 8 pecahan per run asal; sisa terlebar dipusatkan
+        best-effort).
+    Hanya mengubah x (None dipertahankan); panjang, t, speaking, faces
+    tidak disentuh. Bahu tetangga yang ngintip TIDAK dijamin hilang
+    (punggung/bahu tanpa kotak wajah tidak bisa dideteksi dari track) —
+    yang dijamin adalah muka pembicara tidak kepotong. Fungsi murni
+    terhadap list track (dict) -> bisa diuji tanpa OpenCV. Mode Split
+    tidak memakai fungsi ini (panel kiri/kanan punya logika sendiri).
+    """
+    if not track or not crop_w or not width or float(crop_w) >= float(width):
+        return track
+    W = float(width)
+    CW = float(crop_w)
+    n = len(track)
+    runs = []
+    start = 0
+    for i in range(1, n + 1):
+        if i == n or track[i].get("x") != track[start].get("x"):
+            runs.append((start, i))
+            start = i
+    for (a, b) in runs:
+        x = track[a].get("x")
+        if x is None:
+            continue
+        segs = [(a, b)]
+        for _ in range(9):  # maks 8 pecahan per run asal
+            changed = False
+            new_segs = []
+            for (s, e) in segs:
+                items = []
+                for j in range(s, e):
+                    f = _speaker_face(track[j], float(x) + CW / 2.0)
+                    if f is None:
+                        continue
+                    try:
+                        fx, fw = float(f["x"]), float(f["w"])
+                    except Exception:
+                        continue
+                    items.append((j, fx, fw, fx + fw / 2.0))
+                if not items:
+                    new_segs.append((s, e))
+                    continue
+                mg = lambda fw: max(8.0, float(margin_frac) * fw)
+                lo = min(fx - mg(fw) for (_, fx, fw, _) in items)
+                hi = max(fx + fw + mg(fw) for (_, fx, fw, _) in items)
+                if hi - lo <= CW:
+                    nx = round(max(0.0, min(W - CW, (lo + hi - CW) / 2.0)), 1)
+                    for j in range(s, e):
+                        if track[j].get("x") is not None:
+                            track[j]["x"] = nx
+                    new_segs.append((s, e))
+                else:
+                    jumps = [(abs(items[k][3] - items[k - 1][3]), items[k][0])
+                             for k in range(1, len(items))]
+                    if not jumps:
+                        new_segs.append((s, e))
+                        continue
+                    _, cut = max(jumps)
+                    if cut <= s or cut >= e:
+                        cxs = sorted(c for (_, _, _, c) in items)
+                        med = cxs[len(cxs) // 2]
+                        nx = round(max(0.0, min(W - CW, med - CW / 2.0)), 1)
+                        for j in range(s, e):
+                            if track[j].get("x") is not None:
+                                track[j]["x"] = nx
+                        new_segs.append((s, e))
+                    else:
+                        new_segs.append((s, cut))
+                        new_segs.append((cut, e))
+                        changed = True
+            segs = new_segs
+            if not changed:
+                break
+    return track
+
+
 def presence_face(scored, locked_cx, frame_w):
     """Fallback KEHADIRAN (tuning 23 Okt): pilih wajah buat di-frame saat
     SpeakerLock tidak memilih siapa pun (tidak ada gerak mulut — wajah FOTO /
@@ -876,10 +993,13 @@ def main():
             # Penjaga segmen kosong: segmen yang jendelanya tidak berisi
             # orang digeser ke klaster orang dominan segmen itu.
             guard_empty_segments(track, crop_w, float(W))
+            # Jaminan muka utuh (fix 25 Okt): jendela statis per segmen
+            # digeser/dibelah agar muka pembicara tidak kepotong tepi.
+            refine_segment_windows(track, crop_w, float(W))
     except Exception:
         pass
 
-    result = {"v": 3, "fps": args.fps, "width": W, "height": H, "cropW": round(crop_w, 1),
+    result = {"v": 4, "fps": args.fps, "width": W, "height": H, "cropW": round(crop_w, 1),
               "method": args.method, "hasAudio": has_audio, "meanDb": mean_db,
               "track": track}
     with open(args.out, "w") as f:

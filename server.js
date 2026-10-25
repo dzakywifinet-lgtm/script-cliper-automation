@@ -1925,7 +1925,7 @@ async function clipFaceTrack(job, sel, cand) {
   try {
     if (fs.existsSync(trackFile) && fs.statSync(trackFile).size > 0) {
       const d = JSON.parse(fs.readFileSync(trackFile, 'utf8'));
-      if (Array.isArray(d.track) && d.track.length >= 2 && (+d.v || 1) >= 3) return d.track; // v<3 = track dari kode tracker lama -> hitung ulang
+      if (Array.isArray(d.track) && d.track.length >= 2 && (+d.v || 1) >= 4) return d.track; // v<4 = track sebelum jaminan muka utuh (fix 25 Okt) -> hitung ulang
     }
   } catch {}
   const script = path.join(__dirname, 'face_track.py');
@@ -2235,15 +2235,28 @@ async function clipRender(job, selected, opts) {
     let faceTrack = null;
     if ((opts.podcast || opts.gameplay) && opts.faceTrack !== false) faceTrack = await clipFaceTrack(job, sel, cand);
     else if ((opts.podcast || opts.gameplay) && done === 0) clipLog(job, 'Face tracking NONAKTIF (centang \u{1F3AF} Auto face tracking di Pengaturan Proyek mati) \u2014 crop pakai fokus statis.');
-    // Auto pintar (Fase 3, permintaan Dzaky): mode Auto + 2 wajah besar
-    // berdampingan di banyak sampel -> JANGAN crop 1 orang; pakai Landscape
-    // (muat utuh + background blur) biar dua-duanya kelihatan.
-    if ((effMode === 'auto' || effMode === 'podcast') && faceTrack) { // Auto + Podcast (pilihan Dzaky 23 Okt)
+    // Auto frame per-segmen (aturan Dzaky 24 Okt — MENGGANTIKAN Auto pintar
+    // Fase 3 yang memutus satu klip penuh jadi Landscape): dari track
+    // face_track.py, tiap segmen diputus dari SIAPA NGOMONG — solo / 1
+    // ngomong = crop 9:16 ikut pembicara (rantai portrait mix), 2 ngomong
+    // bareng / tanpa wajah = Landscape blur. Track jelek (gerbang kualitas)
+    // TIDAK diputus di sini — biarkan blok framing per-bagian di bawah
+    // (jalur lama) yang menangani.
+    let mixFaceSegs = null, talkerDecided = false;
+    if ((effMode === 'auto' || effMode === 'podcast') && faceTrack) { // Auto + Podcast
       try {
         const tf = path.join(job.dir, 'clip_' + sel.index + '_facetrack.json');
         const td = JSON.parse(fs.readFileSync(tf, 'utf8'));
         const duo = clipperLib.clipDuoInfo(td.track || faceTrack, td.width || 0);
-        if (duo.duo) {
+        const track = td.track || faceTrack;
+        const talk = clipperLib.clipTalkerSegs(track, cand.end - cand.start, td.width || 0);
+        const q = td ? clipperLib.clipTrackQuality(track, td.cropW || 0) : null;
+        const badTrack = !!(q && q.bearing >= 4 && q.faceIn < 0.5);
+        if (!badTrack && talk.portraitSegs.length && talk.landscapeSegs.length) {
+          mixFaceSegs = talk.portraitSegs; talkerDecided = true;
+          const fmtSegs = a => a.map(s => s.start + '–' + s.end).join(', ');
+          clipLog(job, '🎙️ Auto frame per-segmen klip ' + (sel.index + 1) + ' (duo ' + Math.round(duo.ratio * 100) + '% frame): ' + talk.portraitSegs.length + ' segmen fokus pembicara, ' + talk.landscapeSegs.length + ' segmen Landscape (2 ngomong / tanpa wajah). P [' + fmtSegs(talk.portraitSegs) + '] · L [' + fmtSegs(talk.landscapeSegs) + ']');
+        } else if (!badTrack && !talk.portraitSegs.length && talk.landscapeSegs.length) {
           clipLog(job, '✨ Kamera 2 orang klip ' + (sel.index + 1) + ': 2 wajah berdampingan di ' + Math.round(duo.ratio * 100) + '% frame — pakai Landscape (background blur), bukan crop 1 orang.');
           faceTrack = null; opts.podcast = false;
         }
@@ -2266,8 +2279,7 @@ async function clipRender(job, selected, opts) {
     //  - track ada tapi crop sering kosong (gerbang lama) -> campuran dari
     //    kehadiran track bila muka >= 15%; tidak -> Landscape penuh.
     //  - track sehat -> campuran hanya bila ada celah tanpa wajah.
-    let mixFaceSegs = null;
-    if ((opts.podcast || opts.gameplay) && opts.faceTrack !== false) { // Podcast + Auto (duo Auto sudah diputus di blok Auto pintar)
+    if ((opts.podcast || opts.gameplay) && opts.faceTrack !== false) { // Podcast + Auto (auto frame per-segmen di atas menang bila sudah diputus)
       let bad = false, why = '';
       let td = null;
       try { td = JSON.parse(fs.readFileSync(path.join(job.dir, 'clip_' + sel.index + '_facetrack.json'), 'utf8')); } catch {}
@@ -2285,7 +2297,7 @@ async function clipRender(job, selected, opts) {
           clipLog(job, '🛟 Tracking wajah kurang bagus klip ' + (sel.index + 1) + ' (' + why + ') — pakai Landscape (background blur) biar aman.');
           opts.podcast = false;
         }
-      } else if (opts.podcast && bad) {
+      } else if (opts.podcast && bad && !talkerDecided) {
         const pres = (td && Array.isArray(td.track)) ? clipperLib.clipPresenceSegs(td.track.map(p => ({ t: p.t, face: Array.isArray(p.faces) && p.faces.length > 0 })), cand.end - cand.start, td.width || 0, td.cropW || 0) : null;
         if (pres && pres.faceRatio >= 0.15 && pres.faceSegs.length) {
           mixFaceSegs = pres.faceSegs;
@@ -2294,7 +2306,7 @@ async function clipRender(job, selected, opts) {
           clipLog(job, '🛟 Tracking wajah kurang bagus klip ' + (sel.index + 1) + ' (' + why + ') — pakai Landscape (background blur) biar aman.');
           faceTrack = null; opts.podcast = false;
         }
-      } else if (opts.podcast && td && Array.isArray(td.track)) {
+      } else if (opts.podcast && td && Array.isArray(td.track) && !talkerDecided) {
         const pres2 = clipperLib.clipPresenceSegs(td.track.map(p => ({ t: p.t, face: Array.isArray(p.faces) && p.faces.length > 0 })), cand.end - cand.start, td.width || 0, td.cropW || 0);
         const covered = pres2.faceSegs.reduce((a, x) => a + (x.end - x.start), 0);
         if (pres2.faceSegs.length && covered < (cand.end - cand.start) - 0.05) {
@@ -4163,9 +4175,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/api/clipper/cleanup') {
     const user = sessUser(req);
     // AMAN: selamatkan dulu hasil Final yang ada di Library/Dashboard Hasil
-    // SEBELUM hapus folder kerja. Yang dihapus HANYA video sumber + klip yang
-    // BELUM di-render. Hasil Final (sudah "save render") dipindah ke
-    // <LIBRARY_DIR>/clipper-final/<user>/<jobId>/ dan entri Library di-update
+    // SEBELUM hapus. Entri Library tanpa finalVideo dipindah ke
+    // <LIBRARY_DIR>/clipper-final/<user>/<jobId>/ dan entrinya di-update
     // (finalVideo/finalThumb) — Dashboard Hasil tidak ikut terhapus.
     try {
       const arr = libLoad(user);
@@ -4192,9 +4203,41 @@ const server = http.createServer(async (req, res) => {
       }
       if (changed) libSave(user, arr);
     } catch {}
-    for (const [k, j] of clipperJobs) if (j.user === user) { j.cancelled = true; try { if (j.aiCtrl) j.aiCtrl.abort(); } catch {} try { if (j.abortCtrl) j.abortCtrl.abort(); } catch {} clipperJobs.delete(k); }
-    clipRm(clipUserDir(user));
-    return send(res, 200, { ok: true });
+    // BARU (25 Okt, permintaan Dzaky): hapus SEMUA hasil render klip, tapi
+    // video sumber + yang sudah masuk Dashboard TIDAK ikut dihapus.
+    // - Dashboard: entri Library sudah diselamatkan di atas (finalVideo di
+    //   <LIBRARY_DIR>), jadi file job-dir boleh dihapus — Dashboard aman.
+    // - Sumber: file source.* + job.json + file tak dikenal DIPERTAHANKAN.
+    // - Yang dihapus: semua file render berawalan clip_ (Final, plain, lite,
+    //   facetrack/presence, .ass, thumb). Entri renders job dibersihkan
+    //   supaya kartu tidak menunjuk unduhan yang sudah tidak ada.
+    // - Proyek yang sedang berjalan (analisis/render) DILEWATI utuh.
+    let deletedFiles = 0, jobsPurged = 0, skippedActive = 0;
+    const activeJobIds = new Set();
+    for (const [k, j] of clipperJobs) {
+      if (j.user !== user) continue;
+      if (j.status === 'running' || j.status === 'rendering' || (j.renders || []).some(r => r.status === 'running')) { activeJobIds.add(String(k)); skippedActive++; }
+    }
+    const userDir = clipUserDir(user);
+    let jobDirs = [];
+    try { jobDirs = fs.readdirSync(userDir, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name); } catch {}
+    for (const jobId of jobDirs) {
+      if (activeJobIds.has(String(jobId))) continue;
+      const dir = path.join(userDir, jobId);
+      let n = 0;
+      try {
+        for (const f of fs.readdirSync(dir)) {
+          if (!f.startsWith('clip_')) continue;
+          const fp = path.join(dir, f);
+          try { if (fs.statSync(fp).isFile()) { fs.unlinkSync(fp); n++; } } catch {}
+        }
+      } catch {}
+      const memJob = clipperJobs.get(String(jobId));
+      let rendersCleared = false;
+      if (memJob && memJob.user === user && (memJob.renders || []).length) { memJob.renders = []; rendersCleared = true; try { clipSaveJob(memJob); } catch {} }
+      if (n > 0 || rendersCleared) { deletedFiles += n; jobsPurged++; }
+    }
+    return send(res, 200, { ok: true, deletedFiles, jobsPurged, skippedActive });
   }
   // File Final Clipper yang diselamatkan (lihat /api/clipper/cleanup):
   // GET /api/library/clipper-file?id=<entryId>&kind=video|thumb

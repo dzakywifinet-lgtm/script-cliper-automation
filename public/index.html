@@ -319,6 +319,7 @@ yang lain = jeda (IntersectionObserver). */
 .clip-studio-item{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;background:#12161d;border:1px solid #232c3d;border-radius:10px;padding:8px;margin:0 0 6px;cursor:pointer;color:#e8edf7}
 .clip-studio-item:hover{border-color:#8b5cf6}
 .clip-studio-item.on{border-color:#8b5cf6;background:rgba(139,92,246,.12)}
+.clip-studio-select{display:none;width:100%;background:#0d1117;border:1px solid #263042;border-radius:10px;padding:10px 12px;color:#e8edf7;font-size:14px;font-weight:700}
 .clip-studio-n{font-size:10px;color:#8b94a7;font-weight:800}
 .clip-studio-tt{font-size:12px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .clip-studio-tm{font-size:10px;color:#8b94a7;display:flex;align-items:center;gap:5px}
@@ -448,6 +449,7 @@ yang lain = jeda (IntersectionObserver). */
 .clip-acc.open>[data-clippanel]{display:block}
 @media (max-width:1100px){#clipDetailBox .clip-studio-cols{display:flex;flex-direction:column;overflow-y:auto}#clipDetailBox .clip-studio-cols>*{flex:none!important}#clipDetailBox .clip-studio-cols>div:nth-child(2){overflow:visible}#clipDetailBox .clip-studio-cols .clip-tpl-panel{overflow:visible}#clipDetailBox .clip-studio-midcol #clipPreviewBox{width:min(64vw,340px)!important;height:auto!important;max-height:none!important}.clip-studio-list{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden}.clip-studio-item{flex:0 0 210px}.clip-studio-listhead{display:none}}
 @media (max-width:1100px){#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols{overflow:hidden}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-list{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-studio-list{display:flex;flex:none!important;max-height:118px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-midcol{flex:none!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols .clip-tpl-panel{flex:1 1 auto!important;min-height:0;overflow-y:auto}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-midcol #clipPreviewBox{height:min(30dvh,430px)!important;width:auto!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-head{margin-bottom:6px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-actions .btn{padding:7px 12px;font-size:13px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-cols>div:nth-child(2){padding-bottom:6px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-timeline{padding:6px;margin-top:8px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-row{margin-top:2px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-lane{height:22px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-thumbs canvas{height:16px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-sub{height:16px;top:3px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-tl-clipbar{top:4px;bottom:4px}#clipDetailBox .clip-studio-inner[data-mtab] .clip-laypills{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-timeline{display:none}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-hookrow span:last-of-type{display:none}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-hookrow{display:none!important}#clipDetailBox .clip-studio-inner[data-mtab="judul"] .clip-studio-hookrow{display:flex!important}#clipDetailBox .clip-studio-inner[data-mtab] .clip-acc{display:none}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-acc[data-mgroup="klip"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="judul"] .clip-acc[data-mgroup="judul"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="sub"] .clip-acc[data-mgroup="sub"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="cover"] .clip-acc[data-mgroup="cover"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab="render"] .clip-acc[data-mgroup="render"]{display:block}#clipDetailBox .clip-studio-inner[data-mtab] .clip-studio-tabbar{display:flex}}
+@media (max-width:1100px){.clip-studio-list{display:none!important}#clipDetailBox .clip-studio-inner[data-mtab="klip"] .clip-studio-select{display:block}#clipDetailBox .clip-studio-inner:not([data-mtab]) .clip-studio-select{display:block}}
 
 /* ---------- Preview = render (Detail): pop karaoke, kartu judul, B-roll ---------- */
 /* Pop kata aktif: sama seperti .ass render (\t 0-150ms scale 115% -> 150-300ms 100%). */
@@ -798,10 +800,9 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
           <div class="bar" id="clipBarWrap" hidden><i id="clipBarI"></i></div>
           <div id="clipSteps" style="display:none;gap:4px;flex-wrap:wrap;margin-top:8px"></div>
           <div class="clip-log" id="clipLog" hidden></div>
-          <div class="row" style="margin-top:12px"><button class="btn ghost danger" id="clipCleanupBtn">🗑 Hapus Semua</button></div>
         </div>
        </div>
-        <div class="clip-card" id="clipCreateResults" hidden><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h3 style="margin:0">🎬 Klip</h3><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost" id="clipDownloadAllBtn" style="white-space:nowrap">⬇️ Download All</button><button class="btn" id="clipStudioTopBtn" style="background:var(--p-grn);border-color:var(--p-grn);color:var(--p-grn-d);white-space:nowrap">🎞️ Editor Studio</button></div></div>
+        <div class="clip-card" id="clipCreateResults" hidden><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h3 style="margin:0">🎬 Klip</h3><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost" id="clipDownloadAllBtn" style="white-space:nowrap">⬇️ Download All</button><button class="btn ghost danger" id="clipCleanupBtn" style="white-space:nowrap">🗑 Hapus Semua</button><button class="btn" id="clipStudioTopBtn" style="background:var(--p-grn);border-color:var(--p-grn);color:var(--p-grn-d);white-space:nowrap">🎞️ Editor Studio</button></div></div>
           <p class="hint" style="margin:6px 0 10px">Klip dari video ini. Klik Edit untuk ganti judul / subtitle / preset, atau Unduh untuk menyimpan hasil render.</p>
           <div id="clipCreateResultsList"></div>
         </div>
@@ -3432,6 +3433,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     box.innerHTML = '<div class="clip-modal-inner clip-studio-inner"><div class="clip-studio-head"><button class="btn ghost" id="clipDetailClose" title="Kembali" style="font-size:12px">\u2190 Kembali</button><div class="clip-studio-title">\u2702\uFE0F Editor Studio<span>Klip ' + (idx + 1) + ' dari ' + (candCache || []).length + ' klip \u00b7 ' + esc(String(cand.title || '')) + '</span></div><div class="clip-studio-actions"><button type="button" class="btn ghost" id="clipTplPreview" style="font-weight:800" title="Putar preview klip ini dari awal">👁️ Preview</button><button type="button" class="btn" id="clipTplSave" style="font-weight:800;background:#8b5cf6;color:#fff">\uD83D\uDCBE Simpan</button><button type="button" class="btn" id="clipTplRenderOne" style="font-weight:800;background:#8b5cf6;color:#fff">\uD83C\uDFAC Render Klip Ini</button></div></div>'
       + '<div class="clip-studio-hookrow" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:12px;flex-wrap:wrap"><span style="font-weight:700">⚡ Hook teaser</span><button type="button" class="btn" data-hookon="1" style="font-size:12px;padding:5px 12px">Ada</button><button type="button" class="btn ghost" data-hookon="0" style="font-size:12px;padding:5px 12px">Nggak usah</button><span style="color:#8b94a7">Teks hook tampil di awal preview</span></div>'
       + '<div class="clip-detail-cols clip-studio-cols">'
+      + '<select class="clip-studio-select" aria-label="Pilih klip">' + (candCache || []).map(c => '<option value="' + c.index + '"' + (c.index === idx ? ' selected' : '') + '>KLIP ' + (c.index + 1) + ' - ' + esc(String(c.title || ('Klip ' + (c.index + 1)))) + '</option>').join('') + '</select>'
       + '<div class="clip-studio-list"><div class="clip-studio-listhead">\uD83C\uDFAC KLIP ' + (candCache || []).length + '</div>' + studioRows + '</div>'
       // KIRI: preview (plek ketiplek editor referensi)
       + '<div class="clip-studio-midcol" style="flex:0 1 340px;max-width:100%">'
@@ -3553,6 +3555,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
         }
       }
       box.querySelectorAll('[data-studio-open]').forEach(b => b.addEventListener('click', () => { const n = +b.dataset.studioOpen; if (n !== idx) openClipTemplate(n); }));
+      { const sel = box.querySelector('.clip-studio-select'); if (sel) sel.addEventListener('change', () => { const n = +sel.value; if (n !== idx) openClipTemplate(n); }); }
       { const nl = box.querySelector('.clip-studio-list'); if (nl && prevListScroll) nl.scrollTop = prevListScroll; } // Fase 23d: daftar diam di posisi semula.
       // Simpan & Render Klip Ini kini SATU di header (id clipTplSave /
       // clipTplRenderOne) — tombol panel dobelnya dihapus (Dzaky 24 Okt).
@@ -5150,17 +5153,20 @@ const renderSubPresetSettings = () => {
     ov.addEventListener('pointercancel', end);
   }
   $c('clipCleanupBtn').addEventListener('click', async () => {
-    if (!confirm('Hapus SEMUA video sumber + klip yang BELUM di-render?')) return;
+    if (!confirm('Hapus SEMUA hasil render klip?\n\nVideo sumber + yang sudah masuk Dashboard TIDAK ikut dihapus. Proyek yang sedang berjalan dilewati.')) return;
     try {
-      await fetch('/api/clipper/cleanup', { method: 'POST' });
+      const r = await fetch('/api/clipper/cleanup', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
       jobId = null; saveLs(); stopPoll(); clipSetupArmedFor = null; closeClipRenderSetup();
       $c('clipCandidates').innerHTML = ''; $c('clipRenders').innerHTML = '';
       // Hasil Klip di bawah Buat Klip ikut dibersihkan + kunci anti-thrash
       // direset — tanpa ini klip lama nyangkut di sana sampai refresh.
       { const crb = $c('clipCreateResults'); if (crb) crb.hidden = true; clipCandKey = ''; clipCreateKey = ''; candCache = []; rendersCache = []; }
       refreshProjects();
-      showLog([]); setBar(null); setBadge('Menunggu'); setMsg('Folder kerja dibersihkan.');
-      toast('Folder kerja dibersihkan');
+      showLog([]); setBar(null); setBadge('Menunggu');
+      const msg = 'Hasil render dihapus' + (d.deletedFiles !== undefined ? ' (' + d.deletedFiles + ' file, ' + d.jobsPurged + ' proyek' + (d.skippedActive ? ', ' + d.skippedActive + ' proyek aktif dilewati' : '') + ')' : '') + '. Video sumber + Dashboard aman.';
+      setMsg(msg);
+      toast(msg);
     } catch (e) { setMsg('Gagal membersihkan: ' + e.message); }
   });
   // Pil durasi ala Link Hub prototipe: pil = kulit, <select id="clipDur">
