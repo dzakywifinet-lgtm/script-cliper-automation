@@ -3506,7 +3506,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '<div data-clippreview id="clipPreviewBox" style="position:relative;line-height:0;aspect-ratio:9/16;overflow:hidden;background:#000;border-radius:10px;width:340px;max-width:100%"><video preload="metadata" playsinline data-clipmodalvideo' + videoPoster + ' style="display:block;width:100%;height:100%;object-fit:contain;background:#000" src="' + videoSrc + '"></video>' + '<div id="clipRenderBadge" hidden style="position:absolute;top:8px;left:8px;z-index:6;background:rgba(0,0,0,.72);color:#fbbf24;font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;line-height:1.3">⏳ Rendering…</div>'
       + '<div data-clipoverlay="title" data-candidx="' + idx + '" title="Seret untuk pindah posisi judul" style="position:absolute;left:0;right:0;top:5%;text-align:center;cursor:grab;pointer-events:auto;line-height:1.2;font-weight:700;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;background:rgba(0,0,0,.45);padding:4px 6px"></div>'
       + '<div data-clipoverlay="sub" data-candidx="' + idx + '" title="Seret untuk pindah posisi subtitle" style="position:absolute;left:0;right:0;bottom:23%;text-align:center;cursor:grab;pointer-events:auto;line-height:1.2;font-weight:700;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;background:rgba(0,0,0,.35);padding:4px 6px"></div>'
-      + '<div id="clipWmPreview" style="display:none;position:absolute;z-index:5;pointer-events:none;line-height:1.2"><span id="clipWmPreviewText" style="display:none;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;font-weight:700;white-space:nowrap"></span><img id="clipWmPreviewImg" style="display:none;width:100%;height:auto"></div>'
+      + '<div id="clipWmPreview" style="display:none;position:absolute;left:0;right:0;top:0;bottom:0;z-index:5;pointer-events:none;line-height:1.2"><span id="clipWmPreviewText" style="display:none;position:absolute;color:#fff;text-shadow:0 2px 6px #000,0 0 2px #000;font-weight:700;white-space:nowrap"></span><img id="clipWmPreviewImg" style="display:none;position:absolute;left:0;top:0;width:100%;height:auto"></div>'
             + '<div data-brollph class="clip-broll-ph"><b>🎞️ B-ROLL</b><span data-brollph-name></span></div>'
       + '</div>'
       + '<div style="display:flex;gap:6px;align-items:center;margin-top:8px"><button type="button" class="btn ghost" id="clipPreviewPlay" style="flex:none;width:32px;height:28px;padding:0;font-size:13px" title="Putar/Jeda">▶</button><label style="flex:1;font-size:12px">▶ Posisi preview: <span id="clipPreviewT">0:00</span><input id="clipPreviewSeek" type="range" min="0" max="' + clipDur + '" step="0.1" value="0" style="width:100%;margin-top:2px"></label></div>'
@@ -3689,8 +3689,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       if (ht) { ht.addEventListener('input', paintCounts); ht.addEventListener('change', () => { const v = ht.value.trim(); if (v) cand.hookText = v; else delete cand.hookText; const cc = cc0(); if (cc) { if (v) cc.hookText = v; else delete cc.hookText; } syncClipStyleOverlays(); clipAssPreviewSchedule(); }); }
       paintCounts();
       const paintChips = () => { box.querySelectorAll('[data-coverchip]').forEach(b => { const auto = b.dataset.coverchip === 'auto'; const on = auto ? cand.coverAt === undefined : (cand.coverAt !== undefined && Math.abs(+cand.coverAt - +b.dataset.coverchip) < 0.06); b.style.borderColor = on ? '#8b5cf6' : ''; b.style.color = on ? '#a78bfa' : ''; }); };
-      box.querySelectorAll('[data-coverchip]').forEach(b => b.addEventListener('click', () => { if (b.dataset.coverchip === 'auto') { delete cand.coverAt; const cc = cc0(); if (cc) delete cc.coverAt; if (nt) nt.textContent = 'Frame otomatis: server memilih frame wajah terbaik saat poster dibuat.'; } else if (ca) { ca.value = b.dataset.coverchip; ca.dispatchEvent(new Event('input')); } paintChips(); }));
-      { const au = $c('clipTplCoverAuto'); if (au) au.addEventListener('click', () => { delete cand.coverAt; const cc = cc0(); if (cc) delete cc.coverAt; if (nt) nt.textContent = 'Frame otomatis: server memilih frame wajah terbaik saat poster dibuat.'; paintChips(); }); }
+      box.querySelectorAll('[data-coverchip]').forEach(b => b.addEventListener('click', () => { if (b.dataset.coverchip === 'auto') { delete cand.coverAt; const cc = cc0(); if (cc) delete cc.coverAt; if (ca) ca.value = coverAt0; if (cav) cav.textContent = fmtCoverT(coverAt0); if (nt) nt.textContent = 'Frame otomatis: server memilih frame wajah terbaik saat poster dibuat.'; } else if (ca) { ca.value = b.dataset.coverchip; ca.dispatchEvent(new Event('input')); } paintChips(); }));
+      { const au = $c('clipTplCoverAuto'); if (au) au.addEventListener('click', () => { delete cand.coverAt; const cc = cc0(); if (cc) delete cc.coverAt; if (ca) ca.value = coverAt0; if (cav) cav.textContent = fmtCoverT(coverAt0); if (nt) nt.textContent = 'Frame otomatis: server memilih frame wajah terbaik saat poster dibuat.'; paintChips(); }); }
       if (ca) ca.addEventListener('input', paintChips);
       paintChips();
     }
@@ -3949,6 +3949,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       const wmOn = !!(wmEn && wmEn.checked);
       const wmTx = $c('clipTplWatermarkText');
       const wmText = wmTx ? String(wmTx.value || '').trim() : '';
+      // Teks otomatis (cermin render server): ceklis ON + teks kosong +
+      // channel terdeteksi -> 'source : <channel>' (dulu preview diam saja).
+      const wmChannel = (typeof clipLastJob !== 'undefined' && clipLastJob && clipLastJob.metaUploader && clipLastJob.metaUploader !== 'Upload') ? String(clipLastJob.metaUploader) : '';
+      const wmEff = wmText || (wmOn && wmChannel ? ('source : ' + wmChannel).slice(0, 60) : '');
       const wmPs = $c('clipTplWatermarkPos');
       const wmPos = wmPs && ['bl', 'br', 'tl', 'tr'].includes(wmPs.value) ? wmPs.value : 'bl';
       const lgPs = $c('clipTplWmLogoPos');
@@ -3959,35 +3963,39 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       const lgSzV = lgSz && Number.isFinite(+lgSz.value) ? Math.min(40, Math.max(5, +lgSz.value)) : 15;
       const boxW = box.clientWidth || 340;
       const mg = Math.max(6, Math.round(20 * boxW / 720));
-      el.style.display = 'none';
-      el.style.width = '';
       if (txt) { txt.style.display = 'none'; txt.textContent = ''; }
       if (img) img.style.display = 'none';
-      const place = pos => {
-        el.style.left = ''; el.style.right = ''; el.style.top = ''; el.style.bottom = ''; el.style.transform = '';
-        if (pos === 'tl') { el.style.left = mg + 'px'; el.style.top = mg + 'px'; }
-        else if (pos === 'tr') { el.style.right = mg + 'px'; el.style.top = mg + 'px'; }
-        else if (pos === 'bl') { el.style.left = mg + 'px'; el.style.bottom = mg + 'px'; }
-        else if (pos === 'c') { el.style.left = '50%'; el.style.top = '50%'; el.style.transform = 'translate(-50%,-50%)'; }
-        else { el.style.right = mg + 'px'; el.style.bottom = mg + 'px'; }
+      const place = (t, pos) => {
+        t.style.left = ''; t.style.right = ''; t.style.top = ''; t.style.bottom = ''; t.style.transform = '';
+        if (pos === 'tl') { t.style.left = mg + 'px'; t.style.top = mg + 'px'; }
+        else if (pos === 'tr') { t.style.right = mg + 'px'; t.style.top = mg + 'px'; }
+        else if (pos === 'bl') { t.style.left = mg + 'px'; t.style.bottom = mg + 'px'; }
+        else if (pos === 'c') { t.style.left = '50%'; t.style.top = '50%'; t.style.transform = 'translate(-50%,-50%)'; }
+        else { t.style.right = mg + 'px'; t.style.bottom = mg + 'px'; }
       };
+      let any = false;
+      // Logo + teks tampil BERSAMAAN (cermin render) — dulu logo menutupi teks.
       if (logoOn && wmLogoHasFile) {
-        if (!img) return;
-        if (!img.src || img.src.indexOf('/api/clipper/wmlogo/file') === -1) img.src = '/api/clipper/wmlogo/file?ts=' + Date.now();
-        el.style.width = lgSzV + '%';
-        img.style.display = 'block';
-        img.style.opacity = String(lgOpV / 100);
-        place(lgPos);
-        el.style.display = 'block';
-      } else if (wmOn && wmText) {
-        if (!txt) return;
-        txt.textContent = wmText;
-        txt.style.display = 'block';
-        txt.style.fontSize = Math.max(9, Math.round(24 * boxW / 720)) + 'px';
-        txt.style.opacity = '0.5';
-        place(wmPos);
-        el.style.display = 'block';
+        if (img) {
+          if (!img.src || img.src.indexOf('/api/clipper/wmlogo/file') === -1) img.src = '/api/clipper/wmlogo/file?ts=' + Date.now();
+          img.style.width = lgSzV + '%';
+          img.style.display = 'block';
+          img.style.opacity = String(lgOpV / 100);
+          place(img, lgPos);
+          any = true;
+        }
       }
+      if (wmOn && wmEff) {
+        if (txt) {
+          txt.textContent = wmEff;
+          txt.style.display = 'block';
+          txt.style.fontSize = Math.max(9, Math.round(24 * boxW / 720)) + 'px';
+          txt.style.opacity = '0.5';
+          place(txt, wmPos);
+          any = true;
+        }
+      }
+      el.style.display = any ? 'block' : 'none';
     }
     // __WM_PREVIEW_END__
     // Musik Latar (tab Video, GRATIS): upload file + hapus + switch + volume.
@@ -4043,6 +4051,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     // Preset Gaya Subtitle / Judul Hook: klik kartu -> simpan id ke kandidat
     // + tandai kartu aktif. (Dulu: + set input global Detail — Detail kini
     // tanpa setting, jadi tidak ada lagi sync global.)
+    // Ganti gaya/font judul -> preview melompat ke detik 0 (Dzaky 25 Okt):
+    // overlay judul sembunyi setelah durasi judul, jadi tanpa seek ini
+    // perubahan gaya saat playhead lewat durasi tidak terlihat.
+    const seekTitleStart = () => { const dv = box.querySelector('video'); if (dv) { try { dv.currentTime = 0; } catch {} } };
     const applySubPreset = (id) => { const p = CLIP_SUB_PRESETS[id]; if (!p) return; cand.subPreset = id; if (cand.subSizePercent === undefined) cand.subSizePercent = 100; if (p.font) { cand.subFont = p.font; const fp = $c('clipTplSubFont'); if (fp) fp.value = p.font; } if (cand.styleOv && cand.styleOv.font) { cand.subFont = cand.styleOv.font; const fp2 = $c('clipTplSubFont'); if (fp2) fp2.value = cand.styleOv.font; } const bd2 = $c('clipSubStyleBadge'); if (bd2) bd2.textContent = (cand.styleOv && Object.keys(cand.styleOv).length) ? 'Kustom' : p.label; markPreset('[data-subpreset]', id); renderSubPresetSettings(); syncClipStyleOverlays(); };
     const applyHookPreset = (id) => { const p = CLIP_HOOK_PRESETS[id]; if (!p) return; cand.hookPreset = id; if (cand.titleSizePercent === undefined) cand.titleSizePercent = 100; if (p.font) { cand.titleFont = p.font; const fp = $c('clipTplTitleFont'); if (fp) fp.value = p.font; } // Gaya baru = ukuran balik 100% (biar tidak keinget persen gaya lama).
       // Warna teks/kartu judul ikut preset (Kartu = teks hitam + kartu
@@ -4050,7 +4062,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       // DICABUT 21 Okt (spek Dzaky: warna full dari preset gaya).
       if (p.color1) cand.titleColor1 = p.color1;
       if (p.boxColor) cand.titleCardColor = p.boxColor;
-      markPreset('[data-hookpreset]', id); syncTitleAnimUI(); syncClipStyleOverlays(); };
+      markPreset('[data-hookpreset]', id); syncTitleAnimUI(); syncClipStyleOverlays(); seekTitleStart(); };
     // Toggle Animasi judul (referensi: hanya preset BERANIMASI yang punya
     // toggle Animasi — Kartu/Stiker/Berita/Stabilo/Catatan/Sinema/Layar
     // statis, tanpa toggle). Posisi: Sinema/Layar Lebar = tetap (tidak ada
@@ -4085,7 +4097,7 @@ const renderSubPresetSettings = () => {
     syncTitleAnimUI(); renderSubPresetSettings();
     // Picker font per-klip (Edit): menimpa font bawaan gaya (draf saja).
     { const f = $c('clipTplSubFont'); if (f) f.addEventListener('change', () => { cand.subFont = f.value; syncClipStyleOverlays(); }); }
-    { const f = $c('clipTplTitleFont'); if (f) f.addEventListener('change', () => { cand.titleFont = f.value; syncClipStyleOverlays(); }); }
+    { const f = $c('clipTplTitleFont'); if (f) f.addEventListener('change', () => { cand.titleFont = f.value; syncClipStyleOverlays(); seekTitleStart(); }); }
     // Overlay Template bisa diseret (judul/subtitle) — menulis ke DRAF.
     box.querySelectorAll('[data-clipoverlay]').forEach(ov => { clipMakeDraggable(ov, ov.dataset.clipoverlay); });
     syncClipStyleOverlays();
