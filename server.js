@@ -644,9 +644,13 @@ function clipPostsSave(user, arr) { try { fs.mkdirSync(clipUserDir(user), { recu
 // (YouTube Data API v3 + OAuth Client ID Web). Redirect URI TETAP di
 // bawah — harus persis sama dengan yang didaftarkan di Google Cloud.
 // Upload: API resmi videos.insert (resumable, chunk 8MB, tanpa dep baru —
-// fetch bawaan Node 18+). Kuota: 1 upload ≈ 1.600 unit dari 10.000/hari.
-// Privasi: antrean langsung -> publik; terjadwal -> private + publishAt
-// (YouTube yang menerbitkan tepat di jadwal). TikTok = tahap berikutnya.
+// fetch bawaan Node 18+). Kuota granular: videos.insert punya ember
+// sendiri (±100 upload/hari, 1 unit/upload); thumbnails.set ±50 unit.
+// Privasi (LANGKAH 3): pilihan di modal post — public / private / draft.
+// Draft di API YouTube = private (di Studio tampil sebagai draft/privat
+// yang bisa diterbitkan kapan saja). Terjadwal SELALU private + publishAt
+// (syarat YouTube: publishAt hanya boleh dengan privacyStatus private) —
+// pilihan visibilitas diabaikan bila ada jadwal. TikTok = tahap berikutnya.
 const YT_REDIRECT_URI = 'https://script.dzw.my.id/api/post/oauth/youtube/callback';
 // Scope: upload (wajib buat videos.insert) + readonly (buat baca nama
 // channel di channels.list mine=true — upload saja TIDAK cukup, tanpa ini
@@ -699,7 +703,7 @@ async function clipYtChannelSafe(access) { try { return await clipYtChannel(acce
 async function clipYtUploadVideo(access, file, meta) {
   const size = fs.statSync(file).size;
   if (!size) throw new Error('File Final kosong.');
-  const body = { snippet: { title: meta.title, description: meta.description || '', tags: meta.tags || [], categoryId: '22' }, status: meta.publishAt ? { privacyStatus: 'private', publishAt: meta.publishAt } : { privacyStatus: 'public' } };
+  const body = { snippet: { title: meta.title, description: meta.description || '', tags: meta.tags || [], categoryId: '22' }, status: meta.publishAt ? { privacyStatus: 'private', publishAt: meta.publishAt } : { privacyStatus: meta.privacyStatus || 'public' } };
   const init = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', { method: 'POST', headers: { Authorization: 'Bearer ' + access, 'Content-Type': 'application/json', 'X-Upload-Content-Type': 'video/mp4', 'X-Upload-Content-Length': String(size) }, body: JSON.stringify(body) });
   if (!init.ok) { const t = await init.text().catch(() => ''); throw new Error('Gagal mulai upload YouTube (' + init.status + '): ' + t.slice(0, 200)); }
   const session = init.headers.get('location');
@@ -718,6 +722,34 @@ async function clipYtUploadVideo(access, file, meta) {
     }
     throw new Error('Upload selesai tanpa balasan YouTube.');
   } finally { fs.closeSync(fd); }
+}
+// LANGKAH 3 — visibilitas + thumbnail. privacyStatus buat upload:
+// publishAt (terjadwal) -> 'private' wajib; draft -> 'private' (API tidak
+// punya status draft); private -> 'private'; selain itu -> 'public'.
+// Post lama tanpa field privacy = perilaku lama (langsung -> public).
+function clipYtPrivacyFor(post, publishAt) {
+  if (publishAt) return 'private';
+  const p = String((post && post.privacy) || 'public');
+  return (p === 'private' || p === 'draft') ? 'private' : 'public';
+}
+// Ambil frame awal Final (detik 0,5 — di situlah cover pembuka ±1 dtk
+// berada bila aktif, kalau tidak ya frame hook/pembuka klip) jadi JPEG
+// buat thumbnail YouTube. Throw bila ffmpeg gagal / file tak terbentuk.
+async function clipYtThumbFromFinal(file) {
+  const tmp = path.join(os.tmpdir(), 'yt-thumb-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + '.jpg');
+  try {
+    const ex = await clipRun('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-ss', '0.5', '-i', file, '-frames:v', '1', '-q:v', '3', '-y', tmp], { timeout: 60000 });
+    if (!ex || ex.code !== 0 || !fs.existsSync(tmp)) throw new Error('ffmpeg ekstrak frame gagal' + (ex && ex.stderr ? ': ' + String(ex.stderr).trim().split('\n').slice(-1)[0] : ''));
+    return fs.readFileSync(tmp);
+  } finally { try { fs.unlinkSync(tmp); } catch {} }
+}
+// Set thumbnail video (thumbnails.set, scope youtube.upload sudah cukup).
+// Dipanggil SETELAH videos.insert sukses; gagal di sini TIDAK menggagalkan
+// upload — caller mencatatnya sebagai peringatan di results.youtube.
+async function clipYtSetThumbnail(access, videoId, jpeg) {
+  const r = await fetch('https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=' + encodeURIComponent(videoId), { method: 'POST', headers: { Authorization: 'Bearer ' + access, 'Content-Type': 'image/jpeg', 'Content-Length': String(jpeg.length) }, body: jpeg });
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('Gagal set thumbnail YouTube (' + r.status + '): ' + t.slice(0, 200)); }
+  return await r.json().catch(() => ({}));
 }
 // Cari file Final milik akun: (1) job di memori, (2) entri Library yang
 // diselamatkan (finalVideo relatif ke libDir), (3) pindai job.json di
@@ -752,9 +784,13 @@ async function clipPostExecuteOne(user, post) {
   try {
     const tags = String(post.tags || '').split(/[,\n]/).map(s => s.trim()).filter(Boolean).slice(0, 30);
     const publishAt = (post.scheduleAt && new Date(post.scheduleAt).getTime() > Date.now()) ? new Date(post.scheduleAt).toISOString() : null;
-    const vid = await clipYtUploadVideo(tok.access_token, file, { title: post.title, description: post.description || '', tags, publishAt });
+    const vid = await clipYtUploadVideo(tok.access_token, file, { title: post.title, description: post.description || '', tags, publishAt, privacyStatus: clipYtPrivacyFor(post, publishAt) });
     post.status = 'terkirim';
-    post.results = { ...(post.results || {}), youtube: { videoId: vid.id || '', url: vid.id ? 'https://www.youtube.com/watch?v=' + vid.id : '', publishedAt: publishAt || new Date().toISOString() } };
+    post.results = { ...(post.results || {}), youtube: { videoId: vid.id || '', url: vid.id ? 'https://www.youtube.com/watch?v=' + vid.id : '', publishedAt: publishAt || new Date().toISOString(), privacy: clipYtPrivacyFor(post, publishAt) } };
+    if (post.thumb === 'cover' && vid.id) {
+      try { await clipYtSetThumbnail(tok.access_token, vid.id, await clipYtThumbFromFinal(file)); post.results.youtube.thumbnail = { status: 'ok' }; }
+      catch (e2) { post.results.youtube.thumbnail = { status: 'gagal', error: String((e2 && e2.message) || e2).slice(0, 200) }; }
+    }
     if ((post.platforms || []).includes('tiktok')) post.results.tiktok = { status: 'menyusul' };
   } catch (e) { post.status = 'gagal'; post.results = { ...(post.results || {}), error: String((e && e.message) || e).slice(0, 300) }; }
   return post;
@@ -852,13 +888,31 @@ function clipRestoreJobs() {
           const job = { ...data, cancelled: false, abortCtrl: new AbortController(), aiCtrl: null };
           // Proses yang sedang jalan saat server mati tidak bisa dilanjutkan —
           // tandai error, video tetap tersimpan kalau sudah tersimpan.
+          // Pesan dibedakan: yang kepotong RENDER -> 'klik Render ulang'
+          // (dulu selalu 'klik Analisis lagi' — menyesatkan buat render).
+          const hadRunningRender = (data.renders || []).some(r => r.status === 'running');
           if (job.status === 'running' || job.status === 'rendering') {
-            job.status = 'error'; job.error = 'Server restart saat proses jalan — klik Analisis lagi (video tetap tersimpan kalau sudah tersimpan).';
-            job.log.push({ t: clipLogTime(), msg: 'Server restart — proses terputus.' });
+            // PARITAS dengan tombol Stop (kasus 22 Okt): proyek yang SUDAH punya
+            // hasil analisis (kandidat + sumber siap) kembali 'done', BUKAN 'error'.
+            // Kalau 'error', endpoint render mental 409 'Analisis belum selesai'
+            // dan SEMUA klip proyek itu tidak bisa di-render ulang (kasus Klip 3,
+            // 25 Okt: deploy saat render jalan -> job 'error' -> Render ulang
+            // selalu 409 walau kandidat ada). Tanpa kandidat/sumber = analisis
+            // memang belum jadi -> tetap 'error'.
+            if ((job.candidates || []).length && job.sourceReady) {
+              job.status = 'done'; job.error = null;
+              job.log.push({ t: clipLogTime(), msg: 'Server restart — proses terputus, hasil analisis sebelumnya tetap dipakai (proyek kembali Siap).' });
+            } else {
+              job.status = 'error';
+              job.error = hadRunningRender
+                ? 'Server restart saat render jalan — klik Render ulang di kartu klip (video polos tersimpan dipakai ulang bila lengkap).'
+                : 'Server restart saat proses jalan — klik Analisis lagi (video tetap tersimpan kalau sudah tersimpan).';
+              job.log.push({ t: clipLogTime(), msg: 'Server restart — proses terputus.' });
+            }
           }
           // Entri render 'running' tidak bisa dilanjutkan setelah restart —
           // bersihkan juga (kalau tidak, kartu klip gantung 'Rendering…').
-          for (const r of (job.renders || [])) if (r.status === 'running') { r.status = 'error'; r.error = 'Dihentikan'; }
+          for (const r of (job.renders || [])) if (r.status === 'running') { r.status = 'error'; r.error = 'Terhenti (server restart)'; }
           // Source hilang dari disk (dihapus manual) -> jangan klaim tersimpan.
           if (job.sourceReady && (!job.source || !fs.existsSync(job.source))) { job.sourceReady = false; job.source = null; }
           clipperJobs.set(job.id, job);
@@ -1177,6 +1231,19 @@ async function clipProbeDuration(file) {
     if (m) return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 100;
   } catch {}
   return 0;
+}
+// Cache video polos layak pakai ulang? File lengkap (ffprobe baca durasi)
+// + durasi tidak jauh lebih pendek dari jendela klip (toleransi 1 dtk buat
+// pembulatan frame/audio). File setengah jadi (encode kepotong restart) =
+// ffprobe gagal -> 0 -> TIDAK valid -> caller hapus + encode ulang.
+async function clipPlainCacheValid(file, expectSec) {
+  try {
+    if (!fs.existsSync(file) || fs.statSync(file).size <= 0) return false;
+    const d = await clipProbeDuration(file);
+    if (!(d > 0)) return false;
+    if (expectSec > 0 && d < expectSec - 1) return false;
+    return true;
+  } catch { return false; }
 }
 // Thumbnail otomatis (gaya Klipaja: wajah TERANG + kartu judul + subtitle,
 // diambil dari video FINAL — bukan frame pertama sumber yang bisa gelap).
@@ -2393,9 +2460,19 @@ async function clipRender(job, selected, opts) {
       text: sel.watermark && typeof sel.watermark === 'object' && typeof sel.watermark.text === 'string' ? String(sel.watermark.text).replace(/\s+/g, ' ').trim().slice(0, 60) : (cand.watermarkText || ''),
       pos: sel.watermark && typeof sel.watermark === 'object' && ['bl', 'br', 'tl', 'tr'].includes(sel.watermark.pos) ? sel.watermark.pos : (cand.watermarkPos || 'bl'),
     };
+    // Source OTOMATIS (Dzaky 25 Okt): teks kosong + channel video sumber
+    // diketahui (job.metaUploader, bukan 'Upload') -> 'source : <channel>'.
+    // Ketikan manual selalu menang; otomatis gagal (tanpa channel) -> teks
+    // tetap kosong (tanpa watermark teks). Tidak ditulis balik ke kandidat
+    // (kolom tetap kosong, otomatis berlaku tiap render).
+    if (watermark.enabled && !watermark.text) {
+      const up = String(job.metaUploader || '').trim();
+      if (up && up !== 'Upload') { watermark.text = ('source : ' + up).slice(0, 60); clipLog(job, 'Watermark source otomatis: ' + watermark.text); }
+    }
     // Watermark LOGO per-akun (Dzaky 25 Okt): SATU logo + setelan untuk
-    // semua klip akun ini. Logo aktif = GANTI watermark teks (bukan dobel);
-    // file hilang = fallback teks + log (satu baris per klip).
+    // semua klip akun ini. Logo tampil BERSAMA watermark teks (teks =
+    // source) sejak fix pack 25 Okt — bukan lagi menggantikan teks;
+    // file hilang = hanya teks + log (satu baris per klip).
     const wmLogoSet = clipWmLogoSettings(job.user);
     const wmLogoFile = wmLogoSet.enabled ? clipWmLogoFile(job.user) : null;
     const wmLogoArg = wmLogoFile ? { path: wmLogoFile, opacity: wmLogoSet.opacity, pos: wmLogoSet.pos, size: wmLogoSet.size } : null;
@@ -2619,7 +2696,7 @@ async function clipRender(job, selected, opts) {
           pillColor, kinetikTextColor, kinetikBigColor,
           titleAnim, // false = judul statis (tanpa animasi masuk)
           styleOv: clipperLib.sanitizeStyleOv(sel.styleOv || cand.styleOv), // override gaya per-klip (Fase 13 Item 7-10)
-          watermark: wmLogoArg ? null : (watermark.enabled && watermark.text ? { text: watermark.text, pos: watermark.pos } : null),
+          watermark: (watermark.enabled && watermark.text ? { text: watermark.text, pos: watermark.pos } : null),
           cta: { enabled: false }, // CTA dihapus 2026-10-20 — tidak di-render.
           hook: useHook ? hookRel : [],
         });
@@ -2641,7 +2718,17 @@ async function clipRender(job, selected, opts) {
       // Tahap 1 — video POLOS (tanpa judul/subtitle), sekali saja (cache). Kalau file
       // polos sudah ada (dari render sebelumnya), LEWATI — render ulang judul/subtitle
       // tidak perlu re-encode video lagi (hemat CPU, sesuai permintaan user).
-      const plainExists = fs.existsSync(plainFile) && fs.statSync(plainFile).size > 0;
+      // VALIDASI cache (fix retry nyangkut 25 Okt): render yang kepotong restart/
+      // deploy di tengah Tahap 1 meninggalkan file polos SETENGAH JADI (tanpa moov,
+      // size > 0) — kalau dipakai ulang, Tahap 2 gagal terus & tombol Render ulang
+      // tidak pernah berhasil. ffprobe gagal / durasi jauh dari durasi klip =
+      // cache rusak -> hapus + encode ulang (retry jadi benar-benar jalan).
+      let plainExists = fs.existsSync(plainFile) && fs.statSync(plainFile).size > 0;
+      if (plainExists && !(await clipPlainCacheValid(plainFile, (cand.end || 0) - (cand.start || 0)))) {
+        clipLog(job, 'Video polos tersimpan rusak/tidak lengkap — encode ulang (bukan pakai cache).');
+        try { fs.unlinkSync(plainFile); } catch {}
+        plainExists = false;
+      }
       if (!plainExists) {
         const attempt = { simple: false, bg, blur: bg === 'blur', vcodec: 'libx264', acodec: 'aac' };
         let r = null;
@@ -2778,7 +2865,7 @@ async function clipRender(job, selected, opts) {
           sensor: sensorRel, // kata yang di-sensor -> audio dibisukan di rentang itu
           broll: brollArg, // B-roll ter-upload (Final saja) — null = tanpa B-roll
           music: musicArg, // Musik Latar ter-upload (Final saja) — null = tanpa musik
-          wmLogo: wmLogoArg ? { ...wmLogoArg, dur: len } : null, // Watermark LOGO per-akun (Final saja) — null = tanpa logo (teks berlaku)
+          wmLogo: wmLogoArg ? { ...wmLogoArg, dur: len } : null, // Watermark LOGO per-akun (Final saja) — null = tanpa logo (teks tetap tampil bersamaan bila ada)
           outputDur: brollOutputDur, // jaring pengaman -t (hanya bila B-roll)
           // Resolusi output (Kualitas Render): WAJIB dikirim — tanpa ini
           // buildFfmpegArgs default 720x1280 sehingga B-roll 1080p di-scale
@@ -3885,7 +3972,7 @@ const server = http.createServer(async (req, res) => {
     // Gabung per index dengan whitelist field yang boleh diedit editor
     // (JANGAN sanitizeCandidates di sini: fungsi itu membuang field gaya +
     // index/batch). Pola sama seperti rute render meneruskan field per-klip.
-    const EDITABLE = ['title', 'hook', 'speakers', 'quality', 'showTitle', 'showSub', 'subSet', 'subPreset', 'hookPreset', 'subFont', 'titleFont', 'kertasFont', 'kertasTextColor', 'kertasPaperColor', 'kertasHighlightColor', 'pillColor', 'kinetikTextColor', 'kinetikBigColor', 'titleAnim', 'titleYPercent', 'titleSizePercent', 'subYPercent', 'subSizePercent', 'titleDur', 'titleDurSec', 'hookOn', 'coverText', 'coverAt', 'hookText', 'musicEnabled', 'musicVolume', 'brollEnabled', 'brollCount', 'brollStart', 'brollDur', 'styleOv'];
+    const EDITABLE = ['title', 'hook', 'speakers', 'quality', 'showTitle', 'showSub', 'subSet', 'subPreset', 'hookPreset', 'subFont', 'titleFont', 'kertasFont', 'kertasTextColor', 'kertasPaperColor', 'kertasHighlightColor', 'pillColor', 'kinetikTextColor', 'kinetikBigColor', 'titleAnim', 'titleYPercent', 'titleSizePercent', 'subYPercent', 'subSizePercent', 'titleDur', 'titleDurSec', 'hookOn', 'coverText', 'coverAt', 'hookText', 'musicEnabled', 'musicVolume', 'brollEnabled', 'brollCount', 'brollStart', 'brollDur', 'styleOv', 'watermarkEnabled', 'watermarkText', 'watermarkPos'];
     let n = 0;
     for (const inc of b.candidates) {
       if (!inc || typeof inc !== 'object') continue;
@@ -4114,8 +4201,10 @@ const server = http.createServer(async (req, res) => {
     if (!owned) return send(res, 404, { error: 'Klip tidak ditemukan / bukan milik akun ini.' });
     let scheduleAt = null;
     if (b.scheduleAt) { const t = new Date(b.scheduleAt).getTime(); if (!Number.isFinite(t)) return send(res, 400, { error: 'Jadwal tidak valid.' }); scheduleAt = new Date(t).toISOString(); }
+    const privacy = ['public', 'private', 'draft'].includes(String(b.privacy || '')) ? String(b.privacy) : 'public';
+    const thumb = String(b.thumb || '') === 'cover' ? 'cover' : 'auto';
     const posts = clipPostsLoad(user);
-    const post = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), jobId, renderIdx, libraryId, title, description: String(b.description || ''), tags: String(b.tags || ''), platforms, scheduleAt, status: (scheduleAt && new Date(scheduleAt).getTime() > Date.now()) ? 'terjadwal' : 'antrean', createdAt: Date.now(), results: {} };
+    const post = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), jobId, renderIdx, libraryId, title, description: String(b.description || ''), tags: String(b.tags || ''), platforms, scheduleAt, privacy, thumb, status: (scheduleAt && new Date(scheduleAt).getTime() > Date.now()) ? 'terjadwal' : 'antrean', createdAt: Date.now(), results: {} };
     posts.push(post);
     if (!clipPostsSave(user, posts)) return send(res, 500, { error: 'Gagal menyimpan antrean.' });
     return send(res, 200, { ok: true, post });
@@ -4739,4 +4828,4 @@ const server = http.createServer(async (req, res) => {
 });
 if (require.main === module) { server.listen(PORT, () => console.log('Script VO Agent berjalan di http://localhost:' + PORT)); clipPostStartTicker(); }
 // Ekspor helper (untuk tes unit): require() tidak menyalakan server.
-module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan, clipYtCookiesFor, clipCookiesPath, clipCookiesStatus, clipPostsLoad, clipPostsSave, clipYtOAuthCfg, clipYtOAuthStartUrl, clipYtTokenLoad, clipYtTokenSave, clipYtTokenDelete, clipYtExchangeCode, clipYtRefreshToken, clipYtAccessToken, clipYtChannel, clipYtChannelSafe, clipYtUploadVideo, clipPostFinalFile, clipPostExecuteOne, clipPostRunDue };
+module.exports = { sendTelegram, clipFmtDur, clipTrunc, clipRenderDoneText, clipNotifyFail, TELEGRAM_ENABLED, clipTranscribeGroq, clipGroqChunkPlan, clipGroqParseSegments, clipGroqTranscribeFile, clipTranscribeAuto, clipNormTranscribeVia, clipTranscriptLang, clipNormTranscriptLang, clipFilterMixedLang, clipAppendCandidates, clipFetchYoutubeCaptions, clipParseSrv1, clipFetchTranscript, clipWhisperArgs, GROQ_ENABLED, clipPlainFileName, clipFontsDir, clipLowResWarning, clipProbeHeight, clipBrollPath, clipProbeDuration, clipPlainCacheValid, clipParseMultipart, clipAiNoteText, clipFetchHeatmap, clipHeatmapCandidates, clipHeatmapOrFallback, clipHeuristicCandidates, clipFetchYoutubeInfo, CLIP_YT_INFO_ATTEMPTS, CLIP_YT_DL_ATTEMPTS, clipYtClientArgs, clipYtPlan, clipYtCookiesFor, clipCookiesPath, clipCookiesStatus, clipPostsLoad, clipPostsSave, clipYtOAuthCfg, clipYtOAuthStartUrl, clipYtTokenLoad, clipYtTokenSave, clipYtTokenDelete, clipYtExchangeCode, clipYtRefreshToken, clipYtAccessToken, clipYtChannel, clipYtChannelSafe, clipYtUploadVideo, clipYtPrivacyFor, clipYtThumbFromFinal, clipYtSetThumbnail, clipPostFinalFile, clipPostExecuteOne, clipPostRunDue };

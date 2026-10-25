@@ -2136,9 +2136,15 @@ function buildFfmpegArgs(o) {
       : wmLogoRaw.pos === 'bl' ? M + ':H-h-' + M
       : wmLogoRaw.pos === 'c' ? '(W-w)/2:(H-h)/2'
       : 'W-w-' + M + ':H-h-' + M;
-    filters.push('[' + logoIdx + ':v][' + last + ']scale2ref=w=\'main_w*' + wmPct + '/100\':h=-1[wmL][wmMain]');
+    // Ukuran logo = persen LEBAR VIDEO (OW), BUKAN persen lebar file logo.
+    // scale2ref w='main_w*Pct/100' SALAH: main_w di ffmpeg = lebar input
+    // pertama (file logo) — logo 1460px diset 18% jadi 263px = 36,5% dari
+    // 720 (bug Dzaky 25 Okt: preview benar, Final melebar). scale biasa
+    // dengan OW eksplisit = benar (OW = outW render, 720/1080).
+    const wmW = Math.max(1, Math.round(OW * wmPct / 100));
+    filters.push('[' + logoIdx + ':v]scale=w=' + wmW + ':h=-1[wmL]');
     filters.push('[wmL]format=rgba,colorchannelmixer=aa=' + wmOp + '[wmA]');
-    filters.push('[wmMain][wmA]overlay=' + wmPosExpr + ':enable=\'between(t,' + hookTotal + ',' + (hookTotal + wmDur) + ')\',format=yuv420p[wmV]');
+    filters.push('[' + last + '][wmA]overlay=' + wmPosExpr + ':enable=\'between(t,' + hookTotal + ',' + (hookTotal + wmDur) + ')\',format=yuv420p[wmV]');
     last = 'wmV';
   }
   args.push('-filter_complex', filters.join(';'));
