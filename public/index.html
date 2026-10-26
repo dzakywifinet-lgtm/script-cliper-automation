@@ -585,6 +585,7 @@ yang lain = jeda (IntersectionObserver). */
 /* Akun non-admin: chip kunci server (9router/Groq/bawaan) disembunyikan —
    Koneksi AI mereka hanya berisi provider milik sendiri. */
 body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="router-pc"], body.nonadmin .pkey[data-keycfg="groq"], body.nonadmin .pkey[data-keycfg="gemini"], body.nonadmin .pkey[data-keycfg="claude"], body.nonadmin .pkey[data-keycfg="openai"], body.nonadmin .pkey[data-keycfg="elevenlabs"] { display: none !important; }
+body.nonadmin #updCard{display:none!important}
 /* ---------- Voice Generator (foto 3) ---------- */
 .vp-step{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
 .vp-step h3{margin:0 0 12px;font-size:15px;display:flex;gap:8px;align-items:center}
@@ -922,6 +923,22 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
     <h3 style="margin:0 0 8px">↻ Restart server</h3>
     <button class="btn danger" id="accRestartBtn" style="padding:8px 16px">Restart server</button>
     <p id="restartMsg" class="hint" style="margin-top:8px"></p>
+    <hr style="border:1px solid var(--line);margin:16px 0">
+    <h3 style="margin:0 0 8px">🔄 Update dashboard</h3>
+    <p class="hint" style="margin:0 0 12px">Cek update manual dari GitHub (hanya admin). Update ditolak saat ada job berjalan (render / tahap AI / TTS / antrean posting).</p>
+    <div id="updCard">
+      <p class="hint" style="margin:0 0 8px">Versi sekarang: <span id="updCur">…</span></p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="updCheckBtn" style="padding:8px 16px">Cek update</button>
+        <button class="btn ghost" id="updRollbackBtn" style="padding:8px 16px">Kembalikan ke versi sebelumnya</button>
+      </div>
+      <div id="updBanner" hidden style="margin-top:12px">
+        <p class="hint" style="margin:0 0 8px">Ada update: <span id="updNew"></span></p>
+        <ul id="updLog" style="margin:0 0 8px;padding-left:20px"></ul>
+        <button class="btn" id="updRunBtn" style="padding:8px 16px">Update sekarang</button>
+      </div>
+      <p id="updMsg" class="hint" style="margin-top:8px"></p>
+    </div>
   </div>
   </div>
   <div class="aicard"><h3 style="margin:0 0 8px">🍪 Cookies YouTube (per akun)</h3><p class="hint" style="margin:0 0 12px">Dipakai download klip akun ini — dan nanti bisa dipakai fitur posting (YouTube/TikTok/dll) dari akun yang sama. Export cookies.txt dari browser yang sudah login YouTube, lalu upload di sini. Tiap akun punya file sendiri, akun lain tidak bisa pakai. Bila akun ini belum upload, download tetap pakai file cookies global lama di PC (tidak diubah).</p>
@@ -1999,6 +2016,41 @@ $('accRestartBtn').addEventListener('click',async()=>{
   try{await fetch('/api/restart',{method:'POST'})}catch(e){}
   for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,2000));try{await fetch('/api/health');location.reload();return}catch(e){}}
   $('restartMsg').textContent='Server belum kembali setelah 60 detik. Coba refresh manual atau cek via SSH.';
+});
+/* Update dashboard (manual, admin saja) — kartu di Settings */
+const updMsg=(t)=>{const m=document.getElementById('updMsg');if(m)m.textContent=t||'';};
+const updPollBack=async()=>{for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,2000));try{await fetch('/api/health');location.reload();return;}catch(e){}}updMsg('Server belum kembali setelah 60 detik. Coba refresh manual atau cek jendela server.');};
+const updLoadVer=async()=>{try{const r=await fetch('/api/update/version');const j=await r.json().catch(()=>({}));if(!j.admin)return;const c=document.getElementById('updCur');if(!c)return;if(!j.git){c.textContent='bukan hasil git clone — update via dashboard tidak tersedia';return;}c.textContent=j.version+((j.date)?(' ('+j.date+')'):'')+(j.rolledBack?(' — dipulihkan dari backup ('+(j.restoredVersion||'')+')'):'');}catch(e){}};
+updLoadVer();
+const updCheckBtn=document.getElementById('updCheckBtn');
+if(updCheckBtn)updCheckBtn.addEventListener('click',async()=>{
+  updMsg('Mengecek update…');const b=document.getElementById('updBanner');if(b)b.hidden=true;
+  try{const r=await fetch('/api/update/check');const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Gagal cek update');
+    if(!j.updateAvailable){updMsg('Sudah versi terbaru ('+(j.current||'')+').');return;}
+    const n=document.getElementById('updNew');if(n)n.textContent=(j.current||'')+' → '+(j.remote||'');
+    const ul=document.getElementById('updLog');if(ul){ul.textContent='';(j.changelog||[]).forEach(l=>{const li=document.createElement('li');li.textContent=l;ul.appendChild(li);});}
+    if(b)b.hidden=false;updMsg('Update tersedia. Klik "Update sekarang" bila tidak ada job berjalan.');
+  }catch(e){updMsg('Gagal: '+e.message);}
+});
+const updRunBtn=document.getElementById('updRunBtn');
+if(updRunBtn)updRunBtn.addEventListener('click',async()=>{
+  if(!confirm('Update dashboard ke versi terbaru? Server akan restart. Pastikan tidak ada job berjalan.'))return;
+  updMsg('Mengupdate… jangan tutup halaman ini.');
+  try{const r=await fetch('/api/update/run',{method:'POST'});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Gagal update');
+    if(j.upToDate){updMsg('Sudah versi terbaru.');return;}
+    updMsg('Update berhasil ditarik, me-restart server… tunggu sampai kembali.');
+    const b=document.getElementById('updBanner');if(b)b.hidden=true;
+    await updPollBack();
+  }catch(e){updMsg('Gagal: '+e.message);}
+});
+const updRollbackBtn=document.getElementById('updRollbackBtn');
+if(updRollbackBtn)updRollbackBtn.addEventListener('click',async()=>{
+  if(!confirm('Kembalikan dashboard ke versi sebelum update terakhir? Server akan restart.'))return;
+  updMsg('Mengembalikan…');
+  try{const r=await fetch('/api/update/rollback',{method:'POST'});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Gagal rollback');
+    updMsg('Dipulihkan ke versi '+(j.restoredVersion||'')+', me-restart server… tunggu sampai kembali.');
+    await updPollBack();
+  }catch(e){updMsg('Gagal: '+e.message);}
 });
 /* Panel Brief bisa dilipat ke kiri (kolom tahap auto melebar), status tersimpan */
 const applyBrief=()=>{const open=S.briefOpen!==false;const b=$('briefBody');if(b)b.hidden=!open;const t=$('briefToggle');if(t)t.textContent=open?'◀':'▶'}; // Brief kini horizontal di bawah AI Connection — toggle sembunyikan/tampilkan body-nya

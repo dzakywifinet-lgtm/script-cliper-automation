@@ -1,5 +1,5 @@
 // Script VO Agent: server tanpa dependensi (Node 18+). API key hanya ada di server.
-const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), crypto = require('crypto'), { spawn } = require('child_process');
+const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), crypto = require('crypto'), { spawn, execFileSync } = require('child_process');
 const zlib = require('zlib');
 const refs = require('./refs');
 const clipperLib = require('./clipper-lib');
@@ -3095,6 +3095,57 @@ function clipEnsureLite(srcFile) {
   clipLiteInflight.set(liteFile, pr);
   return pr;
 }
+
+/* ===== Auto-update dashboard (manual: tombol "Cek update", admin saja) =====
+   Alur: Cek update (manual, tanpa cek otomatis) -> Update (admin saja,
+   ditolak saat ada job jalan / tree kotor) -> backup 4 file kode +
+   update-backup.json -> git pull -> npm install bila package.json berubah
+   -> jawab dulu, restart kemudian. Rollback = kembalikan 4 file backup +
+   restart. TIDAK PERNAH menyentuh .env, users.json, user-providers.json,
+   user-tts-keys.json, clipper-work/, state, upload (file-file itu tidak
+   terlacak git, jadi git pull tidak menyentuhnya). Remote/branch selalu
+   dari konfigurasi git lokal (origin + upstream), tidak pernah dari input
+   request. Tree kotor hanya melihat file TERLACAK (diff --quiet); file
+   tak terlacak (.env, data) tidak memblokir update. */
+const UPD_FILES = ['server.js', 'clipper-lib.js', 'face_track.py', 'public/index.html'];
+const updGit = (args, opts) => execFileSync('git', args, { cwd: __dirname, encoding: 'utf8', timeout: 120000, stdio: ['ignore', 'pipe', 'pipe'], ...(opts || {}) });
+const updIsSha = v => /^[0-9a-f]{40}$/.test(String(v || '').trim());
+const updGitDir = () => fs.existsSync(path.join(__dirname, '.git'));
+const updHead = () => { try { return updGit(['rev-parse', 'HEAD']).trim(); } catch { return ''; } };
+const updHeadShort = () => { try { return updGit(['rev-parse', '--short', 'HEAD']).trim(); } catch { return ''; } };
+const updHeadDate = () => { try { return updGit(['log', '-1', '--format=%cs']).trim(); } catch { return ''; } };
+const updRemoteHead = () => { try { const m = /^([0-9a-f]{40})/.exec(updGit(['ls-remote', 'origin', 'HEAD'], { timeout: 30000 })); return m ? m[1] : ''; } catch { return ''; } };
+const updTreeDirty = () => { try { updGit(['diff', '--quiet']); updGit(['diff', '--cached', '--quiet']); return false; } catch { return true; } };
+const updAnyJobRunning = () => {
+  for (const j of jobs.values()) if (j && j.status === 'running') return true;
+  for (const j of clipperJobs.values()) if (j && (j.status === 'running' || j.status === 'rendering')) return true;
+  for (const j of userTtsJobs.values()) if (j && j.status === 'running') return true;
+  try { if (tts && typeof tts.anyRunning === 'function' && tts.anyRunning()) return true; } catch {}
+  if (clipPostBusy) return true;
+  return false;
+};
+let updRunning = false;
+const updBackupFile = () => path.join(__dirname, 'update-backup.json');
+const updBackupLoad = () => { try { return JSON.parse(fs.readFileSync(updBackupFile(), 'utf8')); } catch { return null; } };
+const updBackupSave = o => { try { fs.writeFileSync(updBackupFile(), JSON.stringify(o, null, 2)); return true; } catch { return false; } };
+const updChangedFiles = (a, b) => { try { return updGit(['diff', '--name-only', a, b]).split('\n').map(v => v.trim()).filter(Boolean); } catch { return []; } };
+const updChangelog = (a, b) => { try { return updGit(['log', '--oneline', '--max-count=20', a + '..' + b]).split('\n').map(v => v.trim()).filter(Boolean); } catch { return []; } };
+const updNpmCmd = () => (process.platform === 'win32' ? 'npm.cmd' : 'npm');
+/* Restart server — rantai yang sama persis dengan /api/restart lama
+   (RESTART_CMD -> PM2 -> init.d -> pm2.cmd Windows -> process.exit),
+   diekstrak supaya /api/restart dan update/rollback berbagi satu jalur. */
+const requestRestart = () => {
+  setTimeout(() => {
+    try {
+      if (E.RESTART_CMD) { const child = spawn('sh', ['-c', 'sleep 1; ' + E.RESTART_CMD], { detached: true, stdio: 'ignore' }); child.unref(); return; }
+      if (process.env.PM2_HOME || process.env.pm_id !== undefined) { process.exit(1); return; }
+      if (process.platform !== 'win32') { const child = spawn('sh', ['-c', 'sleep 1; /etc/init.d/hermes-vo restart'], { detached: true, stdio: 'ignore' }); child.unref(); return; }
+      const pm2cmd = path.join(process.env.APPDATA || '', 'npm', 'pm2.cmd');
+      if (pm2cmd && fs.existsSync(pm2cmd)) { const child = spawn('cmd.exe', ['/c', 'timeout /t 1 /nobreak >nul & "' + pm2cmd + '" restart hermes-vo'], { detached: true, stdio: 'ignore', windowsHide: true }); child.unref(); return; }
+      process.exit(1);
+    } catch { try { process.exit(1); } catch {} }
+  }, 300);
+};
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'), p = u.pathname;
   // no-cache: browser WAJIB revalidasi HTML tiap muat — tanpa ini heuristik
@@ -3459,28 +3510,99 @@ const server = http.createServer(async (req, res) => {
   //    server tanpa mekanisme restart).
   if (req.method === 'POST' && p === '/api/restart') {
     send(res, 200, { ok: true });
-    setTimeout(() => {
+    requestRestart();
+    return;
+  }
+  // ===== Auto-update dashboard (manual, admin saja) =====
+  if (req.method === 'GET' && p === '/api/update/version') {
+    const admin = isAdminUser(sessUser(req));
+    if (!admin) return send(res, 200, { admin: false });
+    if (!updGitDir()) return send(res, 200, { admin: true, git: false, version: null });
+    const bk = updBackupLoad();
+    return send(res, 200, { admin: true, git: true, version: updHeadShort() || null, full: updHead(), date: updHeadDate(), rolledBack: !!(bk && bk.rolledBackAt), restoredVersion: (bk && bk.rolledBackAt) ? (bk.prevShort || null) : null });
+  }
+  if (req.method === 'GET' && p === '/api/update/check') {
+    if (!isAdminUser(sessUser(req))) return send(res, 403, { error: 'Khusus akun admin.' });
+    if (!updGitDir()) return send(res, 400, { error: 'Folder ini bukan hasil git clone. Update via dashboard hanya untuk install dari installer (git clone).' });
+    const cur = updHead();
+    if (!cur) return send(res, 500, { error: 'Gagal membaca versi lokal.' });
+    const rem = updRemoteHead();
+    if (!updIsSha(rem)) return send(res, 502, { error: 'Gagal menghubungi remote GitHub. Cek internet, lalu coba lagi.' });
+    const bkC = updBackupLoad();
+    const rbInfo = { rolledBack: !!(bkC && bkC.rolledBackAt), restoredVersion: (bkC && bkC.rolledBackAt) ? (bkC.prevShort || null) : null };
+    if (cur === rem) return send(res, 200, { ok: true, updateAvailable: false, current: updHeadShort(), remote: rem.slice(0, 7), changelog: [], ...rbInfo });
+    /* Ambil objek commit remote dulu (read-only, tidak mengubah working
+       tree) supaya changelog bisa dihitung; gagal fetch -> changelog kosong
+       tapi status tersedia tetap dilaporkan. */
+    try { updGit(['fetch', '--quiet', 'origin'], { timeout: 60000 }); } catch {}
+    return send(res, 200, { ok: true, updateAvailable: true, current: updHeadShort(), currentFull: cur, remote: rem.slice(0, 7), remoteFull: rem, changelog: updChangelog(cur, rem), ...rbInfo });
+  }
+  if (req.method === 'POST' && p === '/api/update/run') {
+    if (!isAdminUser(sessUser(req))) return send(res, 403, { error: 'Khusus akun admin.' });
+    if (!updGitDir()) return send(res, 400, { error: 'Folder ini bukan hasil git clone. Update via dashboard hanya untuk install dari installer (git clone).' });
+    if (updRunning) return send(res, 409, { error: 'Update sedang berjalan.' });
+    if (updAnyJobRunning()) return send(res, 409, { error: 'Masih ada job berjalan (render / tahap AI / TTS / antrean posting). Tunggu selesai, lalu update lagi.' });
+    const prev = updHead();
+    if (!prev) return send(res, 500, { error: 'Gagal membaca versi lokal.' });
+    const next = updRemoteHead();
+    if (!updIsSha(next)) return send(res, 502, { error: 'Gagal menghubungi remote GitHub. Cek internet, lalu coba lagi.' });
+    const bk0 = updBackupLoad();
+    if (bk0 && bk0.rolledBackAt && prev === next) {
+      /* Kode pernah dipulihkan dari backup: HEAD sudah di commit baru tapi
+         4 file berisi kode lama. Cabang ini HARUS diperiksa SEBELUM cek
+         tree kotor, karena hasil rollback itu sendiri membuat tree tampak
+         kotor (file = isi commit lama, HEAD = commit baru) — bila cek
+         kotor didahulukan, cabang terapkan-ulang ini tidak pernah tercapai.
+         Aman: hanya lanjut bila SEMUA perbedaan terhadap HEAD ada di
+         dalam 4 file backup; bila ada perubahan lain, tolak sebagai
+         tree kotor. Terapkan ulang hanya menyentuh 4 file itu, tanpa
+         memindah HEAD dan tanpa menyentuh data. */
+      let diffNames = null;
       try {
-        if (E.RESTART_CMD) {
-          const child = spawn('sh', ['-c', 'sleep 1; ' + E.RESTART_CMD], { detached: true, stdio: 'ignore' });
-          child.unref();
-          return;
-        }
-        if (process.env.PM2_HOME || process.env.pm_id !== undefined) { process.exit(1); return; }
-        if (process.platform !== 'win32') {
-          const child = spawn('sh', ['-c', 'sleep 1; /etc/init.d/hermes-vo restart'], { detached: true, stdio: 'ignore' });
-          child.unref();
-          return;
-        }
-        const pm2cmd = path.join(process.env.APPDATA || '', 'npm', 'pm2.cmd');
-        if (pm2cmd && fs.existsSync(pm2cmd)) {
-          const child = spawn('cmd.exe', ['/c', 'timeout /t 1 /nobreak >nul & "' + pm2cmd + '" restart hermes-vo'], { detached: true, stdio: 'ignore', windowsHide: true });
-          child.unref();
-          return;
-        }
-        process.exit(1);
-      } catch { try { process.exit(1); } catch {} }
-    }, 300);
+        const w = updGit(['diff', '--name-only']).split('\n').map(v => v.trim()).filter(Boolean);
+        const c = updGit(['diff', '--cached', '--name-only']).split('\n').map(v => v.trim()).filter(Boolean);
+        diffNames = w.concat(c);
+      } catch { return send(res, 500, { error: 'Gagal memeriksa status tree.' }); }
+      if (!diffNames.every(n => UPD_FILES.indexOf(n) !== -1)) return send(res, 409, { error: 'Ada file kode yang diubah manual di luar hasil rollback. Kembalikan dulu file itu, lalu ulangi.' });
+      try { updGit(['checkout', next, '--'].concat(UPD_FILES)); }
+      catch { return send(res, 500, { error: 'Gagal menerapkan ulang update.' }); }
+      updBackupSave({ prev: bk0.prev, prevShort: bk0.prevShort, next: bk0.next, nextShort: bk0.nextShort, at: bk0.at, rolledBackAt: null });
+      send(res, 200, { ok: true, restarting: true, reapplied: true, prev: bk0.prevShort || prev.slice(0, 7), next: next.slice(0, 7) });
+      requestRestart();
+      return;
+    }
+    if (updTreeDirty()) return send(res, 409, { error: 'Ada file kode yang diubah manual. Kembalikan dulu file itu, lalu update lagi.' });
+    if (prev === next) return send(res, 200, { ok: true, upToDate: true, version: prev.slice(0, 7) });
+    updRunning = true;
+    try {
+      for (const f of UPD_FILES) { const src = path.join(__dirname, f); if (fs.existsSync(src)) fs.copyFileSync(src, src + '.bak-sebelum-update'); }
+      updBackupSave({ prev, prevShort: prev.slice(0, 7), next, nextShort: next.slice(0, 7), at: new Date().toISOString(), rolledBackAt: null });
+      try { updGit(['pull'], { timeout: 300000 }); }
+      catch (e) { updRunning = false; return send(res, 500, { error: 'git pull gagal. Kode tidak jadi diperbarui dan server tidak di-restart. Pakai tombol rollback bila perlu.', detail: String((e && e.message) || e || '').slice(0, 300) }); }
+      const changed = updChangedFiles(prev, next);
+      let npmInstalled = false;
+      if (changed.indexOf('package.json') !== -1) {
+        try { execFileSync(updNpmCmd(), ['install'], { cwd: __dirname, encoding: 'utf8', timeout: 600000, stdio: ['ignore', 'pipe', 'pipe'] }); npmInstalled = true; }
+        catch (e) { updRunning = false; return send(res, 500, { error: 'npm install gagal. Kode sudah tertarik — pakai tombol rollback untuk kembali, lalu ulangi update.', detail: String((e && e.message) || e || '').slice(0, 300) }); }
+      }
+      updRunning = false;
+      send(res, 200, { ok: true, restarting: true, prev: prev.slice(0, 7), next: next.slice(0, 7), npmInstalled });
+      requestRestart();
+    } catch (e) { updRunning = false; return send(res, 500, { error: 'Update gagal: ' + String((e && e.message) || e || '').slice(0, 300) }); }
+    return;
+  }
+  if (req.method === 'POST' && p === '/api/update/rollback') {
+    if (!isAdminUser(sessUser(req))) return send(res, 403, { error: 'Khusus akun admin.' });
+    if (updRunning) return send(res, 409, { error: 'Update sedang berjalan.' });
+    if (updAnyJobRunning()) return send(res, 409, { error: 'Masih ada job berjalan (render / tahap AI / TTS / antrean posting). Tunggu selesai, lalu kembalikan.' });
+    const bk = updBackupLoad();
+    if (!bk || !bk.prev) return send(res, 400, { error: 'Tidak ada backup update. Belum pernah update dari dashboard ini.' });
+    const missing = UPD_FILES.filter(f => !fs.existsSync(path.join(__dirname, f + '.bak-sebelum-update')));
+    if (missing.length) return send(res, 400, { error: 'File backup tidak lengkap: ' + missing.join(', ') });
+    for (const f of UPD_FILES) fs.copyFileSync(path.join(__dirname, f + '.bak-sebelum-update'), path.join(__dirname, f));
+    updBackupSave({ prev: bk.prev, prevShort: bk.prevShort, next: bk.next, nextShort: bk.nextShort, at: bk.at, rolledBackAt: new Date().toISOString() });
+    send(res, 200, { ok: true, restarting: true, restoredVersion: bk.prevShort || bk.prev.slice(0, 7) });
+    requestRestart();
     return;
   }
   // Kunci TTS pribadi (Koneksi AI, slot API TTS) — GET tidak pernah mengembalikan key.

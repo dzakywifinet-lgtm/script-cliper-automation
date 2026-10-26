@@ -284,6 +284,7 @@ module.exports = function ({ E, R, rh, send }) {
   const body = async req => { let raw = ''; for await (const c of req) { raw += c; if (raw.length > 4e5) throw err('Terlalu besar', '', 413); } return JSON.parse(raw || '{}'); };
   return {
     chunkText, engines,
+    anyRunning: () => [...jobs.values()].some(j => j.status === 'running'),
     async route(req, res, u, p) {
       if (!p.startsWith('/api/tts')) return false;
       try {
