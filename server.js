@@ -140,12 +140,19 @@ const cleanThink = t => {
 const CUSTOM_FILE = path.join(__dirname, 'custom-providers.json');
 let CUSTOM = {};
 try { const arr = JSON.parse(fs.readFileSync(CUSTOM_FILE, 'utf8')); if (Array.isArray(arr)) arr.forEach(c => { if (c && c.slug && c.name) CUSTOM[c.slug] = c; }); } catch {}
+// URL chat completions untuk provider custom: dashboard menempel path di belakang baseUrl.
+// Kebanyakan provider memakai /v1/chat/completions, TAPI DeepInfra memakai /v1/openai/chat/completions
+// (baseUrl-nya sudah berakhir /v1/openai) -> tempel /chat/completions saja, bukan /v1/chat/completions.
+const customUrl = (b) => {
+  let s = String(b || '');
+  while (s.endsWith('/')) s = s.slice(0, -1);
+  return s.endsWith('/v1/openai') ? s + '/chat/completions' : s + '/v1/chat/completions';
+};
 const customCall = async (slug, msgs, job) => {
   const c = CUSTOM[slug]; if (!c) throw fail('Provider custom tidak ditemukan: ' + slug, 'input');
   const key = E[c.envVar || ('CUSTOM_' + slug.toUpperCase() + '_API_KEY')];
   if (!key) throw fail('API key ' + (c.envVar || ('CUSTOM_' + slug.toUpperCase() + '_API_KEY')) + ' belum diisi di .env.', 'input');
-  const base = String(c.baseUrl || '').replace(/\/$/, '');
-  const j = await post(base + '/v1/chat/completions', { authorization: 'Bearer ' + key },
+  const j = await post(customUrl(c.baseUrl), { authorization: 'Bearer ' + key },
     { model: c.model || 'gpt-3.5-turbo', messages: msgs }, job.ctrl.signal);
   const fr = j.choices?.[0]?.finish_reason; if (fr) { job.finish = fr; job.truncated = !NORMAL.test(fr); }
   return cleanThink(j.choices?.[0]?.message?.content || '');
@@ -236,8 +243,7 @@ async function userTtsSynth(job, b, apiKey) {
 const userCustomCall = async (u, slug, msgs, job) => {
   const c = userCustom(u)[slug]; if (!c) throw fail('Provider custom tidak ditemukan: ' + slug, 'input');
   if (!c.apiKey) throw fail('API key ' + (c.name || slug) + ' belum diisi.', 'input');
-  const base = String(c.baseUrl || '').replace(/\/$/, '');
-  const j = await post(base + '/v1/chat/completions', { authorization: 'Bearer ' + c.apiKey },
+  const j = await post(customUrl(c.baseUrl), { authorization: 'Bearer ' + c.apiKey },
     { model: c.model || 'gpt-3.5-turbo', messages: msgs }, job.ctrl.signal);
   const fr = j.choices?.[0]?.finish_reason; if (fr) { job.finish = fr; job.truncated = !NORMAL.test(fr); }
   return cleanThink(j.choices?.[0]?.message?.content || '');
