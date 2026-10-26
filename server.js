@@ -3300,6 +3300,31 @@ const server = http.createServer(async (req, res) => {
     } catch { return send(res, 500, { error: 'Gagal menyimpan state' }); }
     return send(res, 200, { ok: true });
   }
+  // ===== Transkrip Tahap 0 yang DIKUNCI (refs-saved): simpanan permanen per akun,
+  // di luar state dashboard — selamat dari update/deploy/restart/pindah perangkat.
+  // Ditulis tiap fetchRefs berhasil; dibaca saat load untuk memulihkan transkrip.
+  const refsFile = u => path.join(stateDir(), encodeURIComponent(u) + '.refs.json');
+  if (req.method === 'GET' && p === '/api/refs-saved') {
+    try { const raw = fs.readFileSync(refsFile(sessUser(req)), 'utf8'); return send(res, 200, JSON.parse(raw)); }
+    catch { return send(res, 200, { refs: {} }); }
+  }
+  if (req.method === 'POST' && p === '/api/refs-saved') {
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 10e6) break; }
+    let j; try { j = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
+    const incoming = (j && j.refs && typeof j.refs === 'object') ? j.refs : null;
+    if (!incoming) return send(res, 400, { error: 'refs harus objek' });
+    const f = refsFile(sessUser(req));
+    let prev = {}; try { prev = JSON.parse(fs.readFileSync(f, 'utf8')).refs || {}; } catch {}
+    const merged = { ...prev };
+    for (const [u, r] of Object.entries(incoming)) {
+      if (r && r.status === 'ok' && String(r.text || '').trim()) merged[u] = r;
+      else if (r && r.status === 'fail' && !merged[u]) merged[u] = r;
+    }
+    while (Object.keys(merged).length > 30) delete merged[Object.keys(merged)[0]];
+    try { fs.writeFileSync(f, JSON.stringify({ refs: merged, _ts: Date.now() })); }
+    catch { return send(res, 500, { error: 'Gagal menyimpan transkrip' }); }
+    return send(res, 200, { ok: true, count: Object.keys(merged).length });
+  }
   // ===== Library (Script & Video Library): database hasil Script VO + Clipper =====
   // Disimpan di /opt/docker (partisi gede, 28GB) — bukan di root yang 96% penuh.
   // File JSON per akun: <LIBRARY_DIR>/<user>.json. Entry: {id,type,title,topic,content|jobId,words/duration,status,createdAt}.
@@ -3355,7 +3380,7 @@ const server = http.createServer(async (req, res) => {
   const libFile = u => path.join(libDir(), encodeURIComponent(u) + '.json');
   const libLoad = u => { try { const a = JSON.parse(fs.readFileSync(libFile(u), 'utf8')); return Array.isArray(a) ? a : []; } catch { return []; } };
   const libSave = (u, arr) => { try { fs.writeFileSync(libFile(u), JSON.stringify(arr)); return true; } catch { return false; } };
-  const LIB_TYPES = ['long', 'short', 'riset', 'seo', 'clipper'];
+  const LIB_TYPES = ['long', 'short', 'riset', 'seo', 'audit', 'clipper'];
   // Hapus file video milik entri Library klip (render di folder proyek +
   // Final yang diselamatkan di folder library). Proyek + sumber TIDAK disentuh.
   function libDeleteClipFiles(it) {
@@ -3395,7 +3420,7 @@ const server = http.createServer(async (req, res) => {
     let raw = ''; for await (const c of req) { raw += c; if (raw.length > 2e6) break; }
     let b = {}; try { b = JSON.parse(raw); } catch {}
     const type = LIB_TYPES.includes(b.type) ? b.type : null;
-    if (!type) return send(res, 400, { error: 'Tipe tidak valid (long/short/riset/seo/clipper)' });
+    if (!type) return send(res, 400, { error: 'Tipe tidak valid (long/short/riset/seo/audit/clipper)' });
     const title = String(b.title || b.topic || '').trim().slice(0, 200) || 'Tanpa judul';
     const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), type, title,
       topic: String(b.topic || '').slice(0, 500), content: String(b.content || '').slice(0, 500000),

@@ -664,6 +664,15 @@ body.nonadmin #updCard{display:none!important}
   #pipe{grid-template-columns:1fr}
   .conn-grid{grid-template-columns:1fr}
 }
+/* HP: cegah kartu Brief meluber saat daftar transkrip muncul (grid blowout:
+   judul nowrap + min-width:auto grid memaksa kolom lebih lebar dari layar). */
+@media(max-width:860px){
+  .brief-card,.brief-grid,.brief-grid>*{min-width:0;max-width:100%}
+  #refs{max-width:100%}
+  #refs .ref{max-width:100%}
+  #refs .ref b{min-width:0!important}
+  #topik{max-width:100%;overflow-wrap:anywhere}
+}
 
 </style>
 </head><body>
@@ -700,7 +709,7 @@ body.nonadmin #updCard{display:none!important}
     <div class="dash-hasil-grid">
     <div class="dash-hasil-col">
     <h3>📁 Folder Script VO</h3>
-    <p class="hint" style="margin:0 0 8px">SEO, riset, dan skrip dari Script VO Agent. Klik Buka untuk lihat isi folder.</p>
+    <p class="hint" style="margin:0 0 8px">SEO, riset, dan skrip dari Script VO Agent. Klik kartu untuk lihat isi folder; tombol 🗑 menghapus folder.</p>
     <div id="hasilScriptList"></div>
     </div>
     <div class="dash-hasil-col">
@@ -726,7 +735,7 @@ body.nonadmin #updCard{display:none!important}
       <div class="brief-grid">
         <div class="wide wide-j"><label for="judul">Judul proyek</label><input id="judul" placeholder="masukan judul"></div>
         <div class="wide wide-t"><label for="topik">Topik dan link referensi (opsional)</label><textarea id="topik" style="min-height:90px" placeholder="Contoh: Sejarah &amp; Evolusi Honda CBR, https://youtu.be/xxxx, https://situs.com/artikel"></textarea><div id="refs"></div></div>
-        <div><label for="gaya">Gaya bahasa</label><input id="gaya" value="Cinematic Dokumenter"><div class="chips" id="gchips" style="margin-top:8px"><button class="chip" data-gaya="Channel otomotif / YouTuber review">Otomotif / review</button><button class="chip" data-gaya="Cinematic Dokumenter">Cinematic</button><button class="chip" data-gaya="Santai / Kasual">Santai</button><button class="chip" data-gaya="Edukatif">Edukatif</button></div></div>
+        <div><label for="gaya">Gaya bahasa</label><input id="gaya" value="Cinematic Dokumenter"><div class="chips" id="gchips" style="margin-top:8px"><button class="chip" data-gaya="Vlogger">Vlogger</button><button class="chip" data-gaya="Cinematic Dokumenter">Cinematic</button><button class="chip" data-gaya="Santai / Kasual">Santai</button><button class="chip" data-gaya="Edukatif">Edukatif</button><button class="chip" data-gaya="Roasting / Satir">Roasting</button><button class="chip" data-gaya="Storytelling (Naratif)">Storytelling</button><button class="chip" data-gaya="Persuasif / Iklan (Hard-Selling)">Persuasif</button><button class="chip" data-gaya="Formal / Baku">Formal</button><button class="chip" data-gaya="Gen-Z / Populer">Gen-Z</button><button class="chip" data-gaya="Kontroversial / Opini">Kontroversial</button></div></div>
         <div><label for="niche">Niche/Kategori channel</label><input id="niche" placeholder="Otomotif"><div class="chips" id="nchips" style="margin-top:8px"><button class="chip" data-niche="Otomotif">Otomotif</button><button class="chip" data-niche="Bisnis">Bisnis</button><button class="chip" data-niche="Teknologi">Teknologi</button><button class="chip" data-niche="Sejarah">Sejarah</button></div><label for="audien">Target audien</label><input id="audien" value="Pecinta otomotif, umum"><label for="dur">Durasi target (menit)</label><input id="dur" type="number" min="5" max="30" value="10"><label for="jsh">Jumlah Shorts</label><input id="jsh" type="number" min="1" max="5" value="1"></div>
         <div><div class="stats"><div class="stat"><b id="sWords">0</b><span>kata naskah</span></div><div class="stat"><b id="sMin">0</b><span>menit baca</span></div><div class="stat"><b id="sTarget">0</b><span>target kata</span></div></div></div>
       </div>
@@ -1081,7 +1090,7 @@ const ST=[
 {n:0,k:'v',p:'gemini',ai:'',t:'Transkrip Referensi',sub:'Teks lengkap dari link, untuk dibandingkan dengan naskah',prompt:()=>''},
 {n:1,k:'g',p:'gemini',ai:'Gemini',t:'AGENT-RISET',sub:'Bedah data atau transkrip, angle unik, outline',
  prompt:(lite)=>{const b=B();return `[ROLE]
-Anda adalah AGENT-RISET dan ARSITEK KONTEN (Data Miner) untuk channel YouTube berformat Dokumenter/Video Essay berdurasi panjang (Long-form Faceless). 
+Anda adalah AGENT-RISET dan ARSITEK KONTEN (Data Miner) untuk channel YouTube video long-form faceless berdurasi panjang. 
 Tugas utama Anda BUKAN menulis naskah, melainkan membongkar (deconstruct) transkrip sumber, mengekstrak fakta mentah, dan merancang kerangka (blueprint/outline) cerita baru yang strukturnya 180 derajat BERBEDA dari sumber aslinya agar terhindar dari plagiarisme ide (Reused Content).
 
 [INPUT VARIABEL]
@@ -1130,12 +1139,12 @@ Akhiri output dengan SATU baris kalimat penutup berikut (tanpa tambahan teks lai
 "Pilih salah satu Angle dari Poin 3, lalu masukkan ke dalam Agent-Script tahap selanjutnya!"`}},
 {n:2,k:'c',p:'claude',ai:'Claude',t:'AGENT-SCRIPT',sub:'Naskah voice over lengkap dan alami',
  prompt:()=>{const b=B();return `[ROLE]
-Anda adalah Master Scriptwriter spesialis YouTube Faceless Video Essay dan Dokumenter ${b.niche}. Tugas utama Anda adalah mengembangkan [OUTLINE] menjadi naskah Voice Over (VO) utuh yang sangat mengalir, dramatis, dan 100% siap dibacakan oleh AI Text-to-Speech (TTS) tanpa perlu pengeditan manual.
+Anda adalah Master Scriptwriter spesialis YouTube Faceless Video Essay dengan gaya bahasa ${b.gaya} untuk niche ${b.niche}. Tugas utama Anda adalah mengembangkan [OUTLINE] menjadi naskah Voice Over (VO) utuh yang sangat mengalir, dramatis, dan 100% siap dibacakan oleh AI Text-to-Speech (TTS) tanpa perlu pengeditan manual.
 
 [INPUT]
 - Outline Dasar: ${outVal()}
 - Target Audien: ${b.audien}
-- Gaya Bahasa Utama: Cinematic Dokumenter, Santai, Edukatif
+[Instruksi Sistem Master - Gaya Bahasa & Aksesibilitas]\nTulis naskah konten secara mengalir dan natural sesuai dengan instruksi gaya bahasa yang dipilih oleh pengguna di bawah ini.\n\nPILIHAN SISTEM: ${b.gaya}.\n\nATURAN GAYA BAHASA (Pilih salah satu sesuai PILIHAN SISTEM):\n- Jika PILIHAN = "Roasting / Satir": Tulis naskah dengan gaya bahasa roasting yang jenaka, sarkasme halus, dan penuh sindiran satir. Selipkan punchline komedi di akhir kalimat penjelasan dan sebutkan fakta unik atau stereotip lucu tentang topik ini. Bikin naskahnya terkesan blak-blakan, sangat menghibur, dan bikin penonton tertawa, namun tetap aman dan tidak kasar/toksik.\n- Jika PILIHAN = "Storytelling (Naratif)": Tulis naskah menggunakan format cerita naratif yang mendalam. Buka dengan hook yang memancing emosi atau konflik kecil agar penonton penasaran. Gunakan alur kronologis yang mengalir (Pengenalan -> Masalah -> Solusi), pakai kata-kata deskriptif yang menyentuh empati, dan atur ritme kalimat agar membangun rasa penasaran.\n- Jika PILIHAN = "Persuasif / Iklan (Hard-Selling)": Tulis naskah dengan gaya pemasaran persuasif yang fokus pada konversi penjualan. Gunakan formula masalah-solusi secara cepat. Tulis dalam kalimat-kalimat pendek yang menembak langsung ke inti, tonjolkan keuntungan produk bagi pengguna (benefit), dan tutup dengan Call to Action (CTA) atau ajakan bertindak yang tegas dan mendesak di akhir video.\n- Jika PILIHAN = "Formal / Baku": Tulis naskah dengan menggunakan bahasa Indonesia baku yang resmi sesuai aturan EYD/PUEBI. Nada bicara harus otoritatif, profesional, berwibawa, dan sangat jelas. Jangan gunakan kata gaul, singkatan sehari-hari, atau kata ganti informal. Naskah ini ditujukan untuk presentasi korporat, berita, atau materi edukasi formal.\n- Jika PILIHAN = "Gen-Z / Populer": Tulis naskah dengan gaya bahasa gaul anak muda (Gen-Z) Indonesia yang sedang tren saat ini. Gunakan tempo yang cepat, ekspresif, energik, dan selipkan istilah-istilah internet populer secara alami. Nada bicara harus terasa sangat akrab, santai, dan sangat relevan untuk penonton remaja atau dewasa muda.\n- Jika PILIHAN = "Kontroversial / Opini": Tulis naskah dengan nada bicara yang berani, kritis, dan memancing pemikiran mendalam (thought-provoking). Angkat sudut pandang unik atau tidak biasa (unconventional) terhadap topik ini untuk memancing diskusi dan perdebatan sehat di kolom komentar. Tetap jaga argumen agar logis dan aman dari pelanggaran platform.\n- Jika PILIHAN di luar 6 gaya di atas (Cinematic Dokumenter, Vlogger, Santai / Kasual, Edukatif): pakai aturan gaya yang sudah ada di prompt ini.\n\nATURAN WAJIB STRUKTUR & AKSESIBILITAS ORANG AWAM (Penting):\n1. Setiap kali naskah harus memuat jargon, istilah teknis, rumus, atau kata-kata asing yang rumit (contoh: torsi, ground clearance, break-even point, dll), naskah WAJIB langsung menjelaskan istilah tersebut menggunakan analogi sederhana sehari-hari agar penonton awam langsung paham dalam sekali dengar.
 
 [ATURAN PENULISAN NASKAH (STRICT RULES)]
 1. OPTIMASI TTS (CLEAN TEXT): 
@@ -1146,7 +1155,7 @@ Anda adalah Master Scriptwriter spesialis YouTube Faceless Video Essay dan Dokum
    - Gunakan tanda baca (koma, titik, tanda tanya) secara presisi untuk mengatur jeda napas narator.
 
 2. GAYA BAHASA & DIKSI (ANTI-ROBOT):
-   - Gunakan gaya tutur lisan yang mengalir, berwibawa namun santai (Cinematic Dokumenter).
+   - Gunakan gaya tutur lisan yang mengalir, berwibawa namun santai (${b.gaya}).
    - DILARANG menggunakan frasa klise AI seperti: "Mari kita selami", "Tak bisa dipungkiri", "Pada akhirnya", "Kesimpulannya", "Di sisi lain", atau "Menariknya". 
    - Gunakan kata ganti "kami" untuk mewakili opini channel, "kalian" untuk menyapa penonton, dan "saya" jika mengacu pada narator tunggal. DILARANG menggunakan "lo", "lu", "gue", atau "gua".
 
@@ -1561,6 +1570,9 @@ function refsHtml(){
    +`<label class="chk"><input type="checkbox" id="useRefs"${S.useRefs!==false?' checked':''}> Pakai referensi di Agent Riset</label><select id="refMode" aria-label="Cara pakai referensi" style="margin-top:6px"><option value="catatan"${S.refMode!=='penuh'?' selected':''}>Ringkas jadi catatan fakta (hemat token)</option><option value="penuh"${S.refMode==='penuh'?' selected':''}>Kirim transkrip lengkap (lebih boros token)</option></select><p class="hint" style="margin-top:6px">Hanya teks yang diambil. Agent Riset membuat peta perbedaan dan angle baru dari sumber ini. Saat revisi atau lanjutkan, transkrip lengkap tidak dikirim ulang.</p>`;
 }
 const updateRefsUI=()=>{$('refs').innerHTML=refsHtml()};
+// Kunci transkrip Tahap 0 ke server (di luar state dashboard) — selamat dari
+// update/deploy/restart/pindah perangkat. Dipanggil tiap fetchRefs berhasil.
+const syncSavedRefs=async()=>{try{const refs={};for(const [u,r] of Object.entries(S.refs||{}))if(r&&r.status==='ok'&&String(r.text||'').trim())refs[u]=r;if(!Object.keys(refs).length)return;await fetch('/api/refs-saved',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({refs})})}catch(e){}};
 async function fetchRefs(force){
   if(refBusy)return;
   const urls=refUrls().filter(u=>force?(!S.refs[u]||S.refs[u].status!=='ok'):!S.refs[u]);
@@ -1572,7 +1584,7 @@ async function fetchRefs(force){
     j.refs.forEach(r=>{S.refs[r.url]=r.ok?{status:'ok',title:r.title,words:r.words,text:r.text,kind:r.kind,truncated:r.truncated}:{status:'fail',error:r.error,kind:r.kind}});
   }catch(e){urls.forEach(u=>S.refs[u]={status:'fail',error:e.message})}
   const cur=refUrls();Object.keys(S.refs).forEach(u=>{if(Object.keys(S.refs).length>10&&!cur.includes(u))delete S.refs[u]});
-  refBusy=false;save();updateRefsUI();render();
+  refBusy=false;save();syncSavedRefs();updateRefsUI();render();
 }
 async function prepNotes(){
   const rs=S.useRefs===false?[]:usableRefs();
@@ -1602,9 +1614,13 @@ ${capW(r.text,AIW)}`;
   }
   S.notes=parts.join('\n\n');S.notesKey=key;
 }
+// Auto Library (Script VO): tahap selesai -> masuk Hasil otomatis
+// (1 entry per tahap+folder, re-run update yang sama). Folder = Judul
+// proyek dari Brief (kalau kosong, pakai topik). Dipakai go() + refresh Hasil.
+function autoLibSave(n){if(!(n>=1&&n<=5)||!(S.out[n]||'').trim())return null;const types={1:'riset',2:'long',3:'seo',4:'short',5:'audit'},names={1:'Riset',2:'Script Long',3:'SEO',4:'Script Short',5:'Audit'};const topic=(((($('judul')&&$('judul').value)||S.judul||B().topik||'')+'').trim()||'Tanpa topik');let h=0;for(let i=0;i<topic.length;i++)h=((h<<5)-h+topic.charCodeAt(i))|0;return fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:types[n]||'long',title:topic.slice(0,120)+' — '+names[n],topic,content:S.out[n],words:words(S.out[n]),replaceKey:'vo-'+n+'-'+h})}).catch(()=>{})}
 async function go(n,mode,ins){
   if(busyN!==null)return;
-  busyN=n;const s=ST[n];S.err[n]='';
+  busyN=n;const s=ST[n];S.err[n]='';let libP=null;
   const route=getRoute(n);
   if((mode==='baru'||mode==='fromScript')&&n===1)await fetchRefs();
   const has=!!(S.out[n]||'').trim();
@@ -1642,22 +1658,15 @@ async function go(n,mode,ins){
     const miss=n>0&&mode!=='revisi'?looksCut(n,S.out[n]):'';
     S.fin[n]=j.truncated?(j.finish?'alasan dari model: '+j.finish:'koneksi berhenti sebelum selesai'):miss;
     S.part[n]=(!!j.truncated||!!miss)&&n>0;S.st[n]=S.part[n]?'Terpotong':'Selesai';
-    // Auto Library (Script VO): tahap selesai -> masuk Library otomatis
-    // (1 entry per tahap+folder, re-run update yang sama). Folder = Judul
-    // proyek dari Brief (kalau kosong, pakai topik).
-    if (n >= 1 && n <= 4 && (S.out[n] || '').trim()) {
-      const types = { 1: 'riset', 2: 'long', 3: 'seo', 4: 'short' }, names = { 1: 'Riset', 2: 'Script Long', 3: 'SEO', 4: 'Script Short' };
-      const topic = ((($('judul') && $('judul').value) || S.judul || B().topik || '') + '').trim() || 'Tanpa topik';
-      let h = 0; for (let i = 0; i < topic.length; i++) h = ((h << 5) - h + topic.charCodeAt(i)) | 0;
-      fetch('/api/library', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: types[n] || 'long', title: topic.slice(0, 120) + ' — ' + names[n], topic, content: S.out[n], words: words(S.out[n]), replaceKey: 'vo-' + n + '-' + h }) }).catch(() => {});
-    }
+    libP=autoLibSave(n);
   }catch(e){
     const partial=(e.partial||'').trim(),stopped=e.kind==='stopped';
     if(stopped)toast('Dihentikan');else{setErr(n,e);toast('Tahap '+n+' gagal: '+classify(S.err[n],n).t,5000)}
     if(n>0&&mode!=='revisi'&&partial){const cp=cleanThink(partial);S.out[n]=mode==='lanjut'?joinText(clean,cp):cp;S.part[n]=true}
     S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):(stopped?'Menunggu':'Gagal');
+    if(S.st[n]==='Selesai')libP=autoLibSave(n);
   }
-  busyN=null;jobId=null;save();render();
+  busyN=null;jobId=null;save();render();if(libP){await libP;try{renderHasil()}catch(e){}}
   if(S.err[n])errPop(n);
 }
 async function stop(){if(busyN===null||!jobId)return;toast('Menghentikan...');try{await fetch('/api/stop?id='+jobId,{method:'POST'})}catch(e){}}
@@ -1956,7 +1965,7 @@ document.addEventListener('click',e=>{
   }
   const cb=e.target.closest('[data-closecard]');if(cb){const n=+cb.dataset.closecard;S.open[n]=false;save();render();setTimeout(()=>{const el=document.querySelector('section.stage[data-n="'+String(n).padStart(2,'0')+'"]');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},60);return}
   const cp=e.target.closest('[data-cliplib]');if(cp){(async()=>{const [jid,ridx]=cp.dataset.cliplib.split(':');const jobIdDec=decodeURIComponent(jid||'');const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'clipper',title:cp.dataset.libtitle||'Klip',topic:cp.dataset.libtitle||'',jobId:jobIdDec,renderIdx:+ridx||0,duration:+cp.dataset.clipdur||0,thumb:'/api/clipper/thumb?id='+encodeURIComponent(jobIdDec)+'&clip='+(+ridx||0)})});const j=await r.json().catch(()=>({}));if(r.ok)toast('Video tersimpan ke Hasil.');else toast(j.error||'Gagal menyimpan');})();return}
-  const sv=e.target.closest('[data-savelib]');if(sv){(async()=>{const n=+sv.dataset.savelib;const o=S.out[n]||'';if(!o.trim())return toast('Belum ada hasil untuk disimpan');const types={1:'riset',2:'long',3:'seo',4:'short'};const names={1:'Riset',2:'Script Long',3:'SEO',4:'Script Short'};const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:types[n]||'long',title:(B().topik||'Tanpa topik').slice(0,120)+' — '+names[n],topic:B().topik||'',content:o,words:words(o)})});const j=await r.json().catch(()=>({}));if(r.ok)toast('Tersimpan ke Hasil.');else toast(j.error||'Gagal menyimpan');})();return}
+  const sv=e.target.closest('[data-savelib]');if(sv){(async()=>{const n=+sv.dataset.savelib;const o=S.out[n]||'';if(!o.trim())return toast('Belum ada hasil untuk disimpan');const types={1:'riset',2:'long',3:'seo',4:'short',5:'audit'};const names={1:'Riset',2:'Script Long',3:'SEO',4:'Script Short',5:'Audit'};const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:types[n]||'long',title:(B().topik||'Tanpa topik').slice(0,120)+' — '+names[n],topic:B().topik||'',content:o,words:words(o)})});const j=await r.json().catch(()=>({}));if(r.ok)toast('Tersimpan ke Hasil.');else toast(j.error||'Gagal menyimpan');})();return}
   const b=e.target.closest('button');if(!b)return;const d=b.dataset;
   if(d.go){const[n,m]=d.go.split(':');startGo(+n,m)}
   else if(d.stop!==undefined||b.id==='stop')stop();
@@ -1978,7 +1987,7 @@ document.addEventListener('click',e=>{
   else if(d.getrefs!==undefined)fetchRefs(true);
   else if(d.rmref){$('topik').value=tidyTopic($('topik').value.split(d.rmref).join(' '));save();updateRefsUI();render()}
   else if(d.manual){const r=S.refs[d.manual];if(r){r.manualOpen=!r.manualOpen;updateRefsUI();render();if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal()}}
-  else if(d.msave){const r=S.refs[d.msave],t=((r&&r.mdraft)||'').trim();if(words(t)<30)return toast('Teks terlalu pendek untuk dijadikan referensi');S.refs[d.msave]={status:'ok',manual:true,title:'Teks manual',text:t.split(/\s+/).slice(0,20000).join(' '),words:Math.min(words(t),20000),kind:'manual'};save();updateRefsUI();render();if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal()}
+  else if(d.msave){const r=S.refs[d.msave],t=((r&&r.mdraft)||'').trim();if(words(t)<30)return toast('Teks terlalu pendek untuk dijadikan referensi');S.refs[d.msave]={status:'ok',manual:true,title:'Teks manual',text:t.split(/\s+/).slice(0,20000).join(' '),words:Math.min(words(t),20000),kind:'manual'};save();syncSavedRefs();updateRefsUI();render();if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal()}
   else if(b.id==='go0')startFlow();
   else if(b.id==='dlall')dlAll();
   else if(d.sim!==undefined){checkSimilarity()}
@@ -2177,7 +2186,7 @@ if($('ideaGenBtn'))$('ideaGenBtn').addEventListener('click',async()=>{
   try{
     const avoid=(S.ideas||[]).map(x=>x.t).filter(Boolean);
     const count=$('ideaCount').value||'10';
-    const txt=await runIdea([{role:'user',content:`Kamu adalah strategist konten YouTube untuk channel faceless (tanpa wajah) niche otomotif.\nBuatkan ${count} ide video YouTube untuk niche: "${niche}".\nGaya channel: ${S.gaya||'Channel otomotif / YouTuber review'}. Target audien: ${S.audien||'Pecinta otomotif, umum'}.\n${avoid.length?`Hindari topik berikut (sudah pernah dibuat): ${avoid.join('; ')}.\n`:''}Aturan format — WAJIB ikuti persis, satu ide per baris:\n1. JUDUL VIDEO || ANGLE (1 kalimat) || KENAPA MENARIK (1 kalimat)\nJangan beri pembuka, penutup, atau penjelasan. Hanya daftar ide.\nJudul harus spesifik, bikin penasaran, dan cocok untuk video faceless (narasi + visual stok).`}]);
+    const txt=await runIdea([{role:'user',content:`Kamu adalah strategist konten YouTube untuk channel faceless (tanpa wajah) niche otomotif.\nBuatkan ${count} ide video YouTube untuk niche: "${niche}".\nGaya channel: ${S.gaya||'Cinematic Dokumenter'}. Target audien: ${S.audien||'Pecinta otomotif, umum'}.\n${avoid.length?`Hindari topik berikut (sudah pernah dibuat): ${avoid.join('; ')}.\n`:''}Aturan format — WAJIB ikuti persis, satu ide per baris:\n1. JUDUL VIDEO || ANGLE (1 kalimat) || KENAPA MENARIK (1 kalimat)\nJangan beri pembuka, penutup, atau penjelasan. Hanya daftar ide.\nJudul harus spesifik, bikin penasaran, dan cocok untuk video faceless (narasi + visual stok).`}]);
     S.ideaOut=txt;save();renderIdeas();$('ideaMsg').textContent='Selesai. Simpan ide yang kamu suka.';
   }catch(e){$('ideaMsg').textContent='Gagal: '+(e.message||e)}
   ideaBusy=false;$('ideaGenBtn').disabled=false;
@@ -2323,6 +2332,7 @@ fetch('/api/health').then(r=>r.json()).then(async h=>{
     }
     serverTs=+(srv._ts||0);
   }catch(e){}
+  try{const sr=await (await fetch('/api/refs-saved')).json();if(sr&&sr.refs){for(const [u,r] of Object.entries(sr.refs)){const cur=S.refs[u];if(!cur||cur.status!=='ok'||!String(cur.text||'').trim())S.refs[u]=r;}}}catch(e){}
   stateReady=true;syncState();render();updateRefsUI();renderIdeas();applyBrief();applyIdea();
   try{const w=await (await fetch('/api/whoami')).json();if(w.user){const sn=document.getElementById('topUserName');if(sn)sn.textContent=w.user;const av=document.getElementById('topUserAv');if(av)av.textContent=String(w.user).trim().charAt(0).toUpperCase()||'D';}}catch(e){}
 })();
@@ -6007,7 +6017,7 @@ const renderSubPresetSettings = () => {
     });
   })();
   // ===== Hasil (Dashboard) — data dari /api/library (backend tetap) =====
-  const LIB_LABEL={long:'📄 Script Long',short:'📄 Script Short',riset:'🔍 Riset',seo:'🏷️ SEO',clipper:'✂️ Video Clipper'};
+  const LIB_LABEL={long:'📄 Script Long',short:'📄 Script Short',riset:'🔍 Riset',seo:'🏷️ SEO',audit:'🛡️ Audit',clipper:'✂️ Video Clipper'};
   const LIB_STAT={baru:'🆕 Baru',dipakai:'✅ Dipakai',diupload:'📤 Diupload'};
   // Poster kartu/modal Hasil (Clipper): thumb tersimpan (kustom) >
   // thumbnail Final on-demand (endpoint /api/clipper/thumb — generate frame
@@ -6075,16 +6085,16 @@ const renderSubPresetSettings = () => {
     // Isi folder = chip Riset/Skrip/SEO/Short berjejer kesamping; klik chip
     // membuka pop-up detail (render rapi, storyboard SEO jadi tabel). Item
     // lama tanpa topik dikelompokkan dari judulnya.
-    const folderOf=it=>(it.topic||'').trim()||String(it.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/,'')||'Tanpa judul';
+    const folderOf=it=>(it.topic||'').trim()||String(it.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short|Audit)$/,'')||'Tanpa judul';
     const folders={};items.filter(it=>it.type!=='clipper').forEach(it=>{const f=folderOf(it);(folders[f]=folders[f]||[]).push(it)});
-    const typeOrder=['riset','long','seo','short'];
+    const typeOrder=['riset','long','seo','short','audit'];
     const folderEntries=Object.entries(folders).sort((a,b)=>Math.max(...b[1].map(x=>x.createdAt||0))-Math.max(...a[1].map(x=>x.createdAt||0)));
     if(!libFoldersSeeded&&folderEntries.length){libOpenFolders.add(folderEntries[0][0]);libFoldersSeeded=true}
     const folderHtml=folderEntries.map(([f,arr])=>{
       const chips=typeOrder.filter(t=>arr.some(x=>x.type===t)).map(t=>{const it=arr.filter(x=>x.type===t).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];return `<button class="btn ghost" data-libview="${it.id}" style="padding:8px 12px;font-size:13px">${LIB_LABEL[t]||t}${it.words?' · '+fmt(it.words)+' kata':''}</button>`}).join('');
       const dt=new Date(Math.max(...arr.map(x=>x.createdAt||0)));const ds=isNaN(dt)?'':dt.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
       const isOpen=libOpenFolders.has(f);
-      return `<div class="aicard" style="padding:10px 12px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><b data-libfolder="${encodeURIComponent(f)}" style="flex:1;font-size:14px;line-height:1.35;word-break:break-word;cursor:pointer" title="Klik buat buka / tutup folder">${isOpen?'▾':'▸'} 📁 ${esc(f)}</b><button class="btn ghost" data-librename="${encodeURIComponent(f)}" style="padding:4px 8px;font-size:12px" title="Ganti nama folder — isi sama persis dengan nama folder lain untuk menggabungkan">✏</button><button class="btn" data-libfolder="${encodeURIComponent(f)}" style="padding:6px 14px;font-size:12px">Buka</button></div><small class="hint" style="display:block;margin:6px 0 0">${arr.length} hasil${ds?' · terakhir '+ds:''}</small>${isOpen?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${chips}</div>`:''}</div>`;}).join('');
+      return `<div class="aicard" data-libfolder="${encodeURIComponent(f)}" style="padding:10px 12px;margin-bottom:8px;cursor:pointer"><div style="display:flex;align-items:center;gap:8px"><b data-libfolder="${encodeURIComponent(f)}" style="flex:1;font-size:14px;line-height:1.35;word-break:break-word;cursor:pointer" title="Klik buat buka / tutup folder">${isOpen?'▾':'▸'} 📁 ${esc(f)}</b><button class="btn ghost" data-librename="${encodeURIComponent(f)}" style="padding:4px 8px;font-size:12px" title="Ganti nama folder — isi sama persis dengan nama folder lain untuk menggabungkan">✏</button><button class="btn danger" data-libfolderdel="${encodeURIComponent(f)}" style="padding:6px 14px;font-size:12px">🗑 Hapus</button></div><small class="hint" style="display:block;margin:6px 0 0">${arr.length} hasil${ds?' · terakhir '+ds:''}</small>${isOpen?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${chips}</div>`:''}</div>`;}).join('');
     scriptList.innerHTML=folderHtml||'<div class="empty-page"><b>Belum ada folder hasil</b>Isi Judul proyek di Brief Script VO lalu jalankan tahapnya — hasil otomatis tersimpan ke folder judul di sini.</div>';
     // ---- Hasil Akhir Render (Fase 25, mockup Dzaky): KARTU bejejer
     // (grid portrait, kayak kartu Klip — koreksi Dzaky 25 Okt: baris
@@ -6118,8 +6128,9 @@ const renderSubPresetSettings = () => {
     // Urutan: HAPUS / COPY / DOWNLOAD dulu (tombol di dalam card / pop up),
     // baru VIEW (klik card). Listener VIEW di bawah juga punya guard yang
     // sama, biar klik tombol tidak ikut buka pop up.
-    const ft2=e.target.closest('[data-libfolder]');if(ft2){const fn=decodeURIComponent(ft2.dataset.libfolder||'');if(libOpenFolders.has(fn))libOpenFolders.delete(fn);else libOpenFolders.add(fn);renderHasil();return}
-    const rn=e.target.closest('[data-librename]');if(rn){(async()=>{const fname=decodeURIComponent(rn.dataset.librename||'');const nn=(prompt('Nama folder baru untuk "'+fname+'":\n(Isi sama persis dengan nama folder lain untuk MENGGABUNGKAN kedua folder.)',fname)||'').trim();if(!nn||nn===fname)return;const d=await fetchLibrary();const fo=x=>(x.topic||'').trim()||String(x.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/,'')||'Tanpa judul';const its=(d.items||[]).filter(x=>x.type!=='clipper'&&fo(x)===fname);if(!its.length)return toast('Folder tidak ditemukan');const stNum={riset:1,long:2,seo:3,short:4};let h=0;for(let i=0;i<nn.length;i++)h=((h<<5)-h+nn.charCodeAt(i))|0;let okN=0;for(const it of its){const del=await fetch('/api/library?id='+encodeURIComponent(it.id),{method:'DELETE'});if(!del.ok)continue;const suf=String(it.title||'').match(/\s+—\s+(Riset|Script Long|SEO|Script Short)$/);const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:it.type,title:suf?nn+suf[0]:it.title,topic:nn,content:it.content,words:it.words,replaceKey:stNum[it.type]?'vo-'+stNum[it.type]+'-'+h:undefined})});if(r.ok)okN++}toast(okN+' hasil dipindah ke folder "'+nn+'"');renderHasil()})();return}
+    const ft2=e.target.closest('[data-libfolder]');if(ft2&&!e.target.closest('button')){const fn=decodeURIComponent(ft2.dataset.libfolder||'');if(libOpenFolders.has(fn))libOpenFolders.delete(fn);else libOpenFolders.add(fn);renderHasil();return}
+    const rn=e.target.closest('[data-librename]');if(rn){(async()=>{const fname=decodeURIComponent(rn.dataset.librename||'');const nn=(prompt('Nama folder baru untuk "'+fname+'":\n(Isi sama persis dengan nama folder lain untuk MENGGABUNGKAN kedua folder.)',fname)||'').trim();if(!nn||nn===fname)return;const d=await fetchLibrary();const fo=x=>(x.topic||'').trim()||String(x.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short|Audit)$/,'')||'Tanpa judul';const its=(d.items||[]).filter(x=>x.type!=='clipper'&&fo(x)===fname);if(!its.length)return toast('Folder tidak ditemukan');const stNum={riset:1,long:2,seo:3,short:4,audit:5};let h=0;for(let i=0;i<nn.length;i++)h=((h<<5)-h+nn.charCodeAt(i))|0;let okN=0;for(const it of its){const del=await fetch('/api/library?id='+encodeURIComponent(it.id),{method:'DELETE'});if(!del.ok)continue;const suf=String(it.title||'').match(/\s+—\s+(Riset|Script Long|SEO|Script Short|Audit)$/);const r=await fetch('/api/library',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:it.type,title:suf?nn+suf[0]:it.title,topic:nn,content:it.content,words:it.words,replaceKey:stNum[it.type]?'vo-'+stNum[it.type]+'-'+h:undefined})});if(r.ok)okN++}toast(okN+' hasil dipindah ke folder "'+nn+'"');renderHasil()})();return}
+    const fd=e.target.closest('[data-libfolderdel]');if(fd){(async()=>{const fname=decodeURIComponent(fd.dataset.libfolderdel||'');const d=await fetchLibrary();const fo=x=>(x.topic||'').trim()||String(x.title||'Tanpa judul').replace(/\s+—\s+(Riset|Script Long|SEO|Script Short|Audit)$/,'')||'Tanpa judul';const its=(d.items||[]).filter(x=>x.type!=='clipper'&&fo(x)===fname);if(!its.length)return toast('Folder tidak ditemukan');if(!confirm('Hapus folder "'+fname+'" ('+its.length+' hasil)?\nHanya file hasil di folder ini yang dihapus. Proyek Script VO, transkrip Tahap 0, proyek Clipper, dan video sumber TIDAK ikut terhapus.'))return;let okN=0;for(const it of its){const r=await fetch('/api/library?id='+encodeURIComponent(it.id),{method:'DELETE'});if(r.ok)okN++}toast(okN+' hasil dihapus dari folder "'+fname+'".');renderHasil()})();return}
     const dl=e.target.closest('[data-libdel]');if(dl){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===dl.dataset.libdel);if(!it)return;const isClip=it.type==='clipper';if(!confirm(isClip?('Hapus "'+(it.title||'')+'" dari Hasil?\nFile video render-nya di server ikut dihapus biar lega. Proyek + video sumber tetap ada.'):('Hapus "'+(it.title||'')+'" dari Hasil?')))return;const r=await fetch('/api/library?id='+encodeURIComponent(it.id)+(isClip?'&deleteFile=1':''),{method:'DELETE'});if(r.ok){toast('Dihapus dari Hasil.');closeLibModal();renderHasil()}else toast('Gagal menghapus');})();return}
     const ps=e.target.closest('[data-libpost]');if(ps){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===ps.dataset.libpost);if(!it)return;if(window.openPostModal)window.openPostModal({libraryId:it.id,jobId:it.jobId||'',renderIdx:it.renderIdx||0,title:it.title||''});})();return}
     const cp=e.target.closest('[data-libcopy]');if(cp){(async()=>{const d=await fetchLibrary();const it=(d.items||[]).find(x=>x.id===cp.dataset.libcopy);if(!it||!it.content)return toast('Tidak ada teks');try{await navigator.clipboard.writeText(it.content);toast('Script tersalin.')}catch{toast('Gagal salin — blokir browser.');}})();return}
