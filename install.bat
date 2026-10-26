@@ -13,6 +13,8 @@ REM  folder user, deteksi spek + rekomendasi Whisper, dependensi
 REM  via winget, restore .env dari backup, backup .env di akhir.
 REM
 REM  STATUS: DRAF - belum dites jalan di Windows, belum dipublish.
+REM  PERBAIKAN 26 Okt 2026: kurung di teks echo dalam blok if dihapus
+REM  (penyebab error '. was unexpected at this time.' di langkah 1/6).
 REM  TIDAK ada secret/API key di file ini. User isi .env sendiri
 REM  atau pulihkan dari backup-nya sendiri.
 REM  Hanya CMD (.bat) - tanpa PowerShell.
@@ -64,17 +66,17 @@ if not defined PICK_DRIVE (
 
 if defined PICK_DRIVE (
   set "INSTALL_DIR=%PICK_DRIVE%:\hermes-vo"
-  echo   Drive terpilih: %PICK_DRIVE%: (sisa sekitar %DRIVE_FREE_GB% GB)
+  echo   Drive terpilih: %PICK_DRIVE%: sisa sekitar %DRIVE_FREE_GB% GB
 ) else (
   if defined BEST_DRIVE (
     echo   NOTIFIKASI: tidak ada drive dengan sisa %MIN_GB% GB+.
-    echo   Memakai drive paling lega yang ada: %BEST_DRIVE%: (sisa sekitar %BEST_GB% GB).
+    echo   Memakai drive paling lega yang ada: %BEST_DRIVE%: sisa sekitar %BEST_GB% GB.
     echo   PERINGATAN: ruang bisa habis saat mengunduh model Whisper
     echo   besar - pilih model kecil atau lewati Whisper.
     set "INSTALL_DIR=%BEST_DRIVE%:\hermes-vo"
   ) else (
     echo   NOTIFIKASI: tidak ada drive tambahan yang terbaca.
-    echo   Memakai folder user (C:) sebagai fallback.
+    echo   Memakai folder user C: sebagai fallback.
     set "INSTALL_DIR=%USERPROFILE%\hermes-vo"
   )
 )
@@ -156,7 +158,7 @@ if "%BUTUH_WINGET%"=="1" (
   echo.
   echo   Beberapa dependensi belum ada. Installer akan mencoba
   echo   memasangnya lewat winget (butuh internet, mungkin minta
-  echo   persetujuan admin untuk sebagian paket).
+  echo   persetujuan admin untuk sebagian paket.
   where winget >nul 2>&1 && (
     echo   Winget ditemukan, memasang yang belum ada...
     where node >nul 2>&1 || winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
@@ -307,7 +309,7 @@ if defined VRAMGB (
     echo.
     echo   PERINGATAN: model %MODEL% butuh sekitar %MODELNEED% GB VRAM,
     echo   sementara GPU kamu sekitar %VRAMGB% GB.
-    echo   Kemungkinan besar GAGAL (out of memory) atau sangat lambat.
+    echo   Kemungkinan besar GAGAL karena kehabisan memori atau sangat lambat.
     echo   Rekomendasi untuk perangkat ini: %REKOMENDASI%.
     echo.
     set "LANJUT="
@@ -315,7 +317,7 @@ if defined VRAMGB (
     if /i not "%LANJUT%"=="YA" echo   Pemasangan Whisper dibatalkan. & goto SELESAI
   )
 ) else (
-  echo   NOTIFIKASI: VRAM tidak terdeteksi (CPU-only). Model %MODEL%
+  echo   NOTIFIKASI: VRAM tidak terdeteksi, CPU-only. Model %MODEL%
   echo   akan jalan di CPU - lebih lambat dari GPU, tapi tetap jalan.
 )
 
