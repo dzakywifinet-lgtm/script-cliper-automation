@@ -97,7 +97,7 @@ label.chk input{margin:0}
 .conn-card .ok{color:var(--grn);font-size:11px;font-weight:700}
 
 /* ---------- Brief (horizontal, di bawah AI Connection) ---------- */
-.brief-card{background:linear-gradient(180deg,rgba(34,211,238,.08),var(--card) 45%);border:1px solid rgba(34,211,238,.75);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:0 0 28px rgba(34,211,238,.45),inset 0 0 0 1px rgba(34,211,238,.18)}
+.brief-card{background:linear-gradient(180deg,rgba(34,211,238,.08),var(--card) 45%);border:1px solid rgba(34,211,238,.75);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:0 0 14px rgba(34,211,238,.45),inset 0 0 0 1px rgba(34,211,238,.18)}
 .brief-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .brief-head h3{margin:0;font-size:15px}
 .brief-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px;align-items:end}
@@ -108,12 +108,14 @@ label.chk input{margin:0}
 .brief-actions .bar{flex:1;min-width:120px;margin:0}
 
 /* ---------- Stages (cards grid, kaya foto 1) ---------- */
-#pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:stretch}
+#pipe{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:stretch}
 .stage{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-width:0;display:flex;flex-direction:column;height:100%}
 .stage .sh{display:flex;flex-direction:column;gap:8px;padding:16px;cursor:pointer;flex:1;height:100%}
 .stage .sh .t{min-height:56px}
 .stage .sh .chev{margin-top:auto}
 .stage .sh-top{display:flex;justify-content:space-between;align-items:flex-start}
+.stage .sh>*{min-width:0}
+.stage select{width:100%;box-sizing:border-box}
 .stage .stage-num{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;font-size:16px;font-weight:900;color:#fff;flex:none}
 .stage .stage-icon{font-size:26px;line-height:1;filter:drop-shadow(0 0 6px rgba(255,255,255,.35))}
 .stage[data-n="00"] .stage-num{background:var(--blu);box-shadow:0 0 14px rgba(59,130,246,.8)}
@@ -126,11 +128,13 @@ label.chk input{margin:0}
 .stage .badge{display:inline-block;font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;background:#16203a;border:1px solid var(--line);width:fit-content}
 .stage .chev{align-self:flex-end;color:var(--mute);font-size:18px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#16203a;line-height:1}
 .stage .body{padding:0 16px 16px;border-top:1px solid var(--line);overflow-x:hidden;overflow-wrap:anywhere}
-.stage[data-n="00"]{border-top:4px solid var(--blu);border-color:rgba(59,130,246,.75);background:linear-gradient(180deg,rgba(59,130,246,.10),var(--card) 42%);box-shadow:0 0 36px rgba(59,130,246,.55),0 0 12px rgba(59,130,246,.35),inset 0 0 0 1px rgba(59,130,246,.18)}
-.stage[data-n="01"]{border-top:4px solid var(--vio);border-color:rgba(139,92,246,.75);background:linear-gradient(180deg,rgba(139,92,246,.10),var(--card) 42%);box-shadow:0 0 36px rgba(139,92,246,.55),0 0 12px rgba(139,92,246,.35),inset 0 0 0 1px rgba(139,92,246,.18)}
-.stage[data-n="02"]{border-top:4px solid var(--org);border-color:rgba(245,158,11,.75);background:linear-gradient(180deg,rgba(245,158,11,.10),var(--card) 42%);box-shadow:0 0 36px rgba(245,158,11,.55),0 0 12px rgba(245,158,11,.35),inset 0 0 0 1px rgba(245,158,11,.18)}
-.stage[data-n="03"]{border-top:4px solid var(--grn);border-color:rgba(34,197,94,.75);background:linear-gradient(180deg,rgba(34,197,94,.10),var(--card) 42%);box-shadow:0 0 36px rgba(34,197,94,.55),0 0 12px rgba(34,197,94,.35),inset 0 0 0 1px rgba(34,197,94,.18)}
-.stage[data-n="04"]{border-top:4px solid var(--pnk);border-color:rgba(236,72,153,.75);background:linear-gradient(180deg,rgba(236,72,153,.10),var(--card) 42%);box-shadow:0 0 36px rgba(236,72,153,.55),0 0 12px rgba(236,72,153,.35),inset 0 0 0 1px rgba(236,72,153,.18)}
+.stage[data-n="00"]{border-top:4px solid var(--blu);border-color:rgba(59,130,246,.75);background:linear-gradient(180deg,rgba(59,130,246,.10),var(--card) 42%);box-shadow:0 0 14px rgba(59,130,246,.55),0 0 12px rgba(59,130,246,.35),inset 0 0 0 1px rgba(59,130,246,.18)}
+.stage[data-n="01"]{border-top:4px solid var(--vio);border-color:rgba(139,92,246,.75);background:linear-gradient(180deg,rgba(139,92,246,.10),var(--card) 42%);box-shadow:0 0 14px rgba(139,92,246,.55),0 0 12px rgba(139,92,246,.35),inset 0 0 0 1px rgba(139,92,246,.18)}
+.stage[data-n="02"]{border-top:4px solid var(--org);border-color:rgba(245,158,11,.75);background:linear-gradient(180deg,rgba(245,158,11,.10),var(--card) 42%);box-shadow:0 0 14px rgba(245,158,11,.55),0 0 12px rgba(245,158,11,.35),inset 0 0 0 1px rgba(245,158,11,.18)}
+.stage[data-n="03"]{border-top:4px solid var(--grn);border-color:rgba(34,197,94,.75);background:linear-gradient(180deg,rgba(34,197,94,.10),var(--card) 42%);box-shadow:0 0 14px rgba(34,197,94,.55),0 0 12px rgba(34,197,94,.35),inset 0 0 0 1px rgba(34,197,94,.18)}
+.stage[data-n="04"]{border-top:4px solid var(--pnk);border-color:rgba(236,72,153,.75);background:linear-gradient(180deg,rgba(236,72,153,.10),var(--card) 42%);box-shadow:0 0 14px rgba(236,72,153,.55),0 0 12px rgba(236,72,153,.35),inset 0 0 0 1px rgba(236,72,153,.18)}
+.stage[data-n="05"] .stage-num{background:#14b8a6;box-shadow:0 0 14px rgba(20,184,166,.8)}
+.stage[data-n="05"]{border-top:4px solid #14b8a6;border-color:rgba(20,184,166,.75);background:linear-gradient(180deg,rgba(20,184,166,.10),var(--card) 42%);box-shadow:0 0 14px rgba(20,184,166,.55),0 0 12px rgba(20,184,166,.35),inset 0 0 0 1px rgba(20,184,166,.18)}
 .stage .md{font-size:13px;line-height:1.65;word-break:break-word}
 .stage .md h2,.stage .md h3,.stage .md h4{margin:14px 0 6px}
 .stage .md p{margin:8px 0}
@@ -722,7 +726,7 @@ body.nonadmin .pkey[data-keycfg="router"], body.nonadmin .pkey[data-keycfg="rout
         <div class="wide wide-j"><label for="judul">Judul proyek</label><input id="judul" placeholder="masukan judul"></div>
         <div class="wide wide-t"><label for="topik">Topik dan link referensi (opsional)</label><textarea id="topik" style="min-height:90px" placeholder="Contoh: Sejarah &amp; Evolusi Honda CBR, https://youtu.be/xxxx, https://situs.com/artikel"></textarea><div id="refs"></div></div>
         <div><label for="gaya">Gaya bahasa</label><input id="gaya" value="Cinematic Dokumenter"><div class="chips" id="gchips" style="margin-top:8px"><button class="chip" data-gaya="Channel otomotif / YouTuber review">Otomotif / review</button><button class="chip" data-gaya="Cinematic Dokumenter">Cinematic</button><button class="chip" data-gaya="Santai / Kasual">Santai</button><button class="chip" data-gaya="Edukatif">Edukatif</button></div></div>
-        <div><label for="audien">Target audien</label><input id="audien" value="Pecinta otomotif, umum"><label for="dur">Durasi target (menit)</label><input id="dur" type="number" min="5" max="30" value="10"><label for="jsh">Jumlah Shorts</label><input id="jsh" type="number" min="1" max="5" value="1"></div>
+        <div><label for="niche">Niche/Kategori channel</label><input id="niche" placeholder="Otomotif"><div class="chips" id="nchips" style="margin-top:8px"><button class="chip" data-niche="Otomotif">Otomotif</button><button class="chip" data-niche="Bisnis">Bisnis</button><button class="chip" data-niche="Teknologi">Teknologi</button><button class="chip" data-niche="Sejarah">Sejarah</button></div><label for="audien">Target audien</label><input id="audien" value="Pecinta otomotif, umum"><label for="dur">Durasi target (menit)</label><input id="dur" type="number" min="5" max="30" value="10"><label for="jsh">Jumlah Shorts</label><input id="jsh" type="number" min="1" max="5" value="1"></div>
         <div><div class="stats"><div class="stat"><b id="sWords">0</b><span>kata naskah</span></div><div class="stat"><b id="sMin">0</b><span>menit baca</span></div><div class="stat"><b id="sTarget">0</b><span>target kata</span></div></div></div>
       </div>
       <div class="brief-actions"><button class="btn" id="go0" style="--k:var(--o)">Mulai (ambil transkrip)</button><button class="btn danger" id="stop" hidden>Stop</button><div class="bar"><i id="pb"></i></div><button class="btn ghost" id="dlall">Unduh semua (.txt)</button><button class="btn ghost" id="reset">Reset proyek</button></div>
@@ -1023,8 +1027,8 @@ const getRoute=n=>{const r=S.route[n];if(r==='router-pc')return 'router-pc';if(r
 const isRouter=r=>r==='router-pi'||r==='router-pc';
 try{S=JSON.parse(localStorage.getItem('hvo2')||'{}')}catch(e){}
 KEYS.forEach(k=>S[k]=S[k]||{});S.err={};
-[0,1,2,3,4].forEach(n=>{if(S.st[n]==='Berjalan')S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):'Menunggu'});
-const IDS=['judul','topik','gaya','audien','dur','jsh']; // Bank Ide dihapus — ideaNiche/ideaCount tidak lagi disimpanIDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
+[0,1,2,3,4,5].forEach(n=>{if(S.st[n]==='Berjalan')S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):'Menunggu'});
+const IDS=['judul','topik','gaya','audien','dur','jsh','niche']; // Bank Ide dihapus — ideaNiche/ideaCount tidak lagi disimpanIDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
 let stateReady=false,saveTimer=null,serverTs=0;
 // Guard anti-hilang (client): kalau S kosong tapi server pernah punya data (serverTs>0),
 // JANGAN kirim — cegah state kosong menimpa state berisi (kasus 17 Okt 2026: semua naskah hilang pas deploy).
@@ -1043,127 +1047,254 @@ const refUrls=()=>[...new Set(($('topik').value.match(URLRE)||[]).map(u=>u.repla
 const tidyTopic=t=>t.replace(/(\s*[,;]\s*){2,}/g,', ').replace(/^[\s,;]+|[\s,;]+$/g,'').replace(/[ \t]+/g,' ').trim();
 const topicText=()=>tidyTopic($('topik').value.replace(URLRE,' '));
 const usableRefs=()=>refUrls().map(u=>S.refs[u]).filter(r=>r&&r.status==='ok');
-const B=()=>({topik:topicText()||(usableRefs()[0]||{}).title||'',gaya:$('gaya').value.trim(),audien:$('audien').value.trim(),dur:Math.max(5,+$('dur').value||10),jsh:Math.min(5,Math.max(1,+$('jsh').value||1))});
+const B=()=>({topik:topicText()||(usableRefs()[0]||{}).title||'',gaya:$('gaya').value.trim(),audien:$('audien').value.trim(),dur:Math.max(5,+$('dur').value||10),jsh:Math.min(5,Math.max(1,+$('jsh').value||1)),niche:$('niche').value.trim()||'Otomotif'});
 const tgt=()=>B().dur*140;
 const AIW=5000;const capW=(t,n)=>{const w=(t||'').split(/\s+/).filter(Boolean);return w.length>n?w.slice(0,n).join(' '):(t||'')};
 const povOpen={};
 
-/* ===== Prompt asli dari Anda (hanya kolom diisi otomatis) ===== */
+/* ===== Prompt Script VO baru (Brief-driven: niche/gaya/audien/durasi dari panel Brief) ===== */
 const gl=()=>{const g=B().gaya;return g?`\n\nGaya bahasa yang dipakai: ${g}.`:''};
 let PTOK=false;
 const srcVal=lite=>PTOK?'{{SUMBER}}':srcField(lite);
 const outVal=()=>PTOK?'{{OUTLINE}}':(S.out[1]||'[OUTLINE DARI AGENT-RISET]');
 const scriptVal=()=>PTOK?'{{NASKAH}}':(S.out[2]||'[NASKAH VO DARI AGENT-SCRIPT]');
+const txTexts=()=>usableRefs().map((r,i)=>`TRANSKRIP ${i+1} (${r.title||''}):\n${capW(r.text||'',AIW)}`).join('\n\n');
+const txVal=()=>PTOK?'{{TRANSKRIP}}':txTexts();
 const ST=[
 {n:0,k:'v',p:'gemini',ai:'',t:'Transkrip Referensi',sub:'Teks lengkap dari link, untuk dibandingkan dengan naskah',prompt:()=>''},
 {n:1,k:'g',p:'gemini',ai:'Gemini',t:'AGENT-RISET',sub:'Bedah data atau transkrip, angle unik, outline',
- prompt:(lite)=>{const b=B();return `Bertindaklah sebagai Researcher & Scriptwriter YouTube profesional untuk channel jenis Faceless Video Essay. Saya ingin membuat video durasi panjang (${b.dur}-${b.dur+2} menit, boleh lebih jika materinya kuat).
+ prompt:(lite)=>{const b=B();return `[ROLE]
+Anda adalah AGENT-RISET dan ARSITEK KONTEN (Data Miner) untuk channel YouTube berformat Dokumenter/Video Essay berdurasi panjang (Long-form Faceless). 
+Tugas utama Anda BUKAN menulis naskah, melainkan membongkar (deconstruct) transkrip sumber, mengekstrak fakta mentah, dan merancang kerangka (blueprint/outline) cerita baru yang strukturnya 180 derajat BERBEDA dari sumber aslinya agar terhindar dari plagiarisme ide (Reused Content).
 
-Detail Konten:
-- Topik / Transkrip Sumber: ${srcVal(lite)}
-- Target Audien: ${b.audien}
-- Gaya Bahasa: ${b.gaya}
+[INPUT VARIABEL]
+- Niche_Konten: ${b.niche}
+- Transkrip_Sumber: ${srcVal(lite)}
 
-Ketentuan Format:
-Video ini TIDAK menampilkan wajah (faceless). Narasi disajikan penuh via Voice Over (VO) yang dipadukan dengan B-roll, footage arsip, dan gambar pendukung.
-Kata ganti: jangan memakai "lo", "lu", "gue", atau "gua". Pakai "kalian" untuk penonton, "kita" untuk kebersamaan, dan "saya" untuk narator.
+[ATURAN EKSTRAKSI & ANTI-JIPLAK]
+1. ISOLASI FAKTA: Pisahkan data teknis (angka, tanggal, nama spesifik, harga, kejadian) dari opini narator di transkrip sumber. Abaikan semua sapaan, lelucon, opini subjektif, dan ajakan subscribe dari sumber asli.
+2. REVERSE STRUCTURE: Jika sumber asli bercerita menggunakan alur A-B-C (kronologis), Anda WAJIB merancang outline dengan alur C-A-B (Mulai dari akibat, bongkar penyebabnya) atau B-A-C. JANGAN meniru urutan penyajian sumber asli.
+3. KETAT VERIFIKASI: Tandai [PERLU VERIFIKASI] pada informasi yang mencurigakan. Jangan pernah mengarang data sejarah, angka, atau spesifikasi.
+4. ATURAN FACELESS & VISUALISASI DINAMIS: Karena video ini berformat Faceless dan berdurasi panjang (>10 menit), blueprint tidak boleh mengandalkan "Talking Head" atau "Wajah Host". Wajib rancang kebutuhan visual yang spesifik dan terus bergerak sesuai [Niche_Konten]. Jangan hanya menulis "Video ilustrasi".
+5. RETENSI DURASI PANJANG (MICRO-HOOKS): Untuk menahan penonton tetap menonton video faceless selama ${b.dur}-${b.dur+2} menit, Anda WAJIB menanamkan "Micro-Hook" (titik pancingan misteri baru) di setiap pergantian Part. Jangan biarkan ada satu menit pun narasi berjalan tanpa ada pertanyaan yang belum terjawab.
 
-Aturan Fakta (WAJIB):
-- Hanya gunakan fakta yang valid dan bisa diverifikasi. Jangan mengarang angka, tanggal, nama, atau kutipan.
-- Tandai "[PERLU VERIFIKASI]" pada informasi yang tidak pasti atau saling bertentangan, lalu jelaskan alasannya dalam satu kalimat.
-- Jika ada transkrip, bedakan mana fakta "dari transkrip" dan mana "tambahan riset".
-- Jangan mengarang sumber. Jika tidak punya sumber pasti, tulis "sumber tidak terverifikasi".
+[FORMAT OUTPUT WAJIB]
+Hasilkan output menggunakan format Markdown berikut secara berurutan, tanpa basa-basi pembuka AI:
 
-Tugasmu:
-1. Jika saya memberikan transkrip video lain:
-   - Ekstrak fakta utamanya saja. Abaikan sapaan, iklan, sponsor, dan ajakan subscribe.
-   - Buat "PETA PERBEDAAN" berisi: (a) angle video sumber, (b) angle baru kita yang berbeda, (c) bagian sumber yang sengaja dibuang, (d) bagian baru yang kita tambahkan.
-   - Susun ulang alurnya dari nol agar segar dan tidak plagiat. Jangan meniru struktur, urutan penyajian, kalimat, atau lelucon dari sumber.
-2. Jika saya hanya memberikan topik: cari data, fakta unik, dan perspektif menarik, lalu pilih SATU angle utama yang jarang dibahas video lain.
-3. Di awal hasil, tuliskan: (a) Angle Utama dalam 1 kalimat, (b) Janji Video, yaitu apa yang penonton dapat jika menonton sampai habis, (c) 3 opsi Hook untuk 15 detik pertama beserta rekomendasi satu yang terbaik.
-4. Buatkan OUTLINE DETAIL yang dibagi menjadi beberapa timestamp (Hook, Intro, Poin Utama 1-4, Call to Action, Outro), cukup padat untuk durasi ${b.dur}-${b.dur+2} menit ATAU LEBIH. Untuk SETIAP bagian tuliskan:
-   - Timestamp dan judul bagian.
-   - Tujuan bagian (apa yang harus dipahami atau dirasakan penonton).
-   - Poin fakta spesifik: nama, tahun, angka, lokasi, atau peristiwa (minimal 3 poin untuk setiap Poin Utama).
-   - Titik penasaran (open loop) yang menjaga penonton tetap menonton, dan kapan dijawab.
-   - Satu kalimat transisi ke bagian berikutnya.
-   - Kebutuhan visual singkat (jenis B-roll atau footage arsip).
-   - Perkiraan jumlah kata (total seluruh bagian minimal ${fmt(tgt())} kata).
-5. Tutup dengan "Catatan Verifikasi dan Sumber".
+### 1. 🗄️ DATA MENTAH (THE VAULT)
+(Ekstrak semua data pasti dari transkrip ke dalam bullet point ringkas. Data ini akan dipakai oleh Agent-Script nanti).
+- Angka, Harga & Statistik: 
+- Tahun & Tanggal Historis: 
+- Spesifikasi / Subjek Utama: 
 
-Gunakan format Markdown (judul dengan ##, daftar dengan tanda -).
-Jangan buatkan skrip lengkapnya dulu. Tampilkan angle, outline, dan sudut pandang utamanya saja. Akhiri dengan satu kalimat: "Apakah ada bagian yang ingin ditambah, dikurangi, atau difokuskan?"`}},
+### 2. 🛡️ PETA ANTI-PLAGIARISME
+- Sudut Pandang (Angle) Asli: [Apa fokus utama video sumber?]
+- Alur Asli: [Bagaimana sumber menyusun ceritanya?]
+- Yang Kita Buang: [Bagian/opini apa dari sumber yang tidak akan kita pakai]
+
+### 3. 🎯 USULAN 3 ANGLE BARU (THE PIVOT)
+(Berikan 3 opsi sudut pandang yang JAUH lebih tajam dan berbeda dari sumber aslinya. Sudut pandang ini akan dipilih user untuk Agent-Script).
+- Opsi 1 (Fokus Bisnis/Strategi): [Deskripsi 1 kalimat]
+- Opsi 2 (Fokus Psikologi/Edukasi): [Deskripsi 1 kalimat]
+- Opsi 3 (Fokus Investigasi/Kontras): [Deskripsi 1 kalimat]
+
+### 4. 📐 BLUEPRINT OUTLINE (REKOMENDASI TERBAIK)
+(Pilih satu angle terbaik dari poin 3, lalu buatkan outline super detail untuk target video ${b.dur}-${b.dur+2} menit atau minimal ${fmt(tgt())} kata total. Bagilah ke dalam beberapa Part/Bab).
+
+Untuk SETIAP PART, tuliskan format berikut:
+- **[Timestamp] | Judul Part:** (Contoh: 00:00 - 02:00 | [Judul Menarik])
+- **Tujuan Bab:** (Apa yang harus dipahami penonton di bab ini)
+- **Data yang Dipakai:** (Sebutkan data spesifik dari "The Vault" yang dimasukkan ke bab ini)
+- **Open Loop (Kait Penasaran):** (Pertanyaan gantung apa yang ditanam di bab ini agar penonton lanjut ke bab berikutnya?)
+- **Visual & B-Roll Cue (Faceless):** (Sebutkan 2-3 ide footage/animasi spesifik yang harus dicari editor untuk menggantikan ketiadaan wajah host di bab ini)
+- **Target Kata:** (Perkiraan jumlah kata untuk bab ini)
+
+Akhiri output dengan SATU baris kalimat penutup berikut (tanpa tambahan teks lain): 
+"Pilih salah satu Angle dari Poin 3, lalu masukkan ke dalam Agent-Script tahap selanjutnya!"`}},
 {n:2,k:'c',p:'claude',ai:'Claude',t:'AGENT-SCRIPT',sub:'Naskah voice over lengkap dan alami',
- prompt:()=>{const b=B();return `Bertindaklah sebagai Scriptwriter spesialis konten Faceless Video Essay. Berdasarkan outline di bawah ini, tuliskan skrip utuh untuk Voice Over (VO):
+ prompt:()=>{const b=B();return `[ROLE]
+Anda adalah Master Scriptwriter spesialis YouTube Faceless Video Essay dan Dokumenter ${b.niche}. Tugas utama Anda adalah mengembangkan [OUTLINE] menjadi naskah Voice Over (VO) utuh yang sangat mengalir, dramatis, dan 100% siap dibacakan oleh AI Text-to-Speech (TTS) tanpa perlu pengeditan manual.
 
-${outVal()}
+[INPUT]
+- Outline Dasar: ${outVal()}
+- Target Audien: ${b.audien}
+- Gaya Bahasa Utama: Cinematic Dokumenter, Santai, Edukatif
 
-Ketentuan Penulisan:
-1. Target kata: Minimal ${fmt(tgt())} kata (agar durasi baca mencapai ${b.dur}-${b.dur+2} menit dengan tempo bicara normal).
-2. Gaya Bahasa Tutur Lisan (Conversational): Gunakan bahasa tutur yang santai, alami, dan mengalir seperti narator dokumenter populer sedang bercerita ke teman di kafe.
-3. HINDARI KATA KAKU KHAS AI: Jangan gunakan kata/frasa klise seperti "pada akhirnya", "tak bisa dipungkiri", "di sisi lain", "selain itu", atau "mari kita selami".
-4. FORMAT KHUSUS VOICE GENERATION (TTS-Ready):
-   - Tulis HANYA teks yang dibaca oleh narator.
-   - JANGAN sertakan petunjuk visual, nama bab, timestamp, atau instruksi dalam kurung seperti (musik pelan) atau [Visual: motor lewat] agar teks bisa langsung disalin ke aplikasi TTS tanpa dibaca salah oleh AI Suara.
-   - Perhatikan tanda baca (titik, koma, dan tanda tanya) secara presisi untuk memberikan jeda napas yang pas bagi AI Voice Generator.
-5. Kata ganti: JANGAN memakai "lo", "lu", "gue", atau "gua". Pakai "kalian" untuk penonton, "kita" untuk kebersamaan, dan "saya" untuk narator.
-6. JANGAN MENGARANG: Pertahankan semua fakta dari outline. Jangan menambah angka, tahun, kutipan, atau data baru. Jangan mengarang pengalaman pribadi, uji coba, atau hasil tes yang tidak ada di outline (channel ini faceless, jangan berpura-pura sudah mencoba sendiri). Bagian bertanda [PERLU VERIFIKASI] ditulis dengan kalimat hati-hati seperti "diperkirakan" atau "menurut sebagian sumber".
-7. Ritme dan retensi: Variasikan panjang kalimat (kalimat pendek, sedang, dan pertanyaan retoris). 15 detik pertama langsung masuk ke inti, tanpa "Halo guys" atau perkenalan channel. Setiap 60-90 detik beri pemicu baru (pertanyaan, fakta mengejutkan, atau rasa penasaran yang dijawab di bagian berikutnya).
-8. Siap dibacakan: Tulis angka, tahun, dan singkatan seperti cara diucapkan bila ambigu. Tanpa emoji dan tanpa simbol markdown (#, *, -). Pisahkan paragraf dengan satu baris kosong.
+[ATURAN PENULISAN NASKAH (STRICT RULES)]
+1. OPTIMASI TTS (CLEAN TEXT): 
+   - Naskah HANYA berisi teks yang akan diucapkan. 
+   - DILARANG KERAS menggunakan simbol markdown (**, #, -, *).
+   - DILARANG KERAS menulis instruksi visual, nama bab, timestamp, atau teks dalam kurung seperti [Visual motor] atau (Musik tegang).
+   - Tulis lambang menjadi kata agar TTS tidak salah baca (contoh: tulis "persen" bukan "%", tulis "kilometer per jam" bukan "km/j").
+   - Gunakan tanda baca (koma, titik, tanda tanya) secara presisi untuk mengatur jeda napas narator.
 
-Tulis naskah VO bersih penuh sekarang dari bab Hook sampai Outro.${gl()}`}},
+2. GAYA BAHASA & DIKSI (ANTI-ROBOT):
+   - Gunakan gaya tutur lisan yang mengalir, berwibawa namun santai (Cinematic Dokumenter).
+   - DILARANG menggunakan frasa klise AI seperti: "Mari kita selami", "Tak bisa dipungkiri", "Pada akhirnya", "Kesimpulannya", "Di sisi lain", atau "Menariknya". 
+   - Gunakan kata ganti "kami" untuk mewakili opini channel, "kalian" untuk menyapa penonton, dan "saya" jika mengacu pada narator tunggal. DILARANG menggunakan "lo", "lu", "gue", atau "gua".
+
+3. STRUKTUR & RETENSI PENONTON:
+   - Targetkan minimal ${fmt(tgt())} kata. 
+   - 15 detik pertama (Hook) langsung hajar ke inti konflik atau misteri utama. DILARANG menggunakan basa-basi seperti "Halo semuanya", "Kembali lagi di channel", atau "Selamat datang".
+   - Variasikan panjang kalimat. Gunakan kalimat pendek untuk penekanan dramatis, dan kalimat panjang untuk penjelasan teknis.
+   - Tanamkan "Open Loop" (pertanyaan gantung atau fakta mengejutkan) setiap 60-90 detik untuk memaksa penonton terus menyimak.
+
+4. FAKTA & BATASAN FACELESS:
+   - JANGAN mengarang data, angka, tahun, atau nama komponen di luar dari referensi outline.
+   - Karena ini video Faceless, DILARANG berpura-pura memiliki pengalaman pribadi fisik (contoh salah: "Waktu saya coba geber motor ini di jalanan..."). Ubah menjadi observasi objektif (contoh benar: "Jika motor ini digeber di jalanan...").
+   - Jika ada data [PERLU VERIFIKASI] di outline, gunakan frasa "diperkirakan" atau "banyak pihak meyakini".
+
+[OUTPUT FORMAT]
+Hasilkan naskah VO bersih, mengalir dari paragraf pertama hingga akhir. Pisahkan antar ide/adegan dengan satu baris kosong (Enter). JANGAN menuliskan judul, pengantar AI, atau catatan penutup. Langsung mulai dengan kalimat pertama Hook.
+
+Gaya bahasa yang dipakai proyek ini: ${b.gaya}.`}},
 {n:3,k:'r',p:'openai',ai:'ChatGPT',t:'AGENT-SEO',sub:'Storyboard editing, SEO ganda, thumbnail',
- prompt:()=>{const b=B();return `Berdasarkan skrip Voice Over di bawah ini, tolong buatkan panduan produksi, editing, dan SEO lengkap untuk konten Faceless Video Essay:
+ prompt:()=>{const b=B();return `[ROLE]
+Anda adalah AGENT-SEO dan POST-PRODUCTION DIRECTOR untuk channel YouTube Faceless Video Essay. Tugas Anda adalah merancang panduan visual menyeluruh untuk editor video dan meracik metadata SEO tingkat lanjut berdasarkan naskah final agar video mendapatkan retensi tinggi dan mendominasi algoritma YouTube.
 
-${scriptVal()}
+[INPUT VARIABEL SYSTEM]
+- Hasil_Riset_Outline: ${outVal()}
+- Naskah_Utama: ${scriptVal()}
 
-Gunakan format Markdown. Pada judul, deskripsi, dan komentar jangan memakai "lo", "lu", "gue", atau "gua"; pakai "kalian", "kita", atau "saya". Tugasmu:
+[ATURAN UMUM]
+1. TONE BAHASA: Gunakan sapaan profesional ("kalian", "kita", "saya"). DILARANG KERAS menggunakan bahasa gaul segmented seperti "lo/gue".
+2. CLEAN OUTPUT: Hasilkan output menggunakan format Markdown secara berurutan tanpa teks pengantar AI, tanpa basa-basi pembuka, dan tanpa kalimat penutup.
+3. KONSISTENSI DATA: Pastikan timestamps dan pembagian bab sinkron dengan alur cerita pada [Naskah_Utama].
 
-## 1. Storyboard & Visual Guide untuk Editor (Tabel 4 Kolom)
-Buat TABEL Markdown dengan header persis: | Timestamp & Potongan Teks VO | Aksi Visual & Pacing Editor | Kata Kunci B-Roll / Stok Footage | SFX & Mood Musik (BGM) |
-- Satu baris per paragraf atau adegan (sekitar 10-20 detik). Wajib mencakup SELURUH naskah dari awal sampai akhir, jangan melewatkan bagian mana pun.
-- Kolom 1: Estimasi timestamp (mm:ss-mm:ss, hitung 140 kata = 1 menit) dan kutipan singkat teks VO (maksimal 12 kata).
-- Kolom 2: Deskripsi aksi visual dan pacing, misal 'Fast cut setiap 2 detik', 'Slow zoom in', 'Transition whip pan'.
-- Kolom 3: Kata kunci spesifik dalam Bahasa Indonesia DAN Inggris untuk dicari manual di Pexels, YouTube, atau TikTok, misal 'Archive footage balapan 90s', 'Close up engine working'. Beri satu kata kunci alternatif jika footage utama sulit ditemukan.
-- Kolom 4: Petunjuk SFX dan mood musik, misal 'SFX Whoosh saat transisi', 'BGM Upbeat Tense'.
-- Setelah tabel, tulis "Catatan Lisensi": ingatkan agar memakai footage bebas royalti atau berlisensi jelas, bukan memakai cuplikan video milik orang lain tanpa izin.
+[FORMAT OUTPUT WAJIB]
 
-## 2. Paket SEO & Formulasi Judul YouTube
-A. Formulasi Judul (total 6 opsi, maksimal 60 karakter per judul, kata kunci di bagian depan):
-   - 3 judul tipe SEARCH/SEO: fokus kata kunci yang sering diketik di kolom pencarian YouTube agar mudah ditemukan jangka panjang.
-   - 3 judul tipe REKOMENDASI/CTR: fokus emosi, curiosity gap, dan rasa penasaran tanpa clickbait bohong agar CTR tinggi di beranda YouTube.
-   - Tandai satu judul rekomendasi terbaik beserta alasan singkatnya.
-B. Deskripsi Video Terstruktur (SEO-Optimized):
-   - 150 karakter pertama: kalimat hook yang mengandung KATA KUNCI UTAMA (bagian yang paling mungkin tampil di preview pencarian).
-   - Ringkasan singkat isi video (2-3 paragraf).
-   - Daftar timestamp / bab video (format mm:ss judul bab) yang SESUAI dengan bab di naskah.
-   - 3-5 hashtag utama yang paling relevan.
-C. Kata Kunci & Pencarian:
-   - 1 Kata Kunci Utama (Focus Keyword).
-   - 5 Kata Kunci Turunan / Long-tail (frasa pencarian spesifik yang sering diketik audien).
-   - 15 Tag dipisah koma (campuran kata kunci utama dan long-tail).
-D. Pelengkap:
-   - 1 komentar pertama (pinned comment) berupa pertanyaan pemancing diskusi.
-   - Checklist sebelum upload: cek fakta bertanda [PERLU VERIFIKASI], cek lisensi footage dan musik, dan cek apakah perlu mengaktifkan pengungkapan konten buatan/sintetis di YouTube Studio.
+### 1. 🎬 STORYBOARD & VISUAL GUIDE UNTUK EDITOR
+(Buat tabel 4 kolom di bawah ini. Wajib mencakup SELURUH paragraf/adegan dari awal sampai akhir naskah tanpa ada yang terlewat. Asumsikan 140 kata = 1 menit).
 
-## 3. Konsep Thumbnail
-Buat 3 opsi konsep. Untuk tiap opsi tuliskan:
-- Deskripsi visual dan elemen utama (objek utama, komposisi, efek visual, suasana, palet warna). Maksimal 3 elemen agar terbaca jelas di layar HP.
-- Teks pendek di thumbnail (maksimal 3-4 kata) yang MELENGKAPI judul, bukan mengulangnya.
-- Prompt gambar AI (Midjourney/DALL-E) dalam Bahasa Inggris untuk elemen latar belakang, lengkap dengan gaya, pencahayaan, rasio 16:9, dan instruksi "no text in image" (teks ditambahkan manual saat editing).
-- Pasangkan tiap konsep dengan satu judul dari bagian 2 yang paling cocok.`}},
+| Timestamp & Potongan Teks VO | Aksi Visual & Pacing Editor | Kata Kunci B-Roll / Stok Footage (ID & EN) | SFX & Mood Musik (BGM) |
+| :--- | :--- | :--- | :--- |
+| [00:00-00:20] "Kutipan awal VO..." | [Misal: Fast cut tiap 2 detik, whip pan] | [Misal: Archive footage balapan 90s / 90s motorcycle race] | [Misal: SFX Whoosh, BGM Tense Upbeat] |
+*(Lanjutkan baris tabel hingga akhir naskah)*
+
+**Catatan Lisensi Editor:** Wajib gunakan footage bebas royalti (Pexels, Pixabay, Envato) atau berlisensi *Fair Use*. Jangan mencomot video kreator lain tanpa modifikasi transformatif.
+
+### 2. 🚀 PAKET METADATA & SEO YOUTUBE
+**A. Formulasi Judul (Maks. 60 Karakter, Keyword di depan):**
+- **Search/SEO Intent:** (Fokus kata kunci pencarian organik jangka panjang)
+  1. [Judul SEO 1]
+  2. [Judul SEO 2]
+  3. [Judul SEO 3]
+- **Rekomendasi/CTR Intent:** (Fokus emosi, curiosity gap, no clickbait palsu)
+  1. [Judul CTR 1]
+  2. [Judul CTR 2]
+  3. [Judul CTR 3]
+*🏅 Rekomendasi Judul Terbaik:* [Pilih 1 judul dan berikan 1 kalimat alasan]
+
+**B. Deskripsi Video Terstruktur:**
+- **Hook (150 Karakter Pertama):** [Kalimat memancing yang mengandung Kata Kunci Utama]
+- **Ringkasan:** [2-3 paragraf ringkasan isi video]
+- **Navigasi Bab:** 
+  00:00 - [Judul Bab 1]
+  *(lanjutkan sesuai pembagian tabel storyboard)*
+- **Hashtags:** [3-5 hashtag paling relevan, contoh: #Otomotif #ReviewMotor]
+
+**C. Target Keyword & Tags:**
+- **Kata Kunci Utama:** [1 Keyword Fokus]
+- **Kata Kunci Turunan (Long-tail):** [5 Frasa pencarian spesifik]
+- **Tags Kolom YouTube:** [15 Tag dipisah dengan koma]
+
+**D. Pelengkap Interaksi:**
+- **Pinned Comment:** [1 Kalimat pertanyaan pemancing diskusi di kolom komentar]
+- **Checklist Upload:** ☑️ Cek Fakta Verifikasi | ☑️ Cek Lisensi B-Roll | ☑️ Setel "Konten Buatan/Sintetis" jika memakai AI Voice.
+
+### 3. 🖼️ KONSEP THUMBNAIL & AI PROMPT
+(Buat 3 opsi konsep thumbnail yang kontras dan menarik perhatian di layar HP. Maksimal 3 elemen visual agar tidak penuh).
+
+**Opsi 1: [Nama Konsep]**
+- **Deskripsi Visual:** [Objek utama, komposisi, efek, warna]
+- **Teks Thumbnail:** [Maks. 3-4 kata, melengkapi judul, bukan mengulang]
+- **AI Image Prompt (EN):** [Prompt detail untuk Midjourney/DALL-E: Subject, lighting, camera angle, 16:9 aspect ratio, --no text, fonts, letters]
+- **Cocok dengan Judul:** [Sebutkan judul dari Poin 2A]
+
+**Opsi 2: [Nama Konsep]**
+- **Deskripsi Visual:** [...]
+- **Teks Thumbnail:** [...]
+- **AI Image Prompt (EN):** [...]
+- **Cocok dengan Judul:** [...]
+
+**Opsi 3: [Nama Konsep]**
+- **Deskripsi Visual:** [...]
+- **Teks Thumbnail:** [...]
+- **AI Image Prompt (EN):** [...]
+- **Cocok dengan Judul:** [...]`}},
 {n:4,k:'p',p:'claude',ai:'Claude',t:'AGENT-SHORTS',sub:'Skrip YouTube Shorts 45-60 detik',
- prompt:()=>{const b=B();return `Buatkan ${b.jsh} skrip YouTube Shorts tanpa wajah (durasi 45-60 detik, format vertikal 9:16) tentang: ${b.topik}.
-Gaya bahasa: ${b.gaya}. Jika membuat lebih dari satu, setiap Shorts wajib memakai sudut pandang yang berbeda dan hanya membahas SATU ide.
+ prompt:()=>{const b=B();return `[ROLE]
+Anda adalah AGENT-SHORTS dan Spesialis Konten Vertikal (YouTube Shorts/TikTok/Reels) untuk channel Faceless Video Essay. Tugas Anda adalah mengekstrak satu ide atau konflik paling menarik dari naskah panjang, lalu meraciknya menjadi skrip vertikal 45-60 detik yang memiliki tingkat retensi penonton ekstrim.
 
-Aturan: hanya gunakan fakta yang valid. Jangan mengarang angka, tahun, atau kutipan. Jangan berpura-pura punya pengalaman pribadi. Jangan memakai "lo", "lu", "gue", atau "gua"; pakai "kalian", "kita", atau "saya".
+[INPUT VARIABEL SYSTEM]
+- Hasil_Riset_Outline: ${outVal()}
+- Naskah_Utama: ${scriptVal()}
+- Gaya Bahasa: ${b.gaya} (Cepat, Padat, Menegangkan)
 
-Untuk SETIAP Shorts, gunakan format keluaran (Markdown) ini:
-1. Hook di 3 detik pertama: satu kalimat yang memancing rasa penasaran, tanpa salam pembuka.
-2. Skrip Voice Over (maksimal 150 kata, gaya tutur cepat & padat, kalimat pendek). Akhiri dengan penutup yang nyambung kembali ke hook agar penonton memutar ulang, plus ajakan singkat (follow atau tonton video lengkap).
-3. Tabel Storyboard per Detik dengan kolom: Detik | Teks VO | Kata Kunci Stok Footage Manual (Indonesia & Inggris) | Teks di Layar (caption singkat, karena banyak penonton menonton tanpa suara) | SFX. Satu baris tiap 2-4 detik dari detik 0 sampai akhir.
-4. 1 Judul Shorts (maksimal 60 karakter) + 5 Hashtag relevan (sertakan #Shorts).`}}
-];
+[ATURAN PENULISAN (STRICT RULES)]
+1. DURASI & PACING: Targetkan maksimal 130-150 kata untuk durasi Voice Over (VO) 45-60 detik. Gunakan kalimat tunggal yang pendek dan langsung menohok. Hapus semua argumen yang bertele-tele.
+2. SAPAAN PROFESIONAL: Gunakan "kalian", "kita", atau "saya". DILARANG KERAS menggunakan bahasa gaul (seperti "lo", "lu", "gue", "gua") dan DILARANG memakai salam pembuka basi (seperti "Halo guys", "Selamat datang").
+3. FAKTA & FACELESS: Hanya gunakan data valid dari input. Jangan mengarang angka atau tahun. DILARANG berpura-pura memiliki pengalaman pribadi fisik di dalam naskah.
+4. TEKNIK SEAMLESS LOOP: Buat kalimat di ujung video sengaja dibiarkan menggantung (open-ended) yang jika digabungkan secara melingkar dengan kalimat pertama (Hook), akan membentuk satu kalimat utuh yang masuk akal tanpa disadari penonton. Sisipkan ajakan singkat (Call to Action) halus tepat sebelum kalimat gantung tersebut.
+
+[FORMAT OUTPUT WAJIB]
+Hasilkan output menggunakan format Markdown berikut secara berurutan tanpa teks pengantar AI:
+
+### 1. 📱 Judul & Metadata Shorts
+- **Judul (Maks. 60 Karakter):** [Tulis judul hook yang memancing klik]
+- **Hashtags:** [Sertakan #Shorts dan 4 hashtag relevan]
+
+### 2. 📜 Skrip Voice Over (TTS-Ready)
+(Tulis naskah bersih penuh di sini, khusus untuk dicopy-paste ke AI Text-to-Speech. Pastikan teknik Seamless Loop diterapkan antara ujung paragraf terakhir dengan kalimat pertama di paragraf awal).
+
+### 3. 🎬 Storyboard Vertikal (9:16)
+(Buat tabel dengan pembagian waktu yang logis dari detik ke-0 hingga detik ke-60. Tiap baris mewakili 2-4 detik).
+
+| Detik | Potongan Teks VO | Kata Kunci Stok Footage (ID & EN) | Teks di Layar (Caption Pop-up) | Petunjuk SFX & BGM |
+| :--- | :--- | :--- | :--- | :--- |
+| 00-03 | [Kalimat Hook 3 detik pertama] | [Misal: Close up mesin motor / Engine close up] | [Teks tebal, misal: "RECALL BESAR-BESARAN!"] | [SFX Boom/Impact] |
+| 03-06 | [...] | [...] | [...] | [...] |
+*(Lanjutkan hingga akhir naskah/detik ke-60)*`}},
+{n:5,k:'a',p:'gemini',ai:'Gemini',t:'AGENT-AUDIT',sub:'Audit kemiripan AI vs transkrip',
+ prompt:()=>{return `[ROLE]
+Anda adalah Auditor Konten YouTube dan Asisten Editor Kreatif. Tugas Anda adalah membandingkan dua buah teks transkrip untuk menilai tingkat kemiripan substansi, alur berpikir, penggunaan data riset, serta mengukur tingkat keamanan hak cipta (copyright) di YouTube.
+
+[PROMPT VARIABLES]
+- Teks_A (Skrip Asli): ${txVal()}
+- Teks_B (Skrip Baru): ${scriptVal()}
+- Dokumen_Riset: ${outVal()}
+
+[INSTRUKSI EVALUASI]
+Bandingkan Teks_A dan Teks_B dengan mempertimbangkan poin pengayaan dari Dokumen_Riset. Analisis menggunakan metrik berikut:
+1. Alur Narasi: Apakah struktur penyampaian berpindah dengan pola yang sama persis?
+2. Parafrase & Diksi: Apakah ada kemiripan pilihan kata yang mengarah pada duplikasi mentah?
+3. Unsur Kebaruan & Faktual: Apakah Teks_B berhasil membawa sudut pandang baru (novelty) dan menjaga keakuratan data angka/tahun tanpa menyalin cara penyampaian Teks_A?
+
+[RULES FORMAT OUTPUT]
+1. Tampilkan persentase kemiripan di baris pertama beserta status keamanannya (AMAN: < 40%, WASPADA: 40-60%, BAHAYA: > 60%).
+2. Berikan analisis kritis singkat untuk masing-masing pilar evaluasi secara *to the point*.
+3. Wajib menyertakan tabel ringkasan perbandingan di akhir respons menggunakan format Markdown tabel.
+4. Jangan tambahkan teks pembuka atau penutup di luar template.
+
+[OUTPUT TEMPLATE]
+**TOTAL KEMIRIPAN: [X]% - [STATUS AMAN/WASPADA/BAHAYA]**
+
+### 1. Evaluasi Alur dan Restrukturisasi
+[Ulasan ringkas tentang perubahan atau kesamaan struktur narasi]
+
+### 2. Evaluasi Parafrase dan Diksi
+[Ulasan ringkas tentang keunikan gaya bahasa dan kosakata]
+
+### 3. Analisis Risiko YouTube (Reused Content) & Kebaruan
+[Ulasan tentang keamanan ide konten, penggunaan data faktual, dan nilai tambah/novelty dari naskah baru]
+
+### Tabel Ringkasan Perbandingan
+| Indikator | Teks A (Asli) | Teks B (Baru) | Catatan Auditor |
+| :--- | :--- | :--- | :--- |
+| **Angle Utama** | [Angle A] | [Angle B] | [Catatan] |
+| **Urutan Bahasan** | [Pola A] | [Pola B] | [Catatan] |
+| **Gaya Bahasa** | [Tone A] | [Tone B] | [Catatan]`}}
+];;
 /* Sumber di prompt Tahap 1: topik + referensi (catatan fakta, atau transkrip lengkap) */
 const srcField=lite=>{
   const topik=B().topik,rs=S.useRefs===false?[]:usableRefs();
@@ -1171,17 +1302,17 @@ const srcField=lite=>{
   if(S.refMode==='penuh')return topik+(lite?`\n\n[Transkrip sumber dari ${rs.length} referensi ikut dikirim pada permintaan pertama dan tidak diulang di sini.]`:'\n\n'+rs.map((r,i)=>`TRANSKRIP SUMBER ${i+1} (${r.title}):\n${capW(r.text,AIW)}`).join('\n\n'));
   return S.notes?topik+`\n\nCatatan fakta dari ${rs.length} referensi (hasil ekstraksi, bukan transkrip utuh. Perlakukan sebagai transkrip sumber untuk langkah 1 di bagian Tugasmu):\n${S.notes}`:topik;
 };
-const NM={1:'outline',2:'naskah-vo',3:'paket-produksi-seo',4:'shorts'};
+const NM={1:'outline',2:'naskah-vo',3:'paket-produksi-seo',4:'shorts',5:'audit-kemiripan'};
 function promptTemplate(n){PTOK=true;try{return ST[n].prompt(true)}finally{PTOK=false}}
 function promptText(n,lite){
   const t=S.pov[n];if(!t)return ST[n].prompt(lite);
-  return t.split('{{OUTLINE}}').join(S.out[1]||'').split('{{NASKAH}}').join(S.out[2]||'').split('{{SUMBER}}').join(srcField(lite));
+  return t.split('{{OUTLINE}}').join(S.out[1]||'').split('{{NASKAH}}').join(S.out[2]||'').split('{{SUMBER}}').join(srcField(lite)).split('{{TRANSKRIP}}').join(txTexts());
 }
-const POVHINT={1:'{{SUMBER}} diganti otomatis dengan topik dan referensi Anda.',2:'{{OUTLINE}} diganti otomatis dengan outline dari Agent Riset.',3:'{{NASKAH}} diganti otomatis dengan naskah dari Agent Script.',4:''};
+const POVHINT={1:'{{SUMBER}} diganti otomatis dengan topik dan referensi Anda.',2:'{{OUTLINE}} diganti otomatis dengan outline dari Agent Riset.',3:'{{OUTLINE}} diganti otomatis dengan outline dari Agent Riset. {{NASKAH}} diganti otomatis dengan naskah dari Agent Script.',4:'{{OUTLINE}} diganti otomatis dengan outline dari Agent Riset. {{NASKAH}} diganti otomatis dengan naskah dari Agent Script.',5:'{{TRANSKRIP}} diganti otomatis dengan transkrip Tahap 0. {{OUTLINE}} diganti otomatis dengan outline dari Agent Riset. {{NASKAH}} diganti otomatis dengan naskah dari Agent Script.'};
 const povHtml=n=>{const def=promptTemplate(n),cur=S.pov[n]!==undefined?S.pov[n]:def,ed=S.pov[n]!==undefined&&S.pov[n]!==def;
   return `<details class="pv"${povOpen[n]?' open':''}><summary>Prompt yang dikirim (bisa diedit)${ed?' · diedit':''}</summary><p class="hint">Teks ini yang dikirim ke AI saat Anda klik Jalankan. ${POVHINT[n]||''} Jangan hapus tanda {{...}} kalau isinya masih mau dipakai. Perubahan prompt tidak ikut berubah saat Anda mengganti kolom di panel kiri, kecuali Anda klik Kembalikan.</p><textarea data-pov="${n}" style="min-height:240px;font:12px/1.5 ui-monospace,Menlo,monospace">${esc(cur)}</textarea><div class="row"><button class="btn ghost" data-povreset="${n}"${ed?'':' disabled'}>Kembalikan prompt asli</button></div></details>`};
 const refNote=()=>{const u=refUrls();if(!u.length)return'';const ok=usableRefs().length;return `<p class="hint">Referensi yang dipakai: ${ok} dari ${u.length} link${S.useRefs===false?' (dimatikan)':S.refMode==='penuh'?' (transkrip lengkap)':' (catatan fakta per link)'}.${ok<u.length?' Link yang gagal tidak ikut dipakai.':''}</p>`};
-const need=n=>n===2?(S.out[1]?'':'Outline (Tahap 1) belum ada. Jalankan Agent Riset dulu.'):n===3?(S.out[2]?'':'Naskah (Tahap 2) belum ada. Jalankan Agent Script dulu.'):(B().topik?'':'Isi topik atau tempel link referensi dulu di panel kiri.');
+const need=n=>n===5?((S.out[2]||'').trim()&&usableRefs().length?'':'Naskah (Tahap 2) belum ada atau transkrip (Tahap 0) belum ada. Jalankan Agent Script dan ambil transkrip dulu.'):n===2?(S.out[1]?'':'Outline (Tahap 1) belum ada. Jalankan Agent Riset dulu.'):n===3?(S.out[2]?'':'Naskah (Tahap 2) belum ada. Jalankan Agent Script dulu.'):(B().topik?'':'Isi topik atau tempel link referensi dulu di panel kiri.');
 
 /* ===== Penulis markdown ===== */
 const inl=t=>esc(t).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*([^*\s][^*]*)\*/g,'$1<em>$2</em>');
@@ -1257,6 +1388,7 @@ function actions(n){
   else if(!has)h+=`<button class="btn" data-go="${n}:baru"${dis}>${n===1&&S.st[0]==='Dilewati'?'Jalankan dari Topik':'Jalankan'}</button>`;
   else if(n===1)h+=`<button class="btn" data-send="2"${dis}>Lanjut ke Agent Script ▶</button>`;
   else if(n===2)h+=`<button class="btn" data-send="3"${dis}>Lanjut ke Agent SEO ▶</button>`;
+  else if(n===4)h+=`<button class="btn" data-send="5"${dis}>Lanjut ke Agent Audit ▶</button>`;
   if(n===4)h+=`<button class="${has&&!S.part[n]?'btn ghost':'btn'}" data-go="4:fromScript"${dis}${(S.out[2]||'').trim()?'':' disabled'}>Jalankan dari Agent Script</button>`;
   if(has)h+=`<button class="btn ghost" data-go="${n}:baru"${dis}>Mulai dari awal</button>`;
   h+=`<button class="btn ghost" data-editpop="${n}"${dis}>✏ Edit</button>`;
@@ -1353,13 +1485,13 @@ function bodyHtml(n){
 }
 const KEY_LABEL={gemini:'GEMINI_API_KEY',claude:'ANTHROPIC_API_KEY',openai:'OPENAI_API_KEY'};
 const badgeText=n=>{if(n===0&&!S.st[0]){const u=refUrls();return u.length?(usableRefs().length===u.length?'Selesai mentranskrip':`${usableRefs().length}/${u.length} transkrip`):'Menunggu'}return S.st[n]||'Menunggu'};
-const curStage=()=>{for(const n of [0,1,2,3,4])if(!['Selesai','Dilewati'].includes(S.st[n]))return n;return 4};
+const curStage=()=>{for(const n of [0,1,2,3,4,5])if(!['Selesai','Dilewati'].includes(S.st[n]))return n;return 5};
 function render(){
   $('pipe').innerHTML=ST.map(s=>{const n=s.n;const bt=badgeText(n);
-    return `<section class="stage" data-k="${s.k}" data-n="${String(n).padStart(2,'0')}"><div class="sh" data-tg="${n}" style="cursor:pointer" title="Klik untuk melihat hasil tahap ini di pop-up"><div class="sh-top"><span class="stage-num">${n}</span><span class="stage-icon">${["📄","🔍","📝","📈","🎬"][n]||"📄"}</span></div><div class="t"><h2>Tahap ${n}: ${s.t}</h2><small>${s.sub}${n===0?'':' · Jalur: '+(isRouter(getRoute(n))?'9router':'Direct')}</small></div><span class="badge" data-badge="${n}" data-s="${bt}">${bt}</span>${n>0?routeSel(n):''}${n>0&&getRoute(n)==='direct'?directChip(n):''}${n>0&&isRouter(getRoute(n))?modelSel(n):''}</div><div class="body">${bodyHtml(n)}</div></section>`}).join('');
+    return `<section class="stage" data-k="${s.k}" data-n="${String(n).padStart(2,'0')}"><div class="sh" data-tg="${n}" style="cursor:pointer" title="Klik untuk melihat hasil tahap ini di pop-up"><div class="sh-top"><span class="stage-num">${n}</span><span class="stage-icon">${["📄","🔍","📝","📈","🎬","🛡️"][n]||"📄"}</span></div><div class="t"><h2>Tahap ${n}: ${s.t}</h2><small>${s.sub}${n===0?'':' · Jalur: '+(isRouter(getRoute(n))?'9router':'Direct')}</small></div><span class="badge" data-badge="${n}" data-s="${bt}">${bt}</span>${n>0?routeSel(n):''}${n>0&&getRoute(n)==='direct'?directChip(n):''}${n>0&&isRouter(getRoute(n))?modelSel(n):''}</div><div class="body">${bodyHtml(n)}</div></section>`}).join('');
   attachVoice();
   const w=words(S.out[2]);$('sWords').textContent=w;$('sMin').textContent=(w/140).toFixed(1);$('sTarget').textContent=tgt();
-  $('pb').style.width=[1,2,3,4].filter(n=>S.st[n]==='Selesai').length/4*100+'%';
+  $('pb').style.width=[1,2,3,4,5].filter(n=>S.st[n]==='Selesai').length/5*100+'%';
   $('stop').hidden=busyN===null;$('go0').disabled=busyN!==null;
 }
 function toast(m,ms){const t=$('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),ms||2200)}
@@ -1496,7 +1628,7 @@ async function go(n,mode,ins){
     // Auto Library (Script VO): tahap selesai -> masuk Library otomatis
     // (1 entry per tahap+folder, re-run update yang sama). Folder = Judul
     // proyek dari Brief (kalau kosong, pakai topik).
-    if (n >= 1 && (S.out[n] || '').trim()) {
+    if (n >= 1 && n <= 4 && (S.out[n] || '').trim()) {
       const types = { 1: 'riset', 2: 'long', 3: 'seo', 4: 'short' }, names = { 1: 'Riset', 2: 'Script Long', 3: 'SEO', 4: 'Script Short' };
       const topic = ((($('judul') && $('judul').value) || S.judul || B().topik || '') + '').trim() || 'Tanpa topik';
       let h = 0; for (let i = 0; i < topic.length; i++) h = ((h << 5) - h + topic.charCodeAt(i)) | 0;
@@ -1787,7 +1919,7 @@ function makeVoice(k){
 const slug=t=>(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,50)||'video';
 function saveFile(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 function dl(n){const o=S.out[n]||'';if(!o.trim())return toast('Belum ada hasil untuk diunduh');saveFile(slug(B().topik)+'-'+n+'-'+NM[n]+'.txt',o)}
-function dlAll(){const p=[1,2,3,4].filter(n=>(S.out[n]||'').trim()).map(n=>'='.repeat(60)+'\nTAHAP '+n+': '+NM[n].toUpperCase()+'\n'+'='.repeat(60)+'\n\n'+S.out[n].trim());if(!p.length)return toast('Belum ada hasil untuk diunduh');saveFile(slug(B().topik)+'-semua-tahap.txt',p.join('\n\n\n')+'\n')}
+function dlAll(){const p=[1,2,3,4,5].filter(n=>(S.out[n]||'').trim()).map(n=>'='.repeat(60)+'\nTAHAP '+n+': '+NM[n].toUpperCase()+'\n'+'='.repeat(60)+'\n\n'+S.out[n].trim());if(!p.length)return toast('Belum ada hasil untuk diunduh');saveFile(slug(B().topik)+'-semua-tahap.txt',p.join('\n\n\n')+'\n')}
 
 /* ===== Event ===== */
 document.addEventListener('click',e=>{
@@ -1825,6 +1957,7 @@ document.addEventListener('click',e=>{
   else if(d.cp)navigator.clipboard.writeText(S.out[d.cp]||'').then(()=>toast('Tersalin'));
   else if(d.dl)dl(d.dl);
   else if(d.gaya!==undefined){$('gaya').value=d.gaya;save();render()}
+  else if(d.niche!==undefined){$('niche').value=d.niche;save();render()}
   else if(d.getrefs!==undefined)fetchRefs(true);
   else if(d.rmref){$('topik').value=tidyTopic($('topik').value.split(d.rmref).join(' '));save();updateRefsUI();render()}
   else if(d.manual){const r=S.refs[d.manual];if(r){r.manualOpen=!r.manualOpen;updateRefsUI();render();if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal()}}
@@ -2070,7 +2203,7 @@ fetch('/api/health').then(r=>r.json()).then(async h=>{
   // (dropdown Direct custom + status), jangan tunggu timer-nya.
   if (typeof renderClipAi === 'function') renderClipAi();
   // init default route per tahap jika belum ada
-  [1,2,3,4].forEach(n=>{if(!S.route[n])S.route[n]=routerOk?'router-pi':'direct'});
+  [1,2,3,4,5].forEach(n=>{if(!S.route[n])S.route[n]=routerOk?'router-pi':'direct'});
   // Chip status 9router PC (kedua) — tampil di Koneksi AI bersama chip Pi.
   // Jumlah model HANYA dari daftar yang berhasil di-fetch (ML_PC_OK); bila
   // fetch gagal -> "tidak terjangkau", bukan "0 model" yang menyesatkan.
@@ -2090,7 +2223,7 @@ fetch('/api/health').then(r=>r.json()).then(async h=>{
     // karena benar-benar terjangkau). Jadi fetch Pi bisa gagal di sini (Pi
     // mati) — fetch PC tetap jalan agar chip PC menampilkan jumlah benar.
     await fetchPiModels();
-    if(ML_OK)[1,2,3,4].forEach(n=>{if(!ML.some(x=>x.id===S.model[n]))S.model[n]=ML[0]?ML[0].id:''});
+    if(ML_OK)[1,2,3,4,5].forEach(n=>{if(!ML.some(x=>x.id===S.model[n]))S.model[n]=ML[0]?ML[0].id:''});
     // Daftar model 9router PC (untuk dropdown model jalur PC + chip).
     if(routerPcOk) await fetchPcModels();
     if(ML_OK){
@@ -2120,7 +2253,7 @@ fetch('/api/health').then(r=>r.json()).then(async h=>{
     $('keys').innerHTML=pkey('router','9router Pi',false,'tidak terhubung','9router Pi — cek ROUTER_URL / server Pi')+pcChip()+CONN.map(([k,l])=>{const d=direct[k]||{};
       return pkey(k,l,d.ok,d.ok?'✓ aktif':'kunci belum diisi',k==='elevenlabs'?'TTS ElevenLabs — isi ELEVENLABS_API_KEY di .env lalu restart agar langsung aktif':'Model: '+(d.model||'-')+' — isi '+k.toUpperCase()+'_API_KEY di .env lalu restart agar langsung aktif');}).join('')+groqChip()+customChips(direct);
     // paksa semua ke direct hanya bila TIDAK ada router sama sekali (Pi + PC mati)
-    if(!routerPcOk)[1,2,3,4].forEach(n=>{S.route[n]='direct'});
+    if(!routerPcOk)[1,2,3,4,5].forEach(n=>{S.route[n]='direct'});
     save();render();
   }
 }).catch(()=>{});
@@ -2133,7 +2266,7 @@ fetch('/api/health').then(r=>r.json()).then(async h=>{
       for(const k of Object.keys(S))delete S[k];
       Object.assign(S,srv);
       KEYS.forEach(k=>S[k]=S[k]||{});S.err={};
-      [0,1,2,3,4].forEach(n=>{if(S.st[n]==='Berjalan')S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):'Menunggu'});
+      [0,1,2,3,4,5].forEach(n=>{if(S.st[n]==='Berjalan')S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):'Menunggu'});
       IDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
     }
     serverTs=+(srv._ts||0);
