@@ -146,7 +146,7 @@ try { const arr = JSON.parse(fs.readFileSync(CUSTOM_FILE, 'utf8')); if (Array.is
 const customUrl = (b) => {
   let s = String(b || '');
   while (s.endsWith('/')) s = s.slice(0, -1);
-  return s.endsWith('/v1/openai') ? s + '/chat/completions' : s + '/v1/chat/completions';
+  return (s.endsWith('/v1/openai') || s.endsWith('/v1beta/openai')) ? s + '/chat/completions' : s + '/v1/chat/completions';
 };
 const customCall = async (slug, msgs, job) => {
   const c = CUSTOM[slug]; if (!c) throw fail('Provider custom tidak ditemukan: ' + slug, 'input');
