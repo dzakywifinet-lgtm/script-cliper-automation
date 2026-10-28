@@ -1064,7 +1064,8 @@ const stateHasContent=s=>!!(s&&typeof s==='object'&&(
   Object.keys(s.refs||{}).length||Object.keys(s.chat||{}).some(k=>String((s.chat||{})[k]||'').trim())||
   Object.keys(s.log||{}).some(k=>String((s.log||{})[k]||'').trim())||
   Object.values(s.st||{}).some(v=>String(v||'').trim())));
-const syncState=async()=>{if(!stateReady)return;if(serverTs>0&&!stateHasContent(S))return;try{const r=await fetch('/api/state',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(S)});if(r.ok)serverTs=S._ts||0}catch(e){}};
+let lastSyncErrToast=0;
+const syncState=async()=>{if(!stateReady)return;if(serverTs>0&&!stateHasContent(S))return;try{const r=await fetch('/api/state',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(S)});if(r.ok)serverTs=S._ts||0;else throw new Error('HTTP '+r.status)}catch(e){if(Date.now()-lastSyncErrToast>30000){lastSyncErrToast=Date.now();try{toast('Gagal menyimpan ke server — hasil terbaru hanya di browser ini. Coba refresh / cek koneksi.')}catch(_){}}}}; // STATE SYNC ERROR TOAST (Dzaky 28 Okt): gagal sync tidak lagi diam-diam.
 const save=()=>{IDS.forEach(k=>{const el=$(k);if(el)S[k]=el.value;});S._ts=Date.now();try{localStorage.setItem('hvo2',JSON.stringify(S))}catch(e){}if(stateReady){clearTimeout(saveTimer);saveTimer=setTimeout(syncState,1000)}};
 const words=t=>(t||'').trim().split(/\s+/).filter(Boolean).length;
 const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
@@ -2352,8 +2353,26 @@ fetch('/api/health').then(r=>r.json()).then(async h=>{
   try{
     const srv=await (await fetch('/api/state')).json();
     if(srv&&!srv.empty&&(+(srv._ts||0))>=(+(S._ts||0))){
+      // STATE LOAD MERGE (Dzaky 28 Okt): gabung, bukan ganti mentah — yang kosong
+      // tidak boleh menimpa yang berisi; dua-duanya berisi -> server (lebih baru) menang.
+      const _has=v=>v!==undefined&&v!==null&&(typeof v!=='string'||v.trim()!=='')&&(typeof v!=='object'||Object.keys(v).length>0);
+      const _okRef=r=>r&&r.status==='ok'&&String(r.text||'').trim();
+      const _merged={};
+      for(const k of new Set([...Object.keys(S),...Object.keys(srv)])){
+        if(k==='_ts'){_merged[k]=srv._ts;continue;}
+        if(KEYS.includes(k)){
+          const a=S[k]||{},b=srv[k]||{},m={};
+          for(const sk of new Set([...Object.keys(a),...Object.keys(b)])){
+            if(k==='refs')m[sk]=_okRef(b[sk])?b[sk]:(_okRef(a[sk])?a[sk]:(_has(b[sk])?b[sk]:a[sk]));
+            else m[sk]=_has(b[sk])?b[sk]:a[sk];
+          }
+          _merged[k]=m;
+        } else {
+          _merged[k]=_has(srv[k])?srv[k]:S[k];
+        }
+      }
       for(const k of Object.keys(S))delete S[k];
-      Object.assign(S,srv);
+      Object.assign(S,_merged);
       KEYS.forEach(k=>S[k]=S[k]||{});S.err={};
       [0,1,2,3,4,5].forEach(n=>{if(S.st[n]==='Berjalan')S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):'Menunggu'});
       IDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
@@ -6201,7 +6220,9 @@ const renderSubPresetSettings = () => {
   // Pengaturan akun sudah di halaman Settings (accPanel tampil langsung di sana).
   // Fase 24 (perintah Dzaky 24 Okt: tiap pertama buka = Dashboard utama):
   // selalu Dashboard saat load — bukan halaman terakhir, bukan Script VO.
-  try{ switchPage('dashboard'); }catch(e){ switchPage('dashboard'); }
+  // REFRESH TETAP DI HALAMAN TERAKHIR (Dzaky 28 Okt — menggantikan aturan Fase 24 'selalu Dashboard saat load'):
+  // baca hvo-page yang sudah disimpan switchPage tiap pindah halaman.
+  try{ var _lp=null; try{ _lp=localStorage.getItem('hvo-page'); }catch(e){} switchPage(_lp||'dashboard'); }catch(e){ switchPage('dashboard'); }
 })();
 </script>
 

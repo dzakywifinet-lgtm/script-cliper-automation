@@ -3281,7 +3281,8 @@ const server = http.createServer(async (req, res) => {
     Object.keys(s.log || {}).some(k => String((s.log || {})[k] || '').trim()) ||
     Object.values(s.st || {}).some(v => String(v || '').trim())));
   if (req.method === 'POST' && p === '/api/state') {
-    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 1e6) break; }
+    // STATE CAP 10MB (Dzaky 28 Okt): cap 1MB lama membuat state besar gagal sync diam-diam.
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 10e6) break; }
     let j; try { j = JSON.parse(raw); } catch { return send(res, 400, { error: 'JSON tidak valid' }); }
     if (!j || typeof j !== 'object') return send(res, 400, { error: 'State harus objek' });
     const f = stateFile(sessUser(req));
