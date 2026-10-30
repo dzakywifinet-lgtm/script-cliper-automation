@@ -773,7 +773,7 @@ body.nonadmin #updCard{display:none!important}
           </div>
           <div class="row" style="margin-top:10px">
             <div style="flex:1"><label for="clipMode">Layout</label><select id="clipMode"><option value="podcast">🎙️ Podcast</option><option value="auto">✨ Auto</option><option value="landscape">🖼️ Landscape (Fit Penuh)</option><option value="split">👥 Split</option><option value="crop11">▣ Crop 1:1</option><option value="gameplay">🎮 Gameplay</option></select></div>
-            <div style="flex:1"><label for="clipHookPresetCreate">🃏 Kartu Judul</label><select id="clipHookPresetCreate"><option value="kartu" selected>🃏 Kartu</option><option value="kutipan">💡 Kutipan Terang</option><option value="slide">🎞️ Slide Dinamis</option><option value="gulung">🧻 Gulung</option><option value="stiker">🏷️ Stiker</option><option value="layar">🎥 Layar Lebar</option><option value="berita">📰 Berita</option><option value="stabilo">🖍️ Stabilo</option><option value="catatan">📝 Catatan</option><option value="notifchat">💬 Notif Chat</option><option value="glitch">📺 Glitch</option><option value="ketik">⌨️ Ketik</option><option value="boom">💥 Boom</option><option value="classic">🎬 Classic</option><option value="tanpa">➖ Tanpa</option></select></div>
+            <div style="flex:1"><label for="clipHookPresetCreate">🃏 Kartu Judul</label><select id="clipHookPresetCreate"><option value="kartu" selected>🃏 Kartu</option><option value="kutipan">💡 Kutipan Terang</option><option value="slide">🎞️ Slide Dinamis</option><option value="gulung">🧻 Gulung</option><option value="stiker">🏷️ Stiker</option><option value="layar">🎥 Layar Lebar</option><option value="berita">📰 Berita</option><option value="stabilo">🖍️ Stabilo</option><option value="catatan">📝 Catatan</option><option value="notifchat">💬 Notif Chat</option><option value="glitch">📺 Glitch</option><option value="ketik">⌨️ Ketik</option><option value="boom">💥 Boom</option><option value="classic">🎬 Classic</option><option value="tanpa">➖ Tanpa kartu (teks tetap tampil)</option></select></div>
           </div>
           <div class="row" style="margin-top:10px" id="clipAiModelRow">
             <div style="flex:1"><label for="clipCount">Jumlah Clip</label><select id="clipCount"><option value="1">1 klip</option><option value="2">2 klip</option><option value="3" selected>3 klip</option><option value="4">4 klip</option><option value="5">5 klip</option><option value="6">6 klip</option><option value="all">✨ Semua klip bagus</option></select></div>
@@ -2462,10 +2462,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
   // Jalur 9router (Pi / PC) — nilai lama 'router' = Pi (normalisasi).
   const clipIsRouter = r => r === 'router-pi' || r === 'router-pc';
   const clipNormRoute = r => r === 'router' ? 'router-pi' : (['router-pi', 'router-pc', 'direct', 'none'].includes(r) ? r : 'router-pc');
-  let clipSmartCover = true, clipTitleDurDefault = 'auto'; // Skill Packs (Fase 3) — Smart Cover bawaan AKTIF (permintaan Dzaky 23 Okt: habis render langsung ada cover)
+  let clipSmartCover = true, clipTitleDurDefault = 'auto'; // Skill Packs (Fase 3)
+  let clipHookTeaserDefault = false, clipCoverHook = true, clipCoverHookMode = 'auto', clipCoverHookVoice = 'edge-tts/id-ID-ArdiNeural', clipCoverHookGuestSide = 'left', clipCoverHookFont = 'Montserrat'; // Cover Hook (29 Okt) — Smart Cover bawaan AKTIF (permintaan Dzaky 23 Okt: habis render langsung ada cover)
   let clipEnhanceFx = false; // Filter Cerah HD (Fase 21) — bawaan MATI, dinyalakan user di Skill Packs
-  try { const s = JSON.parse(localStorage.getItem(LS) || '{}'); jobId = s.jobId || null; clipRoute = clipNormRoute(s.route); clipModel = s.model || ''; clipProvider = s.provider || 'gemini'; clipTranscribe = s.transcribe || 'groq'; clipWhisperModel = ['tiny', 'base', 'small'].includes(s.whisperModel) ? s.whisperModel : 'base'; clipTranscriptLang = ['id', 'en', 'auto'].includes(s.transcriptLang) ? s.transcriptLang : 'id'; clipDur = CLIP_DUR_OPTS.includes(+s.duration) ? +s.duration : 30; clipMoment = ['ai', 'loudest', 'heatmap'].includes(s.moment) ? s.moment : 'loudest'; clipQuality = s.quality === '720p' ? '720p' : '1080p'; clipSmartCover = s.smartCover !== false; clipEnhanceFx = s.enhanceFx === true; clipTitleDurDefault = ['default', 'auto', '5s', 'full'].includes(s.titleDurDefault) ? s.titleDurDefault : 'auto'; if (s.hookPreset && $c('clipHookPresetCreate')) $c('clipHookPresetCreate').value = s.hookPreset; } catch (e) {}
-  const saveLs = () => { try { localStorage.setItem(LS, JSON.stringify({ jobId, route: clipRoute, model: clipModel, provider: clipProvider, transcribe: clipTranscribe, whisperModel: clipWhisperModel, transcriptLang: clipTranscriptLang, duration: clipDur, moment: clipMoment, quality: clipQuality, mode: clipMode, hookPreset: ($c('clipHookPresetCreate') ? $c('clipHookPresetCreate').value : 'kartu'), smartCover: clipSmartCover, titleDurDefault: clipTitleDurDefault, enhanceFx: clipEnhanceFx })); } catch (e) {} saveClipSettingsServer(); };
+  try { const s = JSON.parse(localStorage.getItem(LS) || '{}'); jobId = s.jobId || null; clipRoute = clipNormRoute(s.route); clipModel = s.model || ''; clipProvider = s.provider || 'gemini'; clipTranscribe = s.transcribe || 'groq'; clipWhisperModel = ['tiny', 'base', 'small'].includes(s.whisperModel) ? s.whisperModel : 'base'; clipTranscriptLang = ['id', 'en', 'auto'].includes(s.transcriptLang) ? s.transcriptLang : 'id'; clipDur = CLIP_DUR_OPTS.includes(+s.duration) ? +s.duration : 30; clipMoment = ['ai', 'loudest', 'heatmap'].includes(s.moment) ? s.moment : 'loudest'; clipQuality = s.quality === '720p' ? '720p' : '1080p'; clipSmartCover = s.smartCover !== false; clipEnhanceFx = s.enhanceFx === true; clipTitleDurDefault = ['default', 'auto', '5s', 'full'].includes(s.titleDurDefault) ? s.titleDurDefault : 'auto'; if (s.hookPreset && $c('clipHookPresetCreate')) $c('clipHookPresetCreate').value = s.hookPreset; if (typeof s.hookTeaserDefault === 'boolean') clipHookTeaserDefault = s.hookTeaserDefault; if (typeof s.coverHook === 'boolean') clipCoverHook = s.coverHook; if (s.coverHookMode === 'manual' || s.coverHookMode === 'auto') clipCoverHookMode = s.coverHookMode; if (typeof s.coverHookVoice === 'string' && s.coverHookVoice) clipCoverHookVoice = s.coverHookVoice; if (s.coverHookGuestSide === 'left' || s.coverHookGuestSide === 'right') clipCoverHookGuestSide = s.coverHookGuestSide; if (typeof s.coverHookFont === 'string' && s.coverHookFont) clipCoverHookFont = s.coverHookFont; } catch (e) {}
+  const saveLs = () => { try { localStorage.setItem(LS, JSON.stringify({ jobId, route: clipRoute, model: clipModel, provider: clipProvider, transcribe: clipTranscribe, whisperModel: clipWhisperModel, transcriptLang: clipTranscriptLang, duration: clipDur, moment: clipMoment, quality: clipQuality, mode: clipMode, hookPreset: ($c('clipHookPresetCreate') ? $c('clipHookPresetCreate').value : 'kartu'), smartCover: clipSmartCover, titleDurDefault: clipTitleDurDefault, enhanceFx: clipEnhanceFx, hookTeaserDefault: clipHookTeaserDefault, coverHook: clipCoverHook, coverHookMode: clipCoverHookMode, coverHookVoice: clipCoverHookVoice, coverHookGuestSide: clipCoverHookGuestSide, coverHookFont: clipCoverHookFont })); } catch (e) {} saveClipSettingsServer(); };
   // Pengaturan Clipper per akun (server): simpan ke /api/clipper/settings
   // (debounce ~1 detik). HANYA setelah load awal dari server selesai (flag
   // clipSettingsLoaded) — biar save startup (nilai localStorage) tidak
@@ -2477,7 +2478,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     clipSettingsSaveTimer = setTimeout(async () => {
       try {
         await fetch('/api/clipper/settings', { method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ route: clipRoute, model: clipModel, provider: clipProvider, transcribe: clipTranscribe, transcriptLang: clipTranscriptLang, duration: clipDur, moment: clipMoment, quality: clipQuality, mode: clipMode, hookPreset: ($c('clipHookPresetCreate') ? $c('clipHookPresetCreate').value : 'kartu'), bg: ($c('clipBgProj') ? $c('clipBgProj').value : 'blur'), focus: +($c('clipPodcastFocus') ? $c('clipPodcastFocus').value : 50), faceTrack: ($c('clipFaceTrack') ? $c('clipFaceTrack').checked : true), smartCover: clipSmartCover, titleDurDefault: clipTitleDurDefault, enhanceFx: clipEnhanceFx }) });
+          body: JSON.stringify({ route: clipRoute, model: clipModel, provider: clipProvider, transcribe: clipTranscribe, transcriptLang: clipTranscriptLang, duration: clipDur, moment: clipMoment, quality: clipQuality, mode: clipMode, hookPreset: ($c('clipHookPresetCreate') ? $c('clipHookPresetCreate').value : 'kartu'), bg: ($c('clipBgProj') ? $c('clipBgProj').value : 'blur'), focus: +($c('clipPodcastFocus') ? $c('clipPodcastFocus').value : 50), faceTrack: ($c('clipFaceTrack') ? $c('clipFaceTrack').checked : true), smartCover: clipSmartCover, titleDurDefault: clipTitleDurDefault, enhanceFx: clipEnhanceFx, hookTeaserDefault: clipHookTeaserDefault, coverHook: clipCoverHook, coverHookMode: clipCoverHookMode, coverHookVoice: clipCoverHookVoice, coverHookGuestSide: clipCoverHookGuestSide, coverHookFont: clipCoverHookFont }) });
       } catch (e) {}
     }, 1000);
   }
@@ -2510,6 +2511,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
         if (Number.isFinite(+s.focus) && $c('clipPodcastFocus')) { $c('clipPodcastFocus').value = s.focus; if ($c('clipPodcastFocusV')) $c('clipPodcastFocusV').textContent = s.focus + '% · ' + (s.focus < 35 ? 'Kiri' : s.focus > 65 ? 'Kanan' : 'Tengah'); }
         if (typeof s.faceTrack === 'boolean' && $c('clipFaceTrack')) $c('clipFaceTrack').checked = s.faceTrack;
         if (typeof s.smartCover === 'boolean') { clipSmartCover = s.smartCover; const sce = $c('clipSmartCover'); if (sce) sce.checked = s.smartCover; }
+        // Cover Hook: server menang atas localStorage (seperti smartCover).
+        if (typeof s.hookTeaserDefault === 'boolean') clipHookTeaserDefault = s.hookTeaserDefault;
+        if (typeof s.coverHook === 'boolean') clipCoverHook = s.coverHook;
+        if (typeof s.coverHookVoice === 'string' && s.coverHookVoice) clipCoverHookVoice = s.coverHookVoice;
+        if (s.coverHookGuestSide === 'left' || s.coverHookGuestSide === 'right') clipCoverHookGuestSide = s.coverHookGuestSide;
+        if (typeof s.coverHookFont === 'string' && s.coverHookFont) clipCoverHookFont = s.coverHookFont;
+        if (s.coverHookMode === 'manual' || s.coverHookMode === 'auto') clipCoverHookMode = s.coverHookMode;
         if (typeof s.enhanceFx === 'boolean') { clipEnhanceFx = s.enhanceFx; const fxe = $c('clipEnhanceFx'); if (fxe) fxe.checked = s.enhanceFx; }
         if (['default', 'auto', '5s', 'full'].includes(s.titleDurDefault)) { clipTitleDurDefault = s.titleDurDefault; const tde = $c('clipTitleDurDefault'); if (tde) tde.value = s.titleDurDefault; }
         // Mode picker: set dropdown (handler change update hint + kotak).
@@ -3447,7 +3455,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     monospace: { label: 'Monospace', emoji: '💻', font: 'JetBrains Mono', size: 46, color: '#E2E8F0', activeColor: '#FFCA28', bold: true, box: true, boxColor: '#0F172A', caps: false, mini: '<span style="font-family:\'JetBrains Mono\',monospace;background:#0F172A;color:#E2E8F0;padding:3px 8px">Aku bisa</span>' },
   };
   const CLIP_HOOK_PRESETS = {
-    tanpa: { label: 'Tanpa', emoji: '➖' },
+    tanpa: { label: 'Tanpa kartu (teks tetap tampil)', emoji: '➖' },
     kartu: { label: 'Kartu', emoji: '🃏', font: 'Montserrat', size: 54, color1: '#000000', box: true, boxColor: '#FFFFFF', bold: true, anim: '' },
     sinema: { label: 'Sinema', emoji: '🎬', font: 'Montserrat', size: 60, color1: '#FFFFFF', bold: true, anim: '', align: 2, gradient: true, holdSub: true },
     keramat: { label: 'Keramat', emoji: '🌙', font: 'Liberation Sans', size: 56, color1: '#FFD93D', bold: true, italic: true, anim: 'flicker', bestEffort: true },
@@ -3493,7 +3501,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       kertasPaperColor: c.kertasPaperColor, kertasHighlightColor: c.kertasHighlightColor, pillColor: c.pillColor,
       kinetikTextColor: c.kinetikTextColor, kinetikBigColor: c.kinetikBigColor,
       titleAnim: c.titleAnim !== undefined ? !!c.titleAnim : undefined,
-      watermark: { enabled: !!c.watermarkEnabled, text: c.watermarkText || '', pos: c.watermarkPos || 'bl' },
+      watermark: { enabled: !!c.watermarkEnabled, text: c.watermarkText || '', pos: c.watermarkPos || 'bl', x: (c.watermarkX !== undefined ? +c.watermarkX : undefined), y: (c.watermarkY !== undefined ? +c.watermarkY : undefined), size: (c.watermarkSize !== undefined ? +c.watermarkSize : undefined) },
       titleDur: c.titleDur || 'default', titleDurSec: c.titleDurSec !== undefined ? +c.titleDurSec : 4,
       coverText: c.coverText || '', coverAt: c.coverAt !== undefined ? +c.coverAt : undefined, hookText: c.hookText || '',
       titleYPercent: c.titleYPercent !== undefined ? +c.titleYPercent : 56, titleSizePercent: c.titleSizePercent !== undefined ? +c.titleSizePercent : undefined,
@@ -3533,6 +3541,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     const d = clipEditDraft && clipEditDraft.data; if (!d || !jobId) return;
     const vid = box.querySelector('[data-clipmodalvideo]'); if (!vid) return;
     try { if (sessionStorage.getItem('clipAssBroken')) return; } catch (e) {}
+    try { if (localStorage.getItem('hvo_clip_ass_mode') === 'dom') return; } catch (e) {} // mode Geser: jangan nyalakan ASS lagi
     const stage = box.querySelector('[data-clippreview]') || vid.parentElement || box;
     const dbg = () => {}; // log 'mesin sub:' dihapus (Dzaky 22 Okt: biar clean)
     const seq = ++clipAssSeq;
@@ -3754,6 +3763,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
             + '<div data-brollph class="clip-broll-ph"><b>🎞️ B-ROLL</b><span data-brollph-name></span></div>'
       + '</div>'
       + '<div style="display:flex;gap:6px;align-items:center;margin-top:8px"><button type="button" class="btn ghost" id="clipPreviewPlay" style="flex:none;width:32px;height:28px;padding:0;font-size:13px" title="Putar/Jeda">▶</button><label style="flex:1;font-size:12px">▶ Posisi preview: <span id="clipPreviewT">0:00</span><input id="clipPreviewSeek" type="range" min="0" max="' + clipDur + '" step="0.1" value="0" style="width:100%;margin-top:2px"></label></div>'
+      + '<div style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12px;flex-wrap:wrap"><span style="font-weight:700">👁️ Preview:</span><button type="button" class="btn" data-assmode="ass" style="font-size:12px;padding:4px 10px">ASS (persis Final)</button><button type="button" class="btn ghost" data-assmode="dom" style="font-size:12px;padding:4px 10px">✋ Geser judul/subtitle</button><span style="color:#8b94a7">Mode Geser mematikan ASS biar overlay bisa diseret</span></div>'
       + '<div class="clip-laypills"><button type="button" data-laypill="podcast">🎯 Face Tracking</button><button type="button" data-laypill="split">🖥 Split Screen</button><button type="button" data-laypill="gameplay">🎮 Gaming 16:9</button></div>'
       + '<div id="clipLayHint" style="display:none;font-size:11px;color:#fbbf24;margin-top:6px">Layout tersimpan buat klip ini — framing barunya tampil setelah render ulang (preview di atas masih hasil render terakhir).</div>'
       + '<div class="clip-timeline" id="clipTimeline"><div class="clip-tl-head"><span>\uD83D\uDD52 TIMELINE</span><span id="clipTlClock">0:00 / ' + fmtCoverT(clipDur) + '</span></div><div class="clip-tl-body" id="clipTlBody">'
@@ -3776,7 +3786,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '<div style="border:1px solid #333;border-radius:8px;padding:10px;margin-top:8px"><b style="font-size:12px">LAYOUT</b><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" class="btn ghost" data-layoutcard="podcast" style="flex:1 1 30%;font-size:12px">🎯 Auto Reframe</button><button type="button" class="btn ghost" data-layoutcard="landscape" style="flex:1 1 30%;font-size:12px">🖼️ Full Frame</button><button type="button" class="btn ghost" data-layoutcard="split" style="flex:1 1 30%;font-size:12px">👥 Split Screen</button></div><p class="hint" id="clipLayoutDesc" style="margin:6px 0 0">Auto Reframe: crop mengikuti wajah/pembicara.</p></div>'
       + '</div>'
       + '<div data-clippanel="judul">'
-      + '<label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplShowTitle" ' + (cand.showTitle !== false ? 'checked' : '') + '> Tampilkan judul di video</label>'
+      + '<label style="font-size:13px;display:flex;align-items:center;gap:8px;background:#2a1a4a;border:1px solid #8b5cf6;border-radius:8px;padding:8px 10px;font-weight:800"><input type="checkbox" id="clipTplShowTitle" ' + (cand.showTitle !== false ? 'checked' : '') + '> 🎯 Judul video: AKTIF / NON-AKTIF <span style="font-weight:400;font-size:12px;color:#c4b5fd">— kalau tidak dicentang, render full polos (tanpa judul &amp; tanpa kartu)</span></label>'
       + '<label style="font-size:12px;display:block;margin-top:8px">Judul overlay<input data-cliptitle="' + idx + '" value="' + esc(cand.title || '') + '" style="margin-top:2px;font-weight:800" maxlength="120"></label>'
       + '<details id="clipTplTitleAdv" style="margin-top:8px;border:1px solid #333;border-radius:8px;padding:8px"><summary style="cursor:pointer;font-weight:800;font-size:12px">🎛 Atur posisi, ukuran & durasi judul</summary>'
       + '<div id="clipTplTitlePosBlock" style="margin-top:8px"><b style="font-size:12px">📍 Posisi judul</b><div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn ghost" data-titlepos="top" style="flex:1;font-size:12px">Atas</button><button type="button" class="btn ghost" data-titlepos="center" style="flex:1;font-size:12px">Tengah</button></div><label style="font-size:12px;display:block;margin-top:4px">Posisi vertikal judul <span id="clipTplTitleYPercentV">' + titleYPercent + '%</span><input id="clipTplTitleYPercent" type="range" min="0" max="100" step="1" value="' + titleYPercent + '" style="width:100%"></label></div>'
@@ -3812,6 +3822,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '<label style="font-size:12px;display:block;margin-top:6px">Detik ke <span id="clipTplCoverAtV">' + fmtCoverT(coverAt0) + '</span><input id="clipTplCoverAt" type="range" min="0" max="' + clipDur + '" step="0.1" value="' + coverAt0 + '" style="width:100%"></label><p class="hint" style="margin:2px 0">Geser untuk memilih frame mana saja di klip ini — atau putar preview, jeda di frame yang pas, lalu pakai tombol di bawah.</p>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn ghost" id="clipTplCoverUsePreview" style="font-size:12px">⏸ Pakai frame yang lagi tampil di preview</button><button type="button" class="btn ghost" id="clipTplCoverAuto" style="font-size:12px">🪄 Pilih frame otomatis</button></div>'
       + '<div style="margin-top:10px"><b style="font-size:11px;letter-spacing:.4px">TEKS COVER</b><span class="hint" style="float:right" id="clipTplCoverTextN"></span><input id="clipTplCoverText" value="' + esc(cand.coverText || cand.title || '') + '" maxlength="90" style="margin-top:4px;font-weight:800" placeholder="mis. Lyodra KAGET Setengah Mati"><p class="hint" style="margin:2px 0">Teks di poster — kartu putih teks hitam di bawah. Enaknya 3–6 kata. Kosongkan untuk memakai judul klip.</p></div>'
+      + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:10px"><b style="font-size:12px">🪝 Cover hook klip ini</b><p class="hint" style="margin:4px 0">Pembuka split + suara. Kosongkan = ikut proyek.</p><label style="font-size:12px;display:block;margin-top:6px">Cover hook<select id="clipTplCoverHookOn" style="margin-top:2px"><option value="">Ikut proyek</option><option value="1">Nyala</option><option value="0">Mati</option></select></label><label style="font-size:12px;display:block;margin-top:6px">Mode momen<select id="clipTplCoverHookMode" style="margin-top:2px"><option value="">Ikut proyek</option><option value="auto">Otomatis</option><option value="manual">Manual</option></select></label><div id="clipTplCoverHookManual" style="display:none"><label style="font-size:12px;display:block;margin-top:6px">Momen atas (detik) <span id="clipTplCoverHookTopV"></span><input id="clipTplCoverHookTop" type="range" min="0" max="' + clipDur + '" step="0.1" value="' + (cand.coverHookTop !== undefined ? +cand.coverHookTop : coverAt0) + '" style="width:100%"></label><label style="font-size:12px;display:block;margin-top:6px">Momen bawah (detik) <span id="clipTplCoverHookBottomV"></span><input id="clipTplCoverHookBottom" type="range" min="0" max="' + clipDur + '" step="0.1" value="' + (cand.coverHookBottom !== undefined ? +cand.coverHookBottom : (cand.coverHookTop !== undefined ? +cand.coverHookTop : coverAt0)) + '" style="width:100%"></label><button type="button" class="btn ghost" id="clipTplCoverHookBottomSame" style="font-size:12px;margin-top:6px">Samakan bawah dengan atas</button></div><label style="font-size:12px;display:block;margin-top:6px">Font kartu cover<select id="clipTplCoverFont" style="margin-top:2px"><option value="">Ikut proyek</option>' + clipFontOptions(cand.coverFont || '') + '</select></label></div>'
       + '<div style="margin-top:8px"><b style="font-size:11px;letter-spacing:.4px">TEKS HOOK</b><span class="hint" style="float:right" id="clipTplHookTextN"></span><input id="clipTplHookText" value="' + esc(cand.hookText || '') + '" maxlength="120" style="margin-top:4px" placeholder="' + esc(cand.title || '') + '"><p class="hint" style="margin:2px 0">Tampil di sepanjang klip tanpa membocorkan akhirnya (sesuai durasi judul). Mengubahnya membuat klip perlu dirender ulang. Kosongkan untuk memakai judul klip.</p></div>'
       + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button type="button" class="btn" id="clipTplCoverBuild" style="background:#8b5cf6;color:#fff;font-weight:800">🖼️ Buat / Perbarui Poster</button><button type="button" class="btn ghost" id="clipTplCoverAll">🖼️ Buat Ulang SEMUA Cover proyek ini</button></div>'
       + '</div></div>'
@@ -3822,7 +3833,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       + '<div data-clippanel="video" hidden>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">📐 Kualitas Render (klip ini)</b><select id="clipTplQuality" style="margin-top:4px"><option value="720p"' + (cand.quality !== '1080p' ? ' selected' : '') + '>720p (default)</option><option value="1080p"' + (cand.quality === '1080p' ? ' selected' : '') + '>1080p (lebih tajam, render lebih lambat)</option></select><span class="hint">Disimpan per klip — dipakai saat Simpan Versi Edit.</span></div>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🖥️ Layout Klip (klip ini)</b><select id="clipTplLayout" style="margin-top:4px"><option value=""' + (!cand.mode ? ' selected' : '') + '>Ikuti Mode Proyek</option><option value="podcast"' + (cand.mode === 'podcast' ? ' selected' : '') + '>🎙️ Podcast (crop wajah 9:16)</option><option value="auto"' + (cand.mode === 'auto' ? ' selected' : '') + '>✨ Auto</option><option value="landscape"' + (cand.mode === 'landscape' ? ' selected' : '') + '>🖼️ Landscape (fit penuh)</option><option value="split"' + (cand.mode === 'split' ? ' selected' : '') + '>👥 Split (2 pembicara atas-bawah)</option><option value="crop11"' + (cand.mode === 'crop11' ? ' selected' : '') + '>▣ Crop 1:1</option><option value="gameplay"' + (cand.mode === 'gameplay' ? ' selected' : '') + '>🎮 Gameplay (game + facecam)</option></select><span class="hint">Disimpan per klip — mengalahkan Mode Proyek saat klip ini di-render.</span></div>'
-      + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">💧 Watermark</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Logo atau nama channel kamu di setiap klip. Logo (satu untuk semua klip akun ini) atau teks kecil semi-transparan di pojok, sepanjang klip utama.</p><label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplWatermarkEnabled" ' + (cand.watermarkEnabled ? 'checked' : '') + '> ✅ Pakai watermark</label><label style="font-size:12px;display:block;margin-top:6px">Teks watermark<input id="clipTplWatermarkText" value="' + esc(cand.watermarkText || '') + '" style="margin-top:2px" maxlength="60" placeholder="Kosongkan = otomatis: source : <channel>"></label><p class="hint" style="margin:4px 0">' + ((typeof clipLastJob !== 'undefined' && clipLastJob && clipLastJob.metaUploader && clipLastJob.metaUploader !== 'Upload') ? ('Channel terdeteksi: ' + esc(String(clipLastJob.metaUploader)) + ' — kosongkan kolom teks untuk otomatis “source : ' + esc(String(clipLastJob.metaUploader)) + '”. Ketikan manual selalu menang.') : 'Channel video sumber tidak terdeteksi — ketik manual di kolom teks.') + '</p><label style="font-size:12px;display:block;margin-top:6px">Posisi<select id="clipTplWatermarkPos" style="margin-top:2px"><option value="bl"' + (cand.watermarkPos !== 'br' && cand.watermarkPos !== 'tl' && cand.watermarkPos !== 'tr' ? ' selected' : '') + '>Kiri bawah</option><option value="br"' + (cand.watermarkPos === 'br' ? ' selected' : '') + '>Kanan bawah</option><option value="tl"' + (cand.watermarkPos === 'tl' ? ' selected' : '') + '>Kiri atas</option><option value="tr"' + (cand.watermarkPos === 'tr' ? ' selected' : '') + '>Kanan atas</option></select></label><label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-top:10px;border-top:1px dashed #444;padding-top:8px"><input type="checkbox" id="clipTplWmLogoEnabled"> 🖼️ Pakai LOGO (berlaku semua klip akun ini)</label><p class="hint" style="margin:4px 0">Satu logo untuk semua klip di akun ini. Logo tampil bersamaan dengan watermark teks di semua klip. Akun lain tidak bisa pakai logo kamu.</p><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="file" id="clipTplWmLogoFile" accept="image/png,image/jpeg,image/webp" style="font-size:12px"><button type="button" class="btn" id="clipTplWmLogoDelete" style="display:none">🗑️ Hapus logo</button></div><div id="clipTplWmLogoStatus" style="font-size:12px;color:#aaa;margin-top:4px">Belum ada logo.</div><img id="clipTplWmLogoImg" style="display:none;max-width:120px;max-height:120px;margin-top:4px;border:1px solid #333;border-radius:6px"><label style="font-size:12px;display:block;margin-top:6px">Posisi logo<select id="clipTplWmLogoPos" style="margin-top:2px"><option value="br">Kanan bawah</option><option value="bl">Kiri bawah</option><option value="tl">Kiri atas</option><option value="tr">Kanan atas</option><option value="c">Tengah</option></select></label><label style="font-size:12px;display:block;margin-top:6px">Transparansi logo: <span id="clipTplWmLogoOpacityVal">80%</span><input type="range" id="clipTplWmLogoOpacity" min="10" max="100" value="80" style="width:100%"></label><label style="font-size:12px;display:block;margin-top:6px">Ukuran logo: <span id="clipTplWmLogoSizeVal">15% lebar video</span><input type="range" id="clipTplWmLogoSize" min="5" max="40" value="15" style="width:100%"></label><p class="hint" style="margin:4px 0">Setelan logo tersimpan saat kamu tekan Simpan / Render (sama seperti setelan klip lainnya).</p></div>'
+      + '<div style="border:1px solid #333;border-radius:8px;padding:8px"><b style="font-size:12px">💧 Watermark</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Logo atau nama channel kamu di setiap klip. Logo (satu untuk semua klip akun ini) atau teks kecil semi-transparan di pojok, sepanjang klip utama.</p><label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplWatermarkEnabled" ' + (cand.watermarkEnabled ? 'checked' : '') + '> ✅ Pakai watermark</label><label style="font-size:12px;display:block;margin-top:6px">Teks watermark<input id="clipTplWatermarkText" value="' + esc(cand.watermarkText || '') + '" style="margin-top:2px" maxlength="60" placeholder="Kosongkan = otomatis (format di bawah)"></label><p class="hint" style="margin:4px 0">' + ((typeof clipLastJob !== 'undefined' && clipLastJob && clipLastJob.metaUploader && clipLastJob.metaUploader !== 'Upload') ? ('Channel terdeteksi: ' + esc(String(clipLastJob.metaUploader)) + ' — kosongkan kolom teks untuk otomatis (format dipilih di bawah). Ketikan manual selalu menang. Ketikan manual selalu menang.') : 'Channel video sumber tidak terdeteksi — ketik manual di kolom teks.') + '</p><label style="font-size:12px;display:block;margin-top:6px">Format source otomatis<select id="clipTplWatermarkSrcFmt" style="margin-top:2px"><option value="tonton"' + (cand.watermarkSrcFmt === 'source' ? '' : ' selected') + '>tonton fullnya di &lt;channel&gt;</option><option value="source"' + (cand.watermarkSrcFmt === 'source' ? ' selected' : '') + '>source : &lt;channel&gt;</option></select></label><label style="font-size:12px;display:block;margin-top:6px">Posisi<select id="clipTplWatermarkPos" style="margin-top:2px"><option value="bl"' + (cand.watermarkPos !== 'br' && cand.watermarkPos !== 'tl' && cand.watermarkPos !== 'tr' && cand.watermarkPos !== 'custom' ? ' selected' : '') + '>Kiri bawah</option><option value="br"' + (cand.watermarkPos === 'br' ? ' selected' : '') + '>Kanan bawah</option><option value="tl"' + (cand.watermarkPos === 'tl' ? ' selected' : '') + '>Kiri atas</option><option value="tr"' + (cand.watermarkPos === 'tr' ? ' selected' : '') + '>Kanan atas</option><option value="custom"' + (cand.watermarkPos === 'custom' ? ' selected' : '') + '>Bebas (geser di preview)</option></select></label><div style="margin-top:6px"><label style="font-size:12px;display:block">Posisi bebas — X% <input id="clipTplWatermarkX" type="number" min="0" max="100" step="1" value="' + (cand.watermarkX !== undefined ? +cand.watermarkX : '') + '" placeholder="0–100" style="width:70px"> &nbsp; Y% <input id="clipTplWatermarkY" type="number" min="0" max="100" step="1" value="' + (cand.watermarkY !== undefined ? +cand.watermarkY : '') + '" placeholder="0–100" style="width:70px"></label><label style="font-size:12px;display:block;margin-top:6px">Ukuran teks: <span id="clipTplWatermarkSizeVal">' + (cand.watermarkSize !== undefined ? +cand.watermarkSize : 100) + '%</span><input id="clipTplWatermarkSize" type="range" min="50" max="200" value="' + (cand.watermarkSize !== undefined ? +cand.watermarkSize : 100) + '" style="width:100%"></label><p class="hint" style="margin:4px 0">Seret teksnya langsung di preview, atau isi angka X/Y — posisi jadi Bebas. Pilih pojok di atas untuk kembali ke preset.</p></div><label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-top:10px;border-top:1px dashed #444;padding-top:8px"><input type="checkbox" id="clipTplWmLogoEnabled"> 🖼️ Pakai LOGO (berlaku semua klip akun ini)</label><p class="hint" style="margin:4px 0">Satu logo untuk semua klip di akun ini. Logo tampil bersamaan dengan watermark teks di semua klip. Akun lain tidak bisa pakai logo kamu.</p><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="file" id="clipTplWmLogoFile" accept="image/png,image/jpeg,image/webp" style="font-size:12px"><button type="button" class="btn" id="clipTplWmLogoDelete" style="display:none">🗑️ Hapus logo</button></div><div id="clipTplWmLogoStatus" style="font-size:12px;color:#aaa;margin-top:4px">Belum ada logo.</div><img id="clipTplWmLogoImg" style="display:none;max-width:120px;max-height:120px;margin-top:4px;border:1px solid #333;border-radius:6px"><label style="font-size:12px;display:block;margin-top:6px">Posisi logo<select id="clipTplWmLogoPos" style="margin-top:2px"><option value="br">Kanan bawah</option><option value="bl">Kiri bawah</option><option value="tl">Kiri atas</option><option value="tr">Kanan atas</option><option value="c">Tengah</option><option value="custom">Bebas (geser di preview)</option></select></label><label style="font-size:12px;display:block;margin-top:6px">Posisi bebas logo — X% <input id="clipTplWmLogoX" type="number" min="0" max="100" step="1" value="" placeholder="0–100" style="width:90px"> &nbsp; Y% <input id="clipTplWmLogoY" type="number" min="0" max="100" step="1" value="" placeholder="0–100" style="width:90px"></label><p class="hint" style="margin:4px 0">Seret logonya langsung di preview, atau isi angka X/Y — posisi jadi Bebas. Berlaku semua klip akun ini.</p><label style="font-size:12px;display:block;margin-top:6px">Transparansi logo: <span id="clipTplWmLogoOpacityVal">80%</span><input type="range" id="clipTplWmLogoOpacity" min="10" max="100" value="80" style="width:100%"></label><label style="font-size:12px;display:block;margin-top:6px">Ukuran logo: <span id="clipTplWmLogoSizeVal">15% lebar video</span><input type="range" id="clipTplWmLogoSize" min="5" max="40" value="15" style="width:100%"></label><p class="hint" style="margin:4px 0">Setelan logo tersimpan saat kamu tekan Simpan / Render (sama seperti setelan klip lainnya).</p></div>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🎵 Musik Latar</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Lagu kamu sendiri di bawah suara klip. Upload file audio (mp3/m4a/wav/ogg/flac/aac, maks 50MB) — di-mix di bawah suara utama.</p><label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="clipTplMusicEnabled" ' + (cand.musicEnabled ? 'checked' : '') + '> ✅ Pakai musik latar</label><label style="font-size:12px;display:block;margin-top:6px">Upload file musik<input id="clipTplMusicFile" type="file" accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/flac,audio/aac,.mp3,.m4a,.wav,.ogg,.flac,.aac" style="margin-top:2px"></label><p class="hint" id="clipTplMusicStatus" style="margin:6px 0 0">Belum ada file musik.</p><button type="button" class="btn ghost" id="clipTplMusicDelete" style="font-size:12px;margin-top:6px;display:none">🗑️ Hapus musik</button><label style="font-size:12px;display:block;margin-top:6px">Volume musik <span id="clipTplMusicVolumeV">' + Math.round((cand.musicVolume !== undefined ? +cand.musicVolume : 0.2) * 100) + '%</span><input id="clipTplMusicVolume" type="range" min="0" max="100" step="5" value="' + Math.round((cand.musicVolume !== undefined ? +cand.musicVolume : 0.2) * 100) + '" style="width:100%"></label><p class="hint" id="clipTplMusicNoFileNote" style="margin:6px 0 0;display:none;color:#facc15">⚠️ Upload dulu file musiknya (di atas) — kalau tidak ada file, render jalan tanpa musik.</p></div>'
       + '<div style="border:1px solid #333;border-radius:8px;padding:8px;margin-top:8px"><b style="font-size:12px">🎞️ AI B-roll</b> <span style="font-size:11px;color:#22c55e">Gratis</span><p class="hint" style="margin:4px 0">Cuplikan video 2–3 detik saat pembicara menyebut sesuatu yang bisa ditampilkan. Footage pelengkap yang menggantikan video utama selama jendela B-roll — misal pas cerita kuda, video pindah ke footage kuda (seperti referensi). Audio utama tetap jalan, B-roll dibisukan. Upload file video B-roll kamu (mp4/mov/webm/mkv, maks 200MB). B-roll diterapkan saat render; preview menampilkan placeholder B-ROLL di jendelanya.</p><label style="font-size:12px;display:block;margin-top:6px">Jumlah<select id="clipTplBrollCount" style="margin-top:2px"><option value="0"' + (!cand.brollEnabled ? ' selected' : '') + '>Mati</option><option value="1"' + (cand.brollEnabled && (cand.brollCount || 1) === 1 ? ' selected' : '') + '>1</option><option value="2"' + (cand.brollEnabled && cand.brollCount === 2 ? ' selected' : '') + '>2</option><option value="3"' + (cand.brollEnabled && cand.brollCount === 3 ? ' selected' : '') + '>3</option><option value="4"' + (cand.brollEnabled && cand.brollCount === 4 ? ' selected' : '') + '>4</option><option value="5"' + (cand.brollEnabled && cand.brollCount === 5 ? ' selected' : '') + '>5</option></select></label><label style="font-size:12px;display:block;margin-top:6px">Upload video B-roll<input id="clipTplBrollFile" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.mov,.webm,.mkv" style="margin-top:2px"></label><p class="hint" id="clipTplBrollStatus" style="margin:6px 0 0">Belum ada file B-roll.</p><button type="button" class="btn ghost" id="clipTplBrollDelete" style="font-size:12px;margin-top:6px;display:none">🗑️ Hapus B-roll</button><div style="display:flex;gap:6px;margin-top:6px"><label style="font-size:12px;flex:1">Mulai (detik)<input id="clipTplBrollStart" type="number" min="0" step="0.5" value="' + (cand.brollStart !== undefined ? +cand.brollStart : Math.round(((cand.end - cand.start) / 2) * 10) / 10) + '" style="margin-top:2px"></label><label style="font-size:12px;flex:1">Durasi (detik)<input id="clipTplBrollDur" type="number" min="0.5" max="60" step="0.5" value="' + (cand.brollDur !== undefined ? +cand.brollDur : 4) + '" style="margin-top:2px"></label></div><p class="hint" id="clipTplBrollNoFileNote" style="margin:6px 0 0;display:none;color:#facc15">⚠️ Upload dulu video B-roll-nya (di atas) — kalau tidak ada file, render jalan tanpa B-roll.</p></div>'
       + '<hr style="border:none;border-top:1px solid var(--line);margin:10px 0">'
@@ -3912,6 +3923,10 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       if (im) { im.onload = () => { im.style.display = 'block'; if (nt) nt.style.display = 'none'; }; im.onerror = () => { im.style.display = 'none'; if (nt) nt.style.display = ''; }; syncCoverImg(); }
       if (ct) ct.addEventListener('change', () => { cand.coverText = ct.value; const cc = cc0(); if (cc) cc.coverText = ct.value; });
       if (ca) ca.addEventListener('input', () => { cand.coverAt = +ca.value; if (cav) cav.textContent = fmtCoverT(+ca.value); const cc = cc0(); if (cc) cc.coverAt = +ca.value; });
+    { const cho = $c('clipTplCoverHookOn'); if (cho) { cho.value = cand.coverHookOn !== undefined ? (cand.coverHookOn ? '1' : '0') : ''; cho.addEventListener('change', () => { const cc = cc0(); const v = cho.value; if (v === '') { delete cand.coverHookOn; if (cc) delete cc.coverHookOn; } else { cand.coverHookOn = v === '1'; if (cc) cc.coverHookOn = v === '1'; } }); } }
+    { const chm = $c('clipTplCoverHookMode'); const chMan = $c('clipTplCoverHookManual'); const syncMan = () => { const eff = chm ? (chm.value || clipCoverHookMode || 'auto') : (clipCoverHookMode || 'auto'); if (chMan) chMan.style.display = eff === 'manual' ? 'block' : 'none'; }; if (chm) { chm.value = cand.coverHookMode || ''; chm.addEventListener('change', () => { const cc = cc0(); const v = chm.value; if (v === '') { delete cand.coverHookMode; if (cc) delete cc.coverHookMode; } else { cand.coverHookMode = v; if (cc) cc.coverHookMode = v; } syncMan(); }); } syncMan(); }
+    { const tp = $c('clipTplCoverHookTop'), tpV = $c('clipTplCoverHookTopV'); if (tp) { tp.addEventListener('input', () => { cand.coverHookTop = +tp.value; if (tpV) tpV.textContent = fmtCoverT(+tp.value); const cc = cc0(); if (cc) cc.coverHookTop = +tp.value; }); if (tpV) tpV.textContent = fmtCoverT(+tp.value); } const bp = $c('clipTplCoverHookBottom'), bpV = $c('clipTplCoverHookBottomV'); if (bp) { bp.addEventListener('input', () => { cand.coverHookBottom = +bp.value; if (bpV) bpV.textContent = fmtCoverT(+bp.value); const cc = cc0(); if (cc) cc.coverHookBottom = +bp.value; }); if (bpV) bpV.textContent = fmtCoverT(+bp.value); } const bs = $c('clipTplCoverHookBottomSame'); if (bs) bs.addEventListener('click', () => { delete cand.coverHookBottom; const cc = cc0(); if (cc) delete cc.coverHookBottom; if (bp && tp) { bp.value = tp.value; if (bpV) bpV.textContent = fmtCoverT(+tp.value); } }); }
+    { const cf = $c('clipTplCoverFont'); if (cf) { cf.value = cand.coverFont || ''; cf.addEventListener('change', () => { const cc = cc0(); const v = cf.value; if (v === '') { delete cand.coverFont; if (cc) delete cc.coverFont; } else { cand.coverFont = v; if (cc) cc.coverFont = v; } }); } }
       if (up) up.addEventListener('click', () => { const v = box.querySelector('[data-clipmodalvideo]'); if (v && ca) { ca.value = Math.min(+ca.max || 0, Math.max(0, v.currentTime || 0)); ca.dispatchEvent(new Event('input')); } });
       if (bd) bd.addEventListener('click', async () => { const old = bd.textContent; bd.disabled = true; bd.textContent = '⏳ Membuat poster…';
         try { const r = await fetch('/api/clipper/cover', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId, clip: idx, coverText: cand.coverText || (ct ? ct.value : ''), coverAt: cand.coverAt !== undefined ? +cand.coverAt : null }) });
@@ -4079,10 +4094,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     const syncWatermarkCand = () => {
       const en = $c('clipTplWatermarkEnabled'); if (en) cand.watermarkEnabled = en.checked;
       const tx = $c('clipTplWatermarkText'); if (tx) cand.watermarkText = String(tx.value || '').replace(/\s+/g, ' ').trim().slice(0, 60);
-      const ps = $c('clipTplWatermarkPos'); if (ps && ['bl', 'br', 'tl', 'tr'].includes(ps.value)) cand.watermarkPos = ps.value;
+      const ps = $c('clipTplWatermarkPos'); if (ps && ['bl', 'br', 'tl', 'tr', 'custom'].includes(ps.value)) cand.watermarkPos = ps.value;
+      const sf = $c('clipTplWatermarkSrcFmt'); if (sf && ['tonton', 'source'].includes(sf.value)) cand.watermarkSrcFmt = sf.value;
+      const wx = $c('clipTplWatermarkX'); if (wx && wx.value !== '' && Number.isFinite(+wx.value)) cand.watermarkX = Math.min(100, Math.max(0, +wx.value));
+      const wy = $c('clipTplWatermarkY'); if (wy && wy.value !== '' && Number.isFinite(+wy.value)) cand.watermarkY = Math.min(100, Math.max(0, +wy.value));
+      const ws = $c('clipTplWatermarkSize'); if (ws && Number.isFinite(+ws.value)) { cand.watermarkSize = Math.min(200, Math.max(50, +ws.value)); const wsv = $c('clipTplWatermarkSizeVal'); if (wsv) wsv.textContent = cand.watermarkSize + '%'; }
       paintWmPreview();
     };
-    ['clipTplWatermarkEnabled', 'clipTplWatermarkText', 'clipTplWatermarkPos'].forEach(id => { const el = $c(id); if (el) el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', syncWatermarkCand); });
+    ['clipTplWatermarkEnabled', 'clipTplWatermarkText', 'clipTplWatermarkPos', 'clipTplWatermarkX', 'clipTplWatermarkY', 'clipTplWatermarkSize', 'clipTplWatermarkSrcFmt'].forEach(id => { const el = $c(id); if (el) el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', syncWatermarkCand); });
     // Potongan hook MANUAL (Dzaky 25 Okt): edit potongan teaser AI (atau
     // buat sendiri) — waktu RELATIF awal klip di UI, disimpan ABSOLUT
     // (relatif + cand.start) ke cand.hook lewat Save biasa (EDITABLE sudah
@@ -4127,7 +4146,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
         wmLogoHasFile = !!(j && j.hasLogo);
         if (!wmLogoInitDone) {
           const en = $c('clipTplWmLogoEnabled'); if (en) en.checked = !!s.enabled;
-          const ps = $c('clipTplWmLogoPos'); if (ps && ['bl', 'br', 'tl', 'tr', 'c'].includes(s.pos)) ps.value = s.pos;
+          const ps = $c('clipTplWmLogoPos'); if (ps && ['bl', 'br', 'tl', 'tr', 'c', 'custom'].includes(s.pos)) ps.value = s.pos; const lxi = $c('clipTplWmLogoX'); if (lxi) lxi.value = (s.x !== undefined ? +s.x : ''); const lyi = $c('clipTplWmLogoY'); if (lyi) lyi.value = (s.y !== undefined ? +s.y : '');
           const op = $c('clipTplWmLogoOpacity'); if (op) op.value = (Number.isFinite(+s.opacity) ? Math.min(100, Math.max(10, +s.opacity)) : 80);
           const sz = $c('clipTplWmLogoSize'); if (sz) sz.value = (Number.isFinite(+s.size) ? Math.min(40, Math.max(5, +s.size)) : 15);
           wmLogoInitDone = true;
@@ -4153,6 +4172,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
     };
     ['clipTplWmLogoOpacity', 'clipTplWmLogoSize'].forEach(id => { const el = $c(id); if (el) el.addEventListener('input', syncWmLogoVals); });
     ['clipTplWmLogoEnabled', 'clipTplWmLogoPos'].forEach(id => { const el = $c(id); if (el) el.addEventListener('change', paintWmPreview); });
+    ['clipTplWmLogoX', 'clipTplWmLogoY'].forEach(id => { const el = $c(id); if (el) el.addEventListener('input', () => { const ps2 = $c('clipTplWmLogoPos'); if (ps2) ps2.value = 'custom'; paintWmPreview(); }); });
     const wf = $c('clipTplWmLogoFile');
     if (wf) wf.addEventListener('change', async () => {
       const f = wf.files && wf.files[0]; if (!f) return;
@@ -4194,19 +4214,29 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
       const wmTx = $c('clipTplWatermarkText');
       const wmText = wmTx ? String(wmTx.value || '').trim() : '';
       // Teks otomatis (cermin render server): ceklis ON + teks kosong +
-      // channel terdeteksi -> 'source : <channel>' (dulu preview diam saja).
+      // channel terdeteksi -> otomatis sesuai format dipilih (tonton/source).
       const wmChannel = (typeof clipLastJob !== 'undefined' && clipLastJob && clipLastJob.metaUploader && clipLastJob.metaUploader !== 'Upload') ? String(clipLastJob.metaUploader) : '';
-      const wmEff = wmText || (wmOn && wmChannel ? ('source : ' + wmChannel).slice(0, 60) : '');
+      const srcFmt = $c('clipTplWatermarkSrcFmt'); const srcPre = (srcFmt && srcFmt.value === 'source') ? 'source : ' : 'tonton fullnya di ';
+      const wmEff = wmText || (wmOn && wmChannel ? (srcPre + wmChannel).slice(0, 60) : '');
       const wmPs = $c('clipTplWatermarkPos');
-      const wmPos = wmPs && ['bl', 'br', 'tl', 'tr'].includes(wmPs.value) ? wmPs.value : 'bl';
+      const wmPos = wmPs && ['bl', 'br', 'tl', 'tr', 'custom'].includes(wmPs.value) ? wmPs.value : 'bl';
+      const wmXi = $c('clipTplWatermarkX'), wmYi = $c('clipTplWatermarkY'), wmSi = $c('clipTplWatermarkSize');
+      const wmCustom = wmPos === 'custom';
+      const wmXv = wmXi && wmXi.value !== '' && Number.isFinite(+wmXi.value) ? Math.min(100, Math.max(0, +wmXi.value)) : 5;
+      const wmYv = wmYi && wmYi.value !== '' && Number.isFinite(+wmYi.value) ? Math.min(100, Math.max(0, +wmYi.value)) : 95;
+      const wmSzF = wmSi && Number.isFinite(+wmSi.value) ? Math.min(200, Math.max(50, +wmSi.value)) / 100 : 1;
       const lgPs = $c('clipTplWmLogoPos');
-      const lgPos = lgPs && ['bl', 'br', 'tl', 'tr', 'c'].includes(lgPs.value) ? lgPs.value : 'br';
+      const lgPos = lgPs && ['bl', 'br', 'tl', 'tr', 'c', 'custom'].includes(lgPs.value) ? lgPs.value : 'br';
+      const lgXi = $c('clipTplWmLogoX'), lgYi = $c('clipTplWmLogoY');
+      const lgXv = lgXi && lgXi.value !== '' && Number.isFinite(+lgXi.value) ? Math.min(100, Math.max(0, +lgXi.value)) : 85;
+      const lgYv = lgYi && lgYi.value !== '' && Number.isFinite(+lgYi.value) ? Math.min(100, Math.max(0, +lgYi.value)) : 85;
       const lgOp = $c('clipTplWmLogoOpacity');
       const lgOpV = lgOp && Number.isFinite(+lgOp.value) ? Math.min(100, Math.max(10, +lgOp.value)) : 80;
       const lgSz = $c('clipTplWmLogoSize');
       const lgSzV = lgSz && Number.isFinite(+lgSz.value) ? Math.min(40, Math.max(5, +lgSz.value)) : 15;
       const boxW = box.clientWidth || 340;
       const mg = Math.max(6, Math.round(20 * boxW / 720));
+      const mgLx = Math.max(2, Math.round(20 * boxW / 1080)), mgLy = Math.max(2, Math.round(20 * box.clientHeight / 1920));
       if (txt) { txt.style.display = 'none'; txt.textContent = ''; }
       if (img) img.style.display = 'none';
       const place = (t, pos) => {
@@ -4217,15 +4247,23 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
         else if (pos === 'c') { t.style.left = '50%'; t.style.top = '50%'; t.style.transform = 'translate(-50%,-50%)'; }
         else { t.style.right = mg + 'px'; t.style.bottom = mg + 'px'; }
       };
+      const placeLogo = (t, pos) => {
+        t.style.left = ''; t.style.right = ''; t.style.top = ''; t.style.bottom = ''; t.style.transform = '';
+        if (pos === 'tl') { t.style.left = mgLx + 'px'; t.style.top = mgLy + 'px'; }
+        else if (pos === 'tr') { t.style.right = mgLx + 'px'; t.style.top = mgLy + 'px'; }
+        else if (pos === 'bl') { t.style.left = mgLx + 'px'; t.style.bottom = mgLy + 'px'; }
+        else if (pos === 'c') { t.style.left = '50%'; t.style.top = '50%'; t.style.transform = 'translate(-50%,-50%)'; }
+        else { t.style.right = mgLx + 'px'; t.style.bottom = mgLy + 'px'; }
+      };
       let any = false;
       // Logo + teks tampil BERSAMAAN (cermin render) — dulu logo menutupi teks.
       if (logoOn && wmLogoHasFile) {
         if (img) {
-          if (!img.src || img.src.indexOf('/api/clipper/wmlogo/file') === -1) img.src = '/api/clipper/wmlogo/file?ts=' + Date.now();
+          if (!img.src || img.src.indexOf('/api/clipper/wmlogo/file') === -1) img.src = '/api/clipper/wmlogo/file?ts=' + Date.now(); if (!img.dataset.wmLoad) { img.dataset.wmLoad = '1'; img.addEventListener('load', paintWmPreview); }
           img.style.width = lgSzV + '%';
           img.style.display = 'block';
           img.style.opacity = String(lgOpV / 100);
-          place(img, lgPos);
+          if (lgPos === 'custom') { const _lw = img.offsetWidth || 0, _lh = img.offsetHeight || 0; const _px = (_lw > 0 && box.clientWidth > _lw) ? (box.clientWidth - _lw) * lgXv / 100 : box.clientWidth * lgXv / 100; const _py = (_lh > 0 && box.clientHeight > _lh) ? (box.clientHeight - _lh) * lgYv / 100 : box.clientHeight * lgYv / 100; img.style.left = Math.max(0, _px) + 'px'; img.style.top = Math.max(0, _py) + 'px'; img.style.right = ''; img.style.bottom = ''; img.style.transform = ''; } else placeLogo(img, lgPos);
           any = true;
         }
       }
@@ -4233,13 +4271,18 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditModal()});
         if (txt) {
           txt.textContent = wmEff;
           txt.style.display = 'block';
-          txt.style.fontSize = Math.max(9, Math.round(24 * boxW / 720)) + 'px';
+          txt.style.fontFamily = clipFontStack(($c('clipTplTitleFont') && $c('clipTplTitleFont').value) || (CLIP_HOOK_PRESETS[(cand.hookPreset || 'kartu')] || {}).font || 'DejaVu Sans');
+          txt.style.fontSize = Math.max(1, Math.round(24 * boxW / 720 * wmSzF)) + 'px';
           txt.style.opacity = '0.5';
-          place(txt, wmPos);
+          if (wmCustom) { txt.style.left = wmXv + '%'; txt.style.top = wmYv + '%'; txt.style.right = ''; txt.style.bottom = ''; txt.style.transform = ''; }
+          else place(txt, wmPos);
+          if (!wmCustom && (wmPos === 'bl' || wmPos === 'br')) txt.style.bottom = Math.round(40 * boxW / 720) + 'px';
           any = true;
         }
       }
       el.style.display = any ? 'block' : 'none';
+      if (txt && !txt.dataset.wmDrag) { txt.dataset.wmDrag = '1'; txt.style.pointerEvents = 'auto'; txt.style.cursor = 'grab'; txt.style.touchAction = 'none'; txt.addEventListener('pointerdown', (ev) => { if (!txt || txt.style.display === 'none') return; ev.preventDefault(); const boxR = box.getBoundingClientRect(); const move = (e2) => { const x = Math.min(100, Math.max(0, (e2.clientX - boxR.left) / boxR.width * 100)); const y = Math.min(100, Math.max(0, (e2.clientY - boxR.top) / boxR.height * 100)); const xi = $c('clipTplWatermarkX'), yi = $c('clipTplWatermarkY'), ps2 = $c('clipTplWatermarkPos'); if (xi) xi.value = Math.round(x); if (yi) yi.value = Math.round(y); if (ps2) ps2.value = 'custom'; syncWatermarkCand(); paintWmPreview(); }; const up2 = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up2); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up2); }); }
+      if (img && !img.dataset.wmLogoDrag) { img.dataset.wmLogoDrag = '1'; img.style.pointerEvents = 'auto'; img.style.cursor = 'grab'; img.style.touchAction = 'none'; img.addEventListener('pointerdown', (ev) => { if (!img || img.style.display === 'none') return; ev.preventDefault(); const boxR = box.getBoundingClientRect(); const move = (e2) => { const iw = img.offsetWidth || 0, ih = img.offsetHeight || 0; let x = Math.min(100, Math.max(0, (e2.clientX - boxR.left) / boxR.width * 100)); let y = Math.min(100, Math.max(0, (e2.clientY - boxR.top) / boxR.height * 100)); if (iw > 0 && boxR.width > iw) x = Math.min(100, Math.max(0, (e2.clientX - boxR.left) / (boxR.width - iw) * 100)); if (ih > 0 && boxR.height > ih) y = Math.min(100, Math.max(0, (e2.clientY - boxR.top) / (boxR.height - ih) * 100)); const xi = $c('clipTplWmLogoX'), yi = $c('clipTplWmLogoY'), ps2 = $c('clipTplWmLogoPos'); if (xi) xi.value = Math.round(x); if (yi) yi.value = Math.round(y); if (ps2) ps2.value = 'custom'; paintWmPreview(); }; const up2 = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up2); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up2); }); }
     }
     // __WM_PREVIEW_END__
     // Musik Latar (tab Video, GRATIS): upload file + hapus + switch + volume.
@@ -4531,7 +4574,15 @@ const renderSubPresetSettings = () => {
     // dipasang sekali) menjadwalkan ulang.
     if (!box.dataset.assWired) { box.dataset.assWired = '1'; box.addEventListener('input', clipAssPreviewSchedule); box.addEventListener('change', clipAssPreviewSchedule); }
     clipAssSeekArmed = true;
-    clipAssPreviewRefresh();
+    // Toggle mode preview ASS vs Geser (Dzaky 30 Okt): ASS = tampilan persis
+    // Final (overlay DOM disembunyikan, tidak bisa digeser); Geser = ASS mati,
+    // overlay DOM muncul + bisa diseret (menulis slider % seperti biasa).
+    // Pilihan tersimpan (localStorage) jadi bertahan pindah klip.
+    let clipAssMode = 'ass'; try { clipAssMode = localStorage.getItem('hvo_clip_ass_mode') || 'ass'; } catch (e) {}
+    const paintAssMode = () => { box.querySelectorAll('[data-assmode]').forEach(b => { const on = b.dataset.assmode === clipAssMode; if (on) b.classList.remove('ghost'); else if (!b.classList.contains('ghost')) b.classList.add('ghost'); }); };
+    box.querySelectorAll('[data-assmode]').forEach(b => b.addEventListener('click', () => { clipAssMode = b.dataset.assmode; try { localStorage.setItem('hvo_clip_ass_mode', clipAssMode); } catch (e) {} paintAssMode(); if (clipAssMode === 'dom') { clipAssPreviewDestroy(); try { syncClipStyleOverlays(); } catch (e) {} } else clipAssPreviewRefresh(); }));
+    paintAssMode();
+    if (clipAssMode === 'dom') { clipAssPreviewDestroy(); try { syncClipStyleOverlays(); } catch (e) {} } else clipAssPreviewRefresh();
     clipBadgePollStart(idx);
   }
   // Preview real-time (mirip CapCut): kandidat + cue disimpan agar subtitle
@@ -4573,13 +4624,15 @@ const renderSubPresetSettings = () => {
         changed.forEach(x => clipDurWarned.add(x.sig));
       }
       const wmLogoBody = (() => {
-        const en = $c('clipTplWmLogoEnabled'), ps = $c('clipTplWmLogoPos'), op = $c('clipTplWmLogoOpacity'), sz = $c('clipTplWmLogoSize');
+        const en = $c('clipTplWmLogoEnabled'), ps = $c('clipTplWmLogoPos'), op = $c('clipTplWmLogoOpacity'), sz = $c('clipTplWmLogoSize'), xi = $c('clipTplWmLogoX'), yi = $c('clipTplWmLogoY');
         if (!en && !ps && !op && !sz) return undefined;
         return {
           enabled: en ? !!en.checked : undefined,
-          pos: ps && ['bl', 'br', 'tl', 'tr', 'c'].includes(ps.value) ? ps.value : undefined,
+          pos: ps && ['bl', 'br', 'tl', 'tr', 'c', 'custom'].includes(ps.value) ? ps.value : undefined,
           opacity: op && Number.isFinite(+op.value) ? Math.min(100, Math.max(10, +op.value)) : undefined,
           size: sz && Number.isFinite(+sz.value) ? Math.min(40, Math.max(5, +sz.value)) : undefined,
+          x: xi && xi.value !== '' && Number.isFinite(+xi.value) ? Math.min(100, Math.max(0, +xi.value)) : undefined,
+          y: yi && yi.value !== '' && Number.isFinite(+yi.value) ? Math.min(100, Math.max(0, +yi.value)) : undefined,
         };
       })();
       const wmBody = { id: jobId, candidates: candCache || [] };
@@ -5039,14 +5092,21 @@ const renderSubPresetSettings = () => {
         + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px"><b style="font-size:13px">🎯 Auto Reframe</b><p class="hint" style="margin:4px 0">Crop ngikutin yang ngomong. Mode ✨ Auto sekarang pintar: 1 orang = tracking; 2 orang = Landscape background blur (dua-duanya kelihatan).</p><div data-packslot="reframe"></div></div>'
         + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px"><b style="font-size:13px">🖼️ Smart Cover</b><p class="hint" style="margin:4px 0">Poster cover dibuat OTOMATIS tiap klip Final selesai (teks = judul klip; bisa diganti per klip di Edit > tab Cover).</p><label class="chk"><input type="checkbox" id="clipSmartCover"> Buat poster otomatis</label></div>'
         + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px"><b style="font-size:13px">✨ Filter Cerah HD</b><p class="hint" style="margin:4px 0">Hasil render batch berikutnya lebih cerah, warnanya hidup, gambarnya lebih tajam (filter video di encode Final). Video polos tidak berubah; kandidat lama tidak ikut berubah.</p><label class="chk"><input type="checkbox" id="clipEnhanceFx"> Pakai Filter Cerah HD</label></div>'
-        + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px"><b style="font-size:13px">⚡ Smart Hook</b><p class="hint" style="margin:4px 0">Hook teaser + gaya & durasi judul hook bawaan buat kandidat baru.</p><div data-packslot="hook"></div><label style="display:block;margin-top:8px">Durasi judul bawaan<select id="clipTitleDurDefault" style="margin-top:2px"><option value="auto">✨ Otomatis (AI pilihkan)</option><option value="default">Default (4 dtk)</option><option value="5s">5 dtk</option><option value="full">Sepanjang klip</option></select></label><div data-packslot="hookpreset" style="margin-top:8px"></div></div>';
+        + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px"><b style="font-size:13px">⚡ Smart Hook</b><p class="hint" style="margin:4px 0">Hook teaser + gaya & durasi judul hook bawaan buat kandidat baru.</p><div data-packslot="hook"></div><label style="display:block;margin-top:8px">Durasi judul bawaan<select id="clipTitleDurDefault" style="margin-top:2px"><option value="auto">✨ Otomatis (AI pilihkan)</option><option value="default">Default (4 dtk)</option><option value="5s">5 dtk</option><option value="full">Sepanjang klip</option></select></label><div data-packslot="hookpreset" style="margin-top:8px"></div><label style="display:block;margin-top:8px">Hook teaser default kandidat baru<select id="clipHookTeaserDefaultSel" style="margin-top:2px"><option value="off">Mati (bawaan baru)</option><option value="on">Nyala</option></select></label></div>' + '<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px"><b style="font-size:13px">🪝 Cover Hook</b><p class="hint" style="margin:4px 0">Pembuka split atas-bawah + suara membacakan judul hook. Toggle sendiri, tidak tergantung hook teaser.</p><label class="chk"><input type="checkbox" id="clipCoverHook"> Pakai cover hook</label><label style="display:block;margin-top:8px">Pilih momen<select id="clipCoverHookModeSel" style="margin-top:2px"><option value="auto">✨ Otomatis (momen wajah terbaik)</option><option value="manual">Manual (pilih detik per klip)</option></select></label><label style="display:block;margin-top:8px">Suara<select id="clipCoverHookVoiceSel" style="margin-top:2px"><option value="edge-tts/id-ID-ArdiNeural">Edge TTS gratis — Ardi (pria)</option><option value="edge-tts/id-ID-GadisNeural">Edge TTS gratis — Gadis (wanita)</option><option value="gemini">Gemini TTS gratis — Zephyr</option></select></label></div>';
       panel.prepend(packs);
       { const ftBox = $c('clipFaceTrackBox'), slotR = packs.querySelector('[data-packslot="reframe"]'); if (ftBox && slotR) slotR.appendChild(ftBox);
         const hk = $c('clipHook'), slotH = packs.querySelector('[data-packslot="hook"]'); if (hk && slotH && hk.closest('label')) slotH.appendChild(hk.closest('label'));
         const hp = $c('clipHookPresetCreate'), slotP = packs.querySelector('[data-packslot="hookpreset"]'); if (hp && slotP && hp.closest('div')) slotP.appendChild(hp.closest('div'));
         const scEl = $c('clipSmartCover'); if (scEl) { scEl.checked = !!clipSmartCover; scEl.addEventListener('change', () => { clipSmartCover = scEl.checked; saveLs(); }); }
         const fxEl = $c('clipEnhanceFx'); if (fxEl) { fxEl.checked = !!clipEnhanceFx; fxEl.addEventListener('change', () => { clipEnhanceFx = fxEl.checked; saveLs(); }); }
-        const tdEl = $c('clipTitleDurDefault'); if (tdEl) { tdEl.value = clipTitleDurDefault || 'auto'; tdEl.addEventListener('change', () => { clipTitleDurDefault = tdEl.value; saveLs(); }); } }
+        const tdEl = $c('clipTitleDurDefault'); if (tdEl) { tdEl.value = clipTitleDurDefault || 'auto'; tdEl.addEventListener('change', () => { clipTitleDurDefault = tdEl.value; saveLs(); }); }
+        const htEl = $c('clipHookTeaserDefaultSel'); if (htEl) { htEl.value = clipHookTeaserDefault ? 'on' : 'off'; htEl.addEventListener('change', () => { clipHookTeaserDefault = htEl.value === 'on'; const hk2 = $c('clipHook'); if (hk2) hk2.checked = clipHookTeaserDefault; saveLs(); }); }
+        const chEl = $c('clipCoverHook'); if (chEl) { chEl.checked = !!clipCoverHook; chEl.addEventListener('change', () => { clipCoverHook = chEl.checked; saveLs(); }); }
+        const cmEl = $c('clipCoverHookModeSel'); if (cmEl) { cmEl.value = clipCoverHookMode || 'auto'; cmEl.addEventListener('change', () => { clipCoverHookMode = cmEl.value; saveLs(); }); }
+        const cvEl = $c('clipCoverHookVoiceSel'); if (cvEl) { cvEl.value = clipCoverHookVoice || 'edge-tts/id-ID-ArdiNeural'; cvEl.addEventListener('change', () => { clipCoverHookVoice = cvEl.value; saveLs(); }); }
+        { const cgCard = $c('clipCoverHook') ? $c('clipCoverHook').closest('div') : null; if (cgCard && !$c('clipCoverHookGuestSideSel')) { const lb = document.createElement('label'); lb.style.display = 'block'; lb.style.marginTop = '8px'; lb.textContent = 'Tamu podcast di sisi '; const sel = document.createElement('select'); sel.id = 'clipCoverHookGuestSideSel'; sel.style.marginTop = '2px'; sel.innerHTML = '<option value="left">Kiri</option><option value="right">Kanan</option>'; lb.appendChild(sel); cgCard.appendChild(lb); } const cgEl = $c('clipCoverHookGuestSideSel'); if (cgEl) { cgEl.value = clipCoverHookGuestSide || 'left'; cgEl.addEventListener('change', () => { clipCoverHookGuestSide = cgEl.value; saveLs(); }); } }
+        { const cgCard2 = $c('clipCoverHook') ? $c('clipCoverHook').closest('div') : null; if (cgCard2 && !$c('clipCoverHookFontSel')) { const lb = document.createElement('label'); lb.style.display = 'block'; lb.style.marginTop = '8px'; lb.textContent = 'Font kartu cover '; const sel = document.createElement('select'); sel.id = 'clipCoverHookFontSel'; sel.style.marginTop = '2px'; sel.innerHTML = clipFontOptions(clipCoverHookFont || 'Montserrat'); lb.appendChild(sel); cgCard2.appendChild(lb); } const cfEl = $c('clipCoverHookFontSel'); if (cfEl) { cfEl.value = clipCoverHookFont || 'Montserrat'; cfEl.addEventListener('change', () => { clipCoverHookFont = cfEl.value; saveLs(); }); } }
+        const hk0 = $c('clipHook'); if (hk0) hk0.checked = clipHookTeaserDefault; }
     } }
   // FASE 27 (Dzaky 24 Okt): Pengaturan Clipper jadi POP-UP modal, ganti panel
   // expand di bawah kartu Buat Klip. Isi = kontrol yang SUDAH ada, dipindah
@@ -5094,6 +5154,8 @@ const renderSubPresetSettings = () => {
       mv($c('clipEnhanceFx') ? $c('clipEnhanceFx').closest('div') : null, secOut);
       mv($c('clipHook') ? $c('clipHook').closest('label') : null, secOut);
       mv($c('clipTitleDurDefault') ? $c('clipTitleDurDefault').closest('label') : null, secOut);
+      mv($c('clipHookTeaserDefaultSel') ? $c('clipHookTeaserDefaultSel').closest('label') : null, secOut); // Cover Hook fix (29 Okt): select ini ikut panel lama yang dihapus modal
+      mv($c('clipCoverHook') ? $c('clipCoverHook').closest('div') : null, secOut); // Cover Hook fix (29 Okt): kartu ini ikut panel lama yang dihapus modal
       mv($c('clipModeHint'), secOut);
       panel.remove();
       const openSet = () => { modal.classList.add('open'); document.body.style.overflow = 'hidden'; };
@@ -5304,7 +5366,7 @@ const renderSubPresetSettings = () => {
           hookPreset: ($c('clipHookPresetCreate') ? $c('clipHookPresetCreate').value : 'kartu'), // Kartu Judul (dropdown Buat Klip) -> default semua kandidat
           provider: clipRoute === 'direct' ? clipProvider : undefined,
           model: clipIsRouter(clipRoute) ? (clipModel || undefined) : undefined,
-          route: clipRoute, moment: clipMoment, autoRender: true, transcribeVia: clipTranscribe, transcriptLang: clipTranscriptLang, aiNote: ($c('clipAiNote') ? $c('clipAiNote').value : ''), smartCover: clipSmartCover, titleDurDefault: clipTitleDurDefault, enhanceFx: clipEnhanceFx, ...clipModeOpts() }) });
+          route: clipRoute, moment: clipMoment, autoRender: true, transcribeVia: clipTranscribe, transcriptLang: clipTranscriptLang, aiNote: ($c('clipAiNote') ? $c('clipAiNote').value : ''), smartCover: clipSmartCover, titleDurDefault: clipTitleDurDefault, enhanceFx: clipEnhanceFx, hookTeaserDefault: clipHookTeaserDefault, coverHook: clipCoverHook, coverHookMode: clipCoverHookMode, coverHookVoice: clipCoverHookVoice, coverHookGuestSide: clipCoverHookGuestSide, coverHookFont: clipCoverHookFont, ...clipModeOpts() }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || 'Gagal memulai analisis');
       jobId = j.id; saveLs(); startPoll();
@@ -5384,6 +5446,7 @@ const renderSubPresetSettings = () => {
         // Smart Cover terkini (Pengaturan > Skill Packs): dikirim tiap render
         // biar render ulang ikut ceklis sekarang, bukan flag analisis lama.
         smartCover: clipSmartCover,
+        coverHook: clipCoverHook, coverHookMode: clipCoverHookMode, coverHookVoice: clipCoverHookVoice, coverHookGuestSide: clipCoverHookGuestSide, coverHookFont: clipCoverHookFont,
         // Toggle per-klip (Detail): kandidat > global (judul default ON).
         showTitle: cand && cand.showTitle !== undefined ? !!cand.showTitle : true,
         // Subtitle: OFF hanya bila user MENYENTUH toggle-nya (subSet) dan
@@ -5406,13 +5469,15 @@ const renderSubPresetSettings = () => {
         kinetikBigColor: cand && cand.kinetikBigColor ? cand.kinetikBigColor : undefined,
         titleAnim: cand && cand.titleAnim !== undefined ? !!cand.titleAnim : undefined,
         // Tab Video (Edit): Watermark + Musik Latar.
-        watermark: { enabled: !!(cand && cand.watermarkEnabled), text: cand && cand.watermarkText ? cand.watermarkText : '', pos: cand && cand.watermarkPos ? cand.watermarkPos : 'bl' },
+        watermark: { enabled: !!(cand && cand.watermarkEnabled), text: cand && cand.watermarkText ? cand.watermarkText : '', pos: cand && cand.watermarkPos ? cand.watermarkPos : 'bl', x: cand && cand.watermarkX !== undefined ? +cand.watermarkX : undefined, y: cand && cand.watermarkY !== undefined ? +cand.watermarkY : undefined, size: cand && cand.watermarkSize !== undefined ? +cand.watermarkSize : undefined },
         music: { enabled: !!(cand && cand.musicEnabled), volume: cand && cand.musicVolume !== undefined ? +cand.musicVolume : 0.2 },
         // Durasi judul (Detail): kandidat > default (4 detik).
         titleDur: cand && cand.titleDur ? cand.titleDur : 'default',
         titleDurSec: cand && cand.titleDurSec ? +cand.titleDurSec : 4,
         // Cover per-klip (Fase 2, tab Cover).
         coverText: cand && cand.coverText ? cand.coverText : '', coverAt: cand && cand.coverAt !== undefined ? +cand.coverAt : undefined,
+        coverHookOn: cand && cand.coverHookOn !== undefined ? !!cand.coverHookOn : undefined, coverHookMode: cand && cand.coverHookMode ? cand.coverHookMode : undefined, coverHookTop: cand && cand.coverHookTop !== undefined ? +cand.coverHookTop : undefined, coverHookBottom: cand && cand.coverHookBottom !== undefined ? +cand.coverHookBottom : undefined,
+        coverFont: cand && cand.coverFont ? cand.coverFont : undefined,
         hookText: cand && cand.hookText ? cand.hookText : '',
         styleOv: cand && cand.styleOv ? cand.styleOv : undefined,
         // Posisi/ukuran/warna per-klip (Detail, slider persen referensi).
@@ -5494,6 +5559,38 @@ const renderSubPresetSettings = () => {
     const w = wrap && wrap.getBoundingClientRect ? (wrap.getBoundingClientRect().width || 0) : 0;
     return (w > 40 ? (assPx / 720 * w) : (assPx / 1280 * 420)) + 'px';
   };
+  // Cermin buildAss: wrap judul maks 3 baris + kecilkan -10%/iterasi
+  // (min 60%, lalu lebarkan 0,62/0,54) — dulu preview tidak mengecilkan
+  // font sehingga judul panjang tampil lebih besar dari Final.
+  function clipTitleWrapLines(text, effSize, widthPx) {
+    const parts = String(text || '').split('|').map(s => s.trim()).filter(Boolean);
+    const cpl = Math.max(10, Math.floor(widthPx / (0.6 * effSize)));
+    const lines = [];
+    parts.forEach((part) => {
+      const words = part.split(/\s+/).filter(Boolean);
+      let cur = '';
+      for (const w of words) {
+        if (!cur) { cur = w; continue; }
+        if (cur.length + 1 + w.length <= cpl) cur += ' ' + w;
+        else { lines.push(cur); cur = w; }
+      }
+      if (cur) lines.push(cur);
+    });
+    return lines;
+  }
+  function clipTitleEffSize(text, baseSize, ovEl) {
+    const wrap = ovEl && ovEl.closest ? ovEl.closest('[data-clippreview]') : null;
+    const w = wrap && wrap.getBoundingClientRect ? (wrap.getBoundingClientRect().width || 0) : 0;
+    const widthPx = (w > 40 ? (680 / 720 * w) : (680 / 1280 * 420));
+    let eff = baseSize;
+    let lines = clipTitleWrapLines(text, eff, widthPx);
+    while (lines.length > 3 && eff > Math.ceil(baseSize * 0.6)) {
+      eff = Math.max(Math.ceil(baseSize * 0.6), Math.round(eff * 0.9));
+      lines = clipTitleWrapLines(text, eff, widthPx);
+    }
+    if (lines.length > 3) lines = clipTitleWrapLines(text, eff, widthPx * 0.62 / 0.54);
+    return eff;
+  }
   function syncClipStyleOverlays() {
     // Semua kontrol edit bermuara ke sini -> jadwalkan bangun-ulang ASS
     // juga. Tombol preset/durasi/posisi TIDAK memicu event input/change,
@@ -5535,7 +5632,7 @@ const renderSubPresetSettings = () => {
             const _pct = cand.titleYPercent !== undefined ? +cand.titleYPercent : 56;
             const _szPct = cand.titleSizePercent !== undefined ? +cand.titleSizePercent : 100;
             ov.style.top = _pct + '%';
-            ov.style.fontSize = clipOvFontPx(ov, Math.round(_base * _szPct / 100));
+            ov.style.fontSize = clipOvFontPx(ov, clipTitleEffSize((cand.hookText || (document.querySelector('[data-cliptitle="' + ci + '"]') || {}).value || cand.title || ''), Math.round(_base * _szPct / 100), ov));
             ov.style.fontFamily = clipFontStack(cand.titleFont || _hp.font || 'DejaVu Sans');
             ov.style.fontWeight = (_hp.bold !== undefined ? !!_hp.bold : true) ? '700' : '400';
             // Cermin render: gaya align 2 (Sinema) = judul di BAWAH frame
@@ -5580,6 +5677,7 @@ const renderSubPresetSettings = () => {
         if (ci !== null && cand) {
           const hp = CLIP_HOOK_PRESETS[cand.hookPreset || 'kartu'] || {};
           ov.querySelectorAll('[data-part]').forEach(sp => { sp.style.color = (+sp.dataset.part === 0) ? (hp.color1 || cand.titleColor1 || '#FFFFFF') : (hp.color2 || cand.titleColor2 || '#FFFF00'); });
+          { const _tt = ov.querySelector('.clip-title-txt'); if (_tt) { const _wr = ov.closest ? ov.closest('[data-clippreview]') : null; const _ww = _wr && _wr.getBoundingClientRect ? (_wr.getBoundingClientRect().width || 0) : 0; if (_ww > 40) { _tt.style.maxWidth = (680 / 720 * _ww) + 'px'; _tt.style.display = 'inline-block'; } } }
         } else {
           ov.querySelectorAll('[data-part]').forEach(sp => { sp.style.color = (+sp.dataset.part === 0) ? '#FFFFFF' : '#FFFF00'; });
         }
@@ -5594,7 +5692,8 @@ const renderSubPresetSettings = () => {
         if (ov.dataset.compact !== '1') {
           if (ci !== null && cand) {
             const _sp = CLIP_SUB_PRESETS[cand.subPreset || 'default'] || {};
-            const _base = _sp.size || 48;
+            const _sov = (cand.styleOv && typeof cand.styleOv === 'object') ? cand.styleOv : {};
+            const _base = _sov.fontSize || _sp.size || 48;
             const _sz = Math.round(_base * ((cand.subSizePercent !== undefined ? +cand.subSizePercent : 100) / 100));
             const _topPx = Math.round(((cand.subYPercent !== undefined ? +cand.subYPercent : 70) / 100) * 1280);
             const _mv = Math.min(1200, Math.max(0, Math.round(1280 - _topPx - 2 * Math.round(_sz * 1.25))));
@@ -5602,7 +5701,7 @@ const renderSubPresetSettings = () => {
             ov.style.fontSize = clipOvFontPx(ov, _sz);
             ov.style.fontFamily = clipFontStack(cand.subFont || _sp.font || 'DejaVu Sans');
             ov.style.fontWeight = (_sp.bold !== undefined ? !!_sp.bold : true) ? '700' : '400';
-            ov.style.color = _sp.color || '#FFFFFF';
+            ov.style.color = _sov.color || _sp.color || '#FFFFFF';
           } else {
             // Overlay hasil render (tanpa kandidat): default referensi.
             ov.style.bottom = (300 / 1280 * 100) + '%';
@@ -5718,6 +5817,8 @@ const renderSubPresetSettings = () => {
           ${j.status === 'error' && j.error ? `<p class="hint" style="margin:4px 0 0;color:#f87171">❌ ${esc(String(j.error).slice(0, 200))}</p>` : ''}
           <div style="margin-top:4px"><span class="badge">${j.candidates || 0} klip</span>${(j.status === 'running' || j.status === 'rendering') ? ' <span class="hint">' + Math.round(j.progress || 0) + '%</span>' : ''}</div></div>
           <div style="display:flex;flex-direction:column;gap:6px"><button class="btn ghost" data-open-proj="${j.id}">Buka</button>
+          <button class="btn" data-render-proj="${j.id}">🎬 Render</button>
+          ${j.sourceReady ? '<button class="btn ghost" data-mp3-proj="' + j.id + '">🎵 MP3</button>' : ''}
           <button class="btn ghost" data-feed-proj="${j.id}">👁️ Preview</button>
           ${j.status === 'error' ? `<button class="btn ghost" data-retry-proj="${j.id}">🔄 Coba Lagi</button>` : ''}
           <button class="btn ghost danger" data-del-proj="${j.id}">Hapus</button></div>
@@ -5820,6 +5921,48 @@ const renderSubPresetSettings = () => {
     const retryBtn = e.target.closest('[data-retry-proj]');
     const feedBtn = e.target.closest('[data-feed-proj]');
     if (feedBtn) { clipOpenFeed(feedBtn.dataset.feedProj); return; }
+    // Tombol MP3 di kartu Klip Saya (Dzaky 30 Okt): unduh audio utuh video
+    // sumber sebagai MP3 (endpoint server mengekstrak + meng-cache).
+    const mp3Btn = e.target.closest('[data-mp3-proj]');
+    if (mp3Btn) {
+      const mid = mp3Btn.dataset.mp3Proj;
+      const mj = (clipJobsCache || []).find(x => x.id === mid);
+      if (!mj || !mj.sourceReady) { setMsg('Video sumber proyek ini belum siap — tunggu unduhan/upload selesai.'); return; }
+      setMsg('⬇️ Menyiapkan MP3 audio sumber…');
+      const a = document.createElement('a'); a.href = '/api/clipper/source-mp3?id=' + encodeURIComponent(mid); a.download = ''; document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    // Tombol Render per sumber di kartu Klip Saya (Dzaky 30 Okt): render
+    // klip-klip sumber itu saja tanpa buka Detail; progres langsung tampil
+    // di log depan (layar Buat Klip). Sudah jalan -> cukup tampilkan
+    // lognya. Belum ada kandidat -> analisis + auto-render (seperti popup
+    // OK Render Sekarang). Sudah ada kandidat -> render semua kandidat itu.
+    const renderBtn = e.target.closest('[data-render-proj]');
+    if (renderBtn) {
+      const rid = renderBtn.dataset.renderProj;
+      const rj = (clipJobsCache || []).find(x => x.id === rid);
+      jobId = rid; saveLs();
+      try { localStorage.setItem('hvo-clipper-open', 'true'); } catch (e2) {}
+      if ($c('clipperBody')) $c('clipperBody').hidden = false;
+      if ($c('clipperChev')) $c('clipperChev').textContent = '▾';
+      showClipView('create');
+      if (rj && (rj.status === 'running' || rj.status === 'rendering')) { setMsg('Proyek ini sedang berjalan — menampilkan progresnya…'); setBadge('Berjalan'); stopPoll(); startPoll(); refreshProjects(); return; }
+      setMsg('Memuat proyek…'); setBadge('Berjalan');
+      try {
+        const rs = await fetch('/api/clipper/status?id=' + encodeURIComponent(rid));
+        const dj = await rs.json().catch(() => ({}));
+        if (!rs.ok) throw new Error(dj.error || 'Gagal memuat proyek');
+        const cands = dj.candidates || [];
+        if (cands.length) {
+          candCache = cands; rendersCache = dj.renders || [];
+          await clipRenderSelected(cands.map(c => c.index));
+        } else {
+          await runClipAnalyze();
+        }
+        refreshProjects();
+      } catch (err) { setMsg(err.message); setBadge('Gagal'); }
+      return;
+    }
     if (retryBtn) { jobId = retryBtn.dataset.retryProj; saveLs(); clipCandKey = ''; $c('clipCandidates').innerHTML = ''; $c('clipRenders').innerHTML = ''; showClipView('detail'); renderJobDetailHead(); clipRetryCurrent(); return; }
     if (openBtn) { openProject(openBtn.dataset.openProj); return; }
     if (delBtn) {

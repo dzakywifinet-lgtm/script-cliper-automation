@@ -687,6 +687,15 @@ function buildAss(cues, start, end, subStyle, overlay) {
   const subCenterY = Number.isFinite(+ov.subCenterY) ? +ov.subCenterY : null;
   const subMarginVFor = (lines) => subCenterY !== null ? Math.min(OUT_H - 80, Math.max(0, Math.round(OUT_H - subCenterY - (Math.max(1, lines) * lineH) / 2)))
     : subTopPx === null ? 0 : Math.min(OUT_H - 80, Math.max(0, OUT_H - subTopPx - Math.max(1, lines) * lineH));
+  // Subtitle di SAMBUNGAN saat segmen Split rame (gaya referensi Dzaky
+  // 29 Okt): ov.splitSegs = [{start, end}] detik RELATIF klip. Per chunk,
+  // bila awal chunk jatuh di segmen split -> margin seam (blok terpusat
+  // di tengah frame = sambungan panel atas-bawah), bukan posisi normal.
+  // Global subCenterY (mode Split/Gameplay) tidak disentuh — ini khusus
+  // segmen split di mode Auto/Podcast (mix).
+  const splitSegsIn = (Array.isArray(ov.splitSegs) ? ov.splitSegs : []).filter(sg => sg && Number.isFinite(+sg.start) && Number.isFinite(+sg.end) && +sg.end > +sg.start);
+  const inSplitSeg = (t) => splitSegsIn.some(sg => t >= +sg.start && t < +sg.end);
+  const seamMarginVFor = (lines) => Math.min(OUT_H - 80, Math.max(0, Math.round(OUT_H - OUT_H / 2 - (Math.max(1, lines) * lineH) / 2)));
   const guardSubTop = subCenterY !== null ? subCenterY - lineH : subTopPx;
   let marginV = (subCenterY !== null || subTopPx !== null) ? subMarginVFor(2) : Math.min(OUT_H - 80, Math.max(0, Math.round((+ss.marginV || 90) * S)));
   // Ruang atas-bawah (Item 10): hanya berlaku saat posisi margin bebas
@@ -832,7 +841,8 @@ function buildAss(cues, start, end, subStyle, overlay) {
   };
   // WrapStyle: 0 = smart wrapping (libass membungkus teks jadi beberapa baris).
   // Sebelumnya WrapStyle: 2 (no wrapping) → subtitle 1 baris raksasa kepotong layar.
-  const header = '[Script Info]\nTitle: Auto Clipper\nScriptType: v4.00+\nPlayResX: ' + OUT_W + '\nPlayResY: ' + OUT_H + '\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,' + font + ',' + size + ',' + primary + ',' + karaokeSec + ',' + subOutlineColor + ',' + subBack + ',' + bold + ',' + subItalic + ',0,0,100,100,' + subSpacing + ',0,' + subBorder + ',' + subOutline + ',' + subShadow + ',' + subAlign + ',' + subMarginLR + ',' + subMarginLR + ',' + marginV + ',1\nStyle: Title1,' + tFont + ',' + tEffSize + ',' + tP1 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Title2,' + tFont + ',' + tEffSize + ',' + tP2 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Cta,' + tFont + ',' + ctaSize + ',' + ctaP + ',&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,8,10,10,' + ctaY + ',1\nStyle: Hook,Montserrat,' + Math.round(71 * S) + ',&H0000FFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,5,10,10,0,1\nStyle: Watermark,' + tFont + ',' + Math.round(24 * S) + ',&H80FFFFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n' + boxStyles + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+  const wmSizeF = (ov.watermark && Number.isFinite(+ov.watermark.size)) ? Math.min(200, Math.max(50, +ov.watermark.size)) / 100 : 1;
+  const header = '[Script Info]\nTitle: Auto Clipper\nScriptType: v4.00+\nPlayResX: ' + OUT_W + '\nPlayResY: ' + OUT_H + '\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,' + font + ',' + size + ',' + primary + ',' + karaokeSec + ',' + subOutlineColor + ',' + subBack + ',' + bold + ',' + subItalic + ',0,0,100,100,' + subSpacing + ',0,' + subBorder + ',' + subOutline + ',' + subShadow + ',' + subAlign + ',' + subMarginLR + ',' + subMarginLR + ',' + marginV + ',1\nStyle: Title1,' + tFont + ',' + tEffSize + ',' + tP1 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Title2,' + tFont + ',' + tEffSize + ',' + tP2 + ',&H000000FF,&H80000000,' + titleBack + ',' + tBold + ',' + tItalic + ',0,0,100,100,' + tSpacing + ',0,' + titleBorder + ',' + titleOutline + ',0,8,10,10,' + tY + ',1\nStyle: Cta,' + tFont + ',' + ctaSize + ',' + ctaP + ',&H000000FF,&H80000000,&H00000000,' + tBold + ',' + tItalic + ',0,0,100,100,0,0,1,2,0,8,10,10,' + ctaY + ',1\nStyle: Hook,Montserrat,' + Math.round(71 * S) + ',&H0000FFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,5,10,10,0,1\nStyle: Watermark,' + tFont + ',' + Math.round(24 * S * wmSizeF) + ',&H80FFFFFF,&H000000FF,&H80000000,&H00000000,-1,0,0,0,100,100,0,0,1,1,0,2,10,10,10,1\n' + boxStyles + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
   const out = [header];
   const clipDur = Math.max(0.2, (end || 0) - (start || 0));
   // Durasi judul (gaya Klipaja): 'default' = 4 detik (judul hook cuma di awal),
@@ -1064,9 +1074,9 @@ function buildAss(cues, start, end, subStyle, overlay) {
   // Watermark (tab Video, GRATIS): teks kecil semi-transparan di pojok,
   // sepanjang klip. Posisi: bl (kiri-bawah, default Klipaja) / br / tl / tr.
   if (ov.watermark && String(ov.watermark.text || '').trim()) {
-    const wmPos = ['bl', 'br', 'tl', 'tr'].includes(ov.watermark.pos) ? ov.watermark.pos : 'bl';
+    const wmPos = ['bl', 'br', 'tl', 'tr', 'custom'].includes(ov.watermark.pos) ? ov.watermark.pos : 'bl';
     const wmMargin = Math.round(20 * S), wmBottom = Math.round(40 * S);
-    const wmPosTag = wmPos === 'bl' ? '{\\pos(' + wmMargin + ',' + (OUT_H - wmBottom) + ')\\an1}'
+    const wmPosTag = wmPos === 'custom' ? '{\\pos(' + Math.round((Number.isFinite(+ov.watermark.x) ? Math.min(100, Math.max(0, +ov.watermark.x)) : 5) * OUT_W / 100) + ',' + Math.round((Number.isFinite(+ov.watermark.y) ? Math.min(100, Math.max(0, +ov.watermark.y)) : 95) * OUT_H / 100) + ')\\an7}' : wmPos === 'bl' ? '{\\pos(' + wmMargin + ',' + (OUT_H - wmBottom) + ')\\an1}'
       : wmPos === 'br' ? '{\\pos(' + (OUT_W - wmMargin) + ',' + (OUT_H - wmBottom) + ')\\an3}'
       : wmPos === 'tl' ? '{\\pos(' + wmMargin + ',' + wmMargin + ')\\an7}'
       : '{\\pos(' + (OUT_W - wmMargin) + ',' + wmMargin + ')\\an9}';
@@ -1230,7 +1240,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
       gs = Math.max(gs, holdUntil);
     }
     const kTotal = ch.lines.length;
-    const kBase = subMarginVFor(kTotal);
+    const kBase = inSplitSeg(Math.max(0, ch.start - start)) ? seamMarginVFor(kTotal) : subMarginVFor(kTotal);
     // Kotak subtitle: SATU rect per chunk, menutupi semua barisnya.
     if (sp.box && subBoxHex) {
       const kRectW = (ws) => ws.map(w => dispText(w)).join(' ').length * size * 0.70;
@@ -1365,7 +1375,7 @@ function buildAss(cues, start, end, subStyle, overlay) {
           : txt;
       }).filter(v => v !== null).join(' ')).filter(l => l).join('\\N');
       if (!rendered) return;
-      const mv = subMarginVFor(kTotal);
+      const mv = inSplitSeg(Math.max(0, ch.start - start)) ? seamMarginVFor(kTotal) : subMarginVFor(kTotal);
       // Chat (slide-up + pop bubble): \move butuh koordinat absolut —
       // top blok = OUT_H - MarginV - tinggi blok. Gaya lain pakai subAnimTag.
       let groupTag = subAnimTag;
@@ -1500,7 +1510,7 @@ function clipTalkerSegs(track, len, srcW) {
     if (t1 <= t0) continue;
     const faces = Array.isArray(arr[i].faces) ? arr[i].faces.filter(f => f && (+f.w || 0) >= W * 0.05) : [];
     const talking = faces.filter(f => (+f.mouth || 0) > 2.0).length;
-    const kind = (faces.length === 0 || talking >= 2) ? 'land' : 'port';
+    const kind = faces.length === 0 ? 'land' : (talking >= 2 ? 'split' : 'port');
     if (runs.length && runs[runs.length - 1].kind === kind) runs[runs.length - 1].end = Math.min(L, t1);
     else runs.push({ start: t0, end: Math.min(L, t1), kind });
   }
@@ -1530,8 +1540,147 @@ function clipTalkerSegs(track, len, srcW) {
   return {
     portraitSegs: runs.filter(r => r.kind === 'port' && r.end > r.start).map(round),
     landscapeSegs: runs.filter(r => r.kind === 'land' && r.end > r.start).map(round),
+    splitSegs: runs.filter(r => r.kind === 'split' && r.end > r.start).map(round),
     samples: arr.length,
   };
+}
+// Panel split rame (Dzaky 29 Okt): tiap segmen rame -> 2 pusat wajah
+// (atas = pembicara utama, bawah = kelompok lawan bicara). Cluster 2-means
+// pada pusat wajah per segmen; pembicara utama = cluster dengan sampel
+// ngomong terbanyak (mulut > 2,0, ambang sama dengan clipTalkerSegs).
+// Untuk 2 orang, median kelompok = persis orang kedua. Tanpa wajah di
+// segmen -> pakai pusat segmen sebelumnya (fallback 25%/75% lebar).
+function clipSplitSegTracks(track, splitSegs, srcW) {
+  const W = +srcW || 0;
+  const arr = (Array.isArray(track) ? track : []).filter(s => s && Number.isFinite(+s.t)).sort((a, b) => a.t - b.t);
+  const segs = (Array.isArray(splitSegs) ? splitSegs : []).filter(x => x && Number.isFinite(+x.start) && Number.isFinite(+x.end) && +x.end > +x.start);
+  const top = [], bot = [];
+  if (!segs.length) return { top, bot };
+  let lastTop = W * 0.25, lastBot = W * 0.75;
+  const med = (a) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
+  for (const sg of segs) {
+    const faces = [];
+    for (const s of arr) {
+      if (+s.t < sg.start || +s.t >= sg.end) continue;
+      for (const f of (Array.isArray(s.faces) ? s.faces : [])) {
+        if (!f || (+f.w || 0) < W * 0.05) continue;
+        faces.push({ cx: (+f.x || 0) + (+f.w || 0) / 2, w: +f.w || 0, talk: (+f.mouth || 0) > 2.0 });
+      }
+    }
+    if (!faces.length) { top.push({ t: sg.start, x: Math.round(lastTop) }); top.push({ t: sg.end, x: Math.round(lastTop) }); bot.push({ t: sg.start, x: Math.round(lastBot) }); bot.push({ t: sg.end, x: Math.round(lastBot) }); continue; }
+    let c0 = Math.min(...faces.map(f => f.cx)), c1 = Math.max(...faces.map(f => f.cx));
+    if (c1 - c0 < 1) { const c = Math.round(c0); top.push({ t: sg.start, x: c }); top.push({ t: sg.end, x: c }); bot.push({ t: sg.start, x: c }); bot.push({ t: sg.end, x: c }); lastTop = c; lastBot = c; continue; }
+    for (let it = 0; it < 10; it++) {
+      const g0 = [], g1 = [];
+      for (const f of faces) (Math.abs(f.cx - c0) <= Math.abs(f.cx - c1) ? g0 : g1).push(f);
+      if (!g0.length || !g1.length) break;
+      const n0 = med(g0.map(f => f.cx)), n1 = med(g1.map(f => f.cx));
+      if (Math.abs(n0 - c0) < 0.5 && Math.abs(n1 - c1) < 0.5) { c0 = n0; c1 = n1; break; }
+      c0 = n0; c1 = n1;
+    }
+    const g0 = [], g1 = [];
+    for (const f of faces) (Math.abs(f.cx - c0) <= Math.abs(f.cx - c1) ? g0 : g1).push(f);
+    if (!g0.length || !g1.length) { const c = Math.round(med(faces.map(f => f.cx))); top.push({ t: sg.start, x: c }); top.push({ t: sg.end, x: c }); bot.push({ t: sg.start, x: c }); bot.push({ t: sg.end, x: c }); lastTop = c; lastBot = c; continue; }
+    const talkN = g => g.filter(f => f.talk).length;
+    const main = talkN(g0) >= talkN(g1) ? g0 : g1;
+    const other = main === g0 ? g1 : g0;
+    const tx = Math.round(med(main.map(f => f.cx))), bx = Math.round(med(other.map(f => f.cx)));
+    top.push({ t: sg.start, x: tx }); top.push({ t: sg.end, x: tx }); bot.push({ t: sg.start, x: bx }); bot.push({ t: sg.end, x: bx });
+    lastTop = tx; lastBot = bx;
+  }
+  return { top, bot };
+}
+// Jendela panel split rame gaya referensi (Dzaky 29 Okt): tiap segmen rame
+// -> 2 jendela crop 9:8 STATIS (panel DIAM sepanjang segmen, hard cut antar
+// segmen — kamera panel tidak bergerak, ikut referensi). Tiap panel BUKAN
+// crop wajah satu orang, tapi crop KELOMPOK dada-ke-atas: tinggi jendela
+// ~3x tinggi wajah (kepala ~1/3 tinggi panel) dan lebar cukup menutup
+// rentang wajah kelompok (+ sedikit ruang). Untuk 2 orang, tiap panel =
+// satu orang dengan framing dada-ke-atas (jauh lebih lebar dari crop wajah
+// lama). Cluster 2-means sama seperti clipSplitSegTracks; atas = kelompok
+// pembicara utama, bawah = kelompok lawan bicara. Tanpa wajah di segmen ->
+// pakai jendela segmen sebelumnya (fallback pusat 25%/75%).
+function clipSplitSegWindows(track, splitSegs, srcW, srcH) {
+  const W = +srcW || 0, H = +srcH || 0;
+  const arr = (Array.isArray(track) ? track : []).filter(s => s && Number.isFinite(+s.t)).sort((a, b) => a.t - b.t);
+  const segs = (Array.isArray(splitSegs) ? splitSegs : []).filter(x => x && Number.isFinite(+x.start) && Number.isFinite(+x.end) && +x.end > +x.start).slice(0, 120);
+  const top = [], bot = [];
+  const empty = { top, bot, topW: 0, topH: 0, botW: 0, botH: 0 };
+  if (!segs.length || !W || !H) return empty;
+  const med = (a) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
+  const even = (v) => Math.max(2, Math.round(v / 2) * 2);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  let lastTop = null, lastBot = null;
+  const fallbackWin = (cx) => {
+    const w = even(W / 2), h = even(w * 8 / 9);
+    return { x: Math.round(clamp(cx - w / 2, 0, Math.max(0, W - w))), y: Math.round(clamp((H - h) / 2, 0, Math.max(0, H - h))), w, h };
+  };
+  for (const sg of segs) {
+    const samples = [];
+    for (const s of arr) {
+      if (+s.t < sg.start || +s.t >= sg.end) continue;
+      const fs = (Array.isArray(s.faces) ? s.faces : []).filter(f => f && (+f.w || 0) >= W * 0.05)
+        .map(f => ({ cx: (+f.x || 0) + (+f.w || 0) / 2, x: +f.x || 0, y: +f.y || 0, w: +f.w || 0, h: +f.h || 0, talk: (+f.mouth || 0) > 2.0 }));
+      if (fs.length) samples.push(fs);
+    }
+    const pooled = samples.reduce((a, b) => a.concat(b), []);
+    if (!pooled.length) {
+      const t = lastTop || fallbackWin(W * 0.25), b = lastBot || fallbackWin(W * 0.75);
+      top.push({ start: sg.start, end: sg.end, x: t.x, y: t.y, w: t.w, h: t.h });
+      bot.push({ start: sg.start, end: sg.end, x: b.x, y: b.y, w: b.w, h: b.h });
+      continue;
+    }
+    let c0 = Math.min(...pooled.map(f => f.cx)), c1 = Math.max(...pooled.map(f => f.cx));
+    if (c1 - c0 >= 1) {
+      for (let it = 0; it < 10; it++) {
+        const g0 = [], g1 = [];
+        for (const f of pooled) (Math.abs(f.cx - c0) <= Math.abs(f.cx - c1) ? g0 : g1).push(f);
+        if (!g0.length || !g1.length) break;
+        const n0 = med(g0.map(f => f.cx)), n1 = med(g1.map(f => f.cx));
+        if (Math.abs(n0 - c0) < 0.5 && Math.abs(n1 - c1) < 0.5) { c0 = n0; c1 = n1; break; }
+        c0 = n0; c1 = n1;
+      }
+    }
+    const near = (f) => Math.abs(f.cx - c0) <= Math.abs(f.cx - c1) ? 0 : 1;
+    const gPooled = [[], []];
+    for (const f of pooled) gPooled[near(f)].push(f);
+    const groupWin = (gi) => {
+      const gf = gPooled[gi];
+      if (!gf.length) return null;
+      const spans = [], centers = [];
+      for (const smp of samples) {
+        const g = smp.filter(f => near(f) === gi);
+        if (!g.length) continue;
+        const l = Math.min(...g.map(f => f.x)), r = Math.max(...g.map(f => f.x + f.w));
+        spans.push(r - l); centers.push((l + r) / 2);
+      }
+      const faceH = med(gf.map(f => f.h));
+      if (!(faceH > 0)) return null;
+      const spanMed = spans.length ? med(spans) : med(gf.map(f => f.x + f.w)) - med(gf.map(f => f.x));
+      const cxMed = centers.length ? med(centers) : med(gf.map(f => f.cx));
+      const topMed = med(gf.map(f => f.y));
+      const spanEff = spanMed + 0.5 * faceH;
+      let h = Math.max(3 * faceH, spanEff * 8 / 9), w = h * 9 / 8;
+      if (h > H) { h = H; w = h * 9 / 8; }
+      if (w > W) { w = W; h = w * 8 / 9; }
+      w = even(w); h = even(h);
+      w = Math.min(w, W); h = Math.min(h, H);
+      return { x: Math.round(clamp(cxMed - w / 2, 0, Math.max(0, W - w))), y: Math.round(clamp(topMed - 0.4 * faceH, 0, Math.max(0, H - h))), w, h };
+    };
+    let wTop = groupWin(0), wBot = groupWin(1);
+    if (!wTop || !wBot) {
+      const one = wTop || wBot || fallbackWin(med(pooled.map(f => f.cx)));
+      wTop = one; wBot = one;
+    } else {
+      const talkN = g => g.filter(f => f.talk).length;
+      if (talkN(gPooled[1]) > talkN(gPooled[0])) { const tmp = wTop; wTop = wBot; wBot = tmp; }
+    }
+    top.push({ start: sg.start, end: sg.end, x: wTop.x, y: wTop.y, w: wTop.w, h: wTop.h });
+    bot.push({ start: sg.start, end: sg.end, x: wBot.x, y: wBot.y, w: wBot.w, h: wBot.h });
+    lastTop = wTop; lastBot = wBot;
+  }
+  const medSize = (list, key) => even(med(list.map(w => w[key])));
+  return { top, bot, topW: medSize(top, 'w'), topH: medSize(top, 'h'), botW: medSize(bot, 'w'), botH: medSize(bot, 'h') };
 }
 function resolveTitleDurMode(titleDur, hookDurAi, clipDur) {
   if (titleDur === 'full') return 'full';
@@ -1595,6 +1744,7 @@ function buildCoverAss(text, opts) {
   let yPct = +(opts && opts.yPercent);
   if (!Number.isFinite(yPct)) yPct = 65;
   yPct = Math.min(88, Math.max(12, yPct));
+  const boxCol = (opts && opts.banner === 'yellow') ? '&H0000FFFF' : '&H00FFFFFF'; // Cover Hook (29 Okt): banner kuning ala contoh
   const centerY = Math.round(1920 * yPct / 100);
   const boxY = Math.min(1920 - boxH - 20, Math.max(20, Math.round(centerY - boxH / 2)));
   const boxX = Math.round((1080 - boxW) / 2);
@@ -1615,8 +1765,8 @@ function buildCoverAss(text, opts) {
   });
   return '[Script Info]\nTitle: Cover\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n'
     + '[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n'
-    + 'Style: CoverBox,DejaVu Sans,10,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1\n'
-    + 'Style: Cover,Montserrat,' + fs + ',&H00000000,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,8,0,0,0,1\n\n'
+    + 'Style: CoverBox,DejaVu Sans,10,' + boxCol + ',&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1\n'
+    + 'Style: Cover,' + (clipFontOk((opts && opts.font) || '') || 'Montserrat') + ',' + fs + ',&H00000000,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,8,0,0,0,1\n\n'
     + '[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n'
     + ev.join('\n') + '\n';
 }
@@ -1817,6 +1967,25 @@ function faceTrackExpr(ft) {
 //   blur/hitam/putih di atas-bawah, ikut bg).
 // gameplay: Gameplay (game crop tengah panel atas 2/3 + facecam face-tracked
 //   panel bawah 1/3, vstack -> OW x OH; subtitle di sambungan via subCenterY).
+// Ekspresi tangga (STEP) per segmen untuk filter crop panel split rame:
+// wins = [{start, end, x, y, w, h}] — nilai key ditahan dari start segmen
+// sampai start segmen berikutnya (panel DIAM sepanjang segmen, hard cut
+// antar segmen — sama seperti faceTrackExpr, tapi untuk x DAN y).
+// Return null bila kosong; satu jendela -> konstanta (tanpa if).
+function stepExpr(wins, key) {
+  const arr = (Array.isArray(wins) ? wins : []).filter(w => w && Number.isFinite(+w.start) && Number.isFinite(+w[key])).sort((a, b) => a.start - b.start).slice(0, 120);
+  if (!arr.length) return null;
+  const pts = [];
+  for (const w of arr) {
+    const v = Math.round(+w[key]);
+    if (pts.length && pts[pts.length - 1].v === v) continue;
+    pts.push({ t: +w.start, v });
+  }
+  if (pts.length < 2) return String(pts[0].v);
+  let expr = String(pts[pts.length - 1].v);
+  for (let i = pts.length - 2; i >= 0; i--) expr = 'if(lt(t,' + pts[i + 1].t + '),' + pts[i].v + ',' + expr + ')';
+  return 'if(lt(t,' + pts[0].t + '),' + pts[0].v + ',' + expr + ')';
+}
 function buildFfmpegArgs(o) {
   const start = +o.start || 0;
   const len = Math.max(1, (+o.end || 0) - start);
@@ -1925,17 +2094,50 @@ function buildFfmpegArgs(o) {
     // dengan enable per segmen muka. Hanya bila ada track (ftExpr) — rantai
     // portrait memakai ekspresi tracking yang sama.
     const mixSegs = (ftExpr && Array.isArray(o.mixFaceSegs)) ? o.mixFaceSegs.filter(x => x && Number.isFinite(+x.start) && Number.isFinite(+x.end) && +x.end > +x.start) : [];
-    if (mixSegs.length) {
+    const splitSegs = (Array.isArray(o.mixSplitSegs) ? o.mixSplitSegs.filter(x => x && Number.isFinite(+x.start) && Number.isFinite(+x.end) && +x.end > +x.start) : []);
+    const splitWins = (o.mixSplitWins && Array.isArray(o.mixSplitWins.top) && Array.isArray(o.mixSplitWins.bot)) ? o.mixSplitWins : null;
+    const splitOn = splitSegs.length > 0 && !!(splitWins && splitWins.top.length && splitWins.bot.length);
+    if (mixSegs.length || splitOn) {
       const enable = mixSegs.map(x => 'between(t,' + (+x.start) + ',' + (+x.end) + ')').join('+');
       const landChain = bg === 'white'
         ? 'scale=' + OW + ':' + OH + ':force_original_aspect_ratio=decrease,pad=' + OW + ':' + OH + ':(ow-iw)/2:(oh-ih)/2:white'
         : bg === 'black'
           ? 'scale=' + OW + ':' + OH + ':force_original_aspect_ratio=decrease,pad=' + OW + ':' + OH + ':(ow-iw)/2:(oh-ih)/2:black'
           : 'split[a][b];[a]scale=' + OW + ':' + OH + ':force_original_aspect_ratio=increase,crop=' + OW + ':' + OH + ',gblur=sigma=40,eq=brightness=-0.18:contrast=1.05[mixbg];[b]scale=' + OW + ':' + OH + ':force_original_aspect_ratio=decrease[mixfg];[mixbg][mixfg]overlay=(W-w)/2:(H-h)/2';
-      filters.push('[0:v]split=2[mixP][mixL]');
-      filters.push("[mixP]crop=w='min(iw,ih*9/16)':h='min(ih,iw*16/9)':x='min(max((" + ftExpr + "),0),iw-ow)':y='(ih-oh)/2',scale=" + OW + ":" + OH + ",format=yuv420p[vport]");
-      filters.push('[mixL]' + landChain + ',format=yuv420p[vland]');
-      filters.push("[vland][vport]overlay=0:0:enable='" + enable + "',format=yuv420p[v0]");
+      // Panel kelompok: ukuran TETAP per panel (median jendela split —
+      // crop w/h ffmpeg hanya dievaluasi sekali di awal, jadi tidak bisa
+      // ganti per segmen), posisi x/y STEP per segmen (statis per segmen).
+      const splitTopX = splitOn ? stepExpr(splitWins.top, 'x') : null;
+      const splitTopY = splitOn ? stepExpr(splitWins.top, 'y') : null;
+      const splitBotX = splitOn ? stepExpr(splitWins.bot, 'x') : null;
+      const splitBotY = splitOn ? stepExpr(splitWins.bot, 'y') : null;
+      const splitCropWin = (w, h, xExpr, yExpr) => "crop=w=" + w + ":h=" + h + ":x='min(max((" + xExpr + "),0),iw-ow)':y='min(max((" + yExpr + "),0),ih-oh)'";
+      if (splitOn && mixSegs.length) {
+        const splitEnable = splitSegs.map(x => 'between(t,' + (+x.start) + ',' + (+x.end) + ')').join('+');
+        filters.push('[0:v]split=3[mixP][mixL][mixS]');
+        filters.push("[mixP]crop=w='min(iw,ih*9/16)':h='min(ih,iw*16/9)':x='min(max((" + ftExpr + "),0),iw-ow)':y='(ih-oh)/2',scale=" + OW + ":" + OH + ",format=yuv420p[vport]");
+        filters.push('[mixL]' + landChain + ',format=yuv420p[vland]');
+        filters.push('[mixS]split=2[spT][spB]');
+        filters.push('[spT]' + splitCropWin(splitWins.topW, splitWins.topH, splitTopX, splitTopY) + ',scale=' + OW + ':' + Math.round(OH / 2) + ',format=yuv420p[panT]');
+        filters.push('[spB]' + splitCropWin(splitWins.botW, splitWins.botH, splitBotX, splitBotY) + ',scale=' + OW + ':' + Math.round(OH / 2) + ',format=yuv420p[panB]');
+        filters.push('[panT][panB]vstack=inputs=2,format=yuv420p[vsplit]');
+        filters.push("[vland][vsplit]overlay=0:0:enable='" + splitEnable + "',format=yuv420p[vmix]");
+        filters.push("[vmix][vport]overlay=0:0:enable='" + enable + "',format=yuv420p[v0]");
+      } else if (splitOn) {
+        const splitEnable = splitSegs.map(x => 'between(t,' + (+x.start) + ',' + (+x.end) + ')').join('+');
+        filters.push('[0:v]split=2[mixL][mixS]');
+        filters.push('[mixL]' + landChain + ',format=yuv420p[vland]');
+        filters.push('[mixS]split=2[spT][spB]');
+        filters.push('[spT]' + splitCropWin(splitWins.topW, splitWins.topH, splitTopX, splitTopY) + ',scale=' + OW + ':' + Math.round(OH / 2) + ',format=yuv420p[panT]');
+        filters.push('[spB]' + splitCropWin(splitWins.botW, splitWins.botH, splitBotX, splitBotY) + ',scale=' + OW + ':' + Math.round(OH / 2) + ',format=yuv420p[panB]');
+        filters.push('[panT][panB]vstack=inputs=2,format=yuv420p[vsplit]');
+        filters.push("[vland][vsplit]overlay=0:0:enable='" + splitEnable + "',format=yuv420p[v0]");
+      } else {
+        filters.push('[0:v]split=2[mixP][mixL]');
+        filters.push("[mixP]crop=w='min(iw,ih*9/16)':h='min(ih,iw*16/9)':x='min(max((" + ftExpr + "),0),iw-ow)':y='(ih-oh)/2',scale=" + OW + ":" + OH + ",format=yuv420p[vport]");
+        filters.push('[mixL]' + landChain + ',format=yuv420p[vland]');
+        filters.push("[vland][vport]overlay=0:0:enable='" + enable + "',format=yuv420p[v0]");
+      }
     } else if (ftExpr) {
       // Crop time-varying STEP (model Klipaja): x dari face_track.py SUDAH
       // per-segmen (median segmen pembicara) -> faceTrackExpr membuat
@@ -2098,7 +2300,9 @@ function buildFfmpegArgs(o) {
   if (o.coverPath && !o.plainOnly) {
     const covIdx = 1 + (broll ? 1 : 0) + (musicIdx >= 0 ? 1 : 0);
     args.push('-loop', '1', '-i', String(o.coverPath));
-    const covDur = Number.isFinite(+o.coverDur) ? Math.min(3, Math.max(0.3, +o.coverDur)) : 1;
+    const covAudioIdx = (o.coverAudio && !o.plainOnly) ? (covIdx + 1) : -1; // Cover Hook (29 Okt): audio TTS pembuka
+    if (covAudioIdx >= 0) args.push('-i', String(o.coverAudio));
+    const covDur = Number.isFinite(+o.coverDur) ? Math.min(10, Math.max(0.3, +o.coverDur)) : 1; // Cover Hook (29 Okt): intro dinamis ikut suara (maks 10 dtk; Smart Cover tetap 1 dtk)
     filters.push('[' + covIdx + ':v]scale=' + OW + ':' + OH + ':force_original_aspect_ratio=increase,crop=' + OW + ':' + OH + ',trim=duration=' + covDur + ',setpts=PTS-STARTPTS,fps=30,format=yuv420p[covv]');
     const covHasAudio = o.audioCodec !== null && o.audioCodec !== false && o.hasAudio !== false;
     if (covHasAudio) {
@@ -2107,7 +2311,8 @@ function buildFfmpegArgs(o) {
       else if (hook.length) mainA = 'outa';
       else { filters.push('[0:a]anull[maina]'); mainA = 'maina'; }
       filters.push('[' + mainA + ']aresample=44100,aformat=channel_layouts=stereo[maina2]');
-      filters.push('anullsrc=r=44100:cl=stereo,atrim=duration=' + covDur + ',asetpts=PTS-STARTPTS,aformat=channel_layouts=stereo[cova]');
+      if (covAudioIdx >= 0) filters.push('[' + covAudioIdx + ':a]aresample=44100,aformat=channel_layouts=stereo,volume=2.0,alimiter=limit=0.9:level=false,apad=whole_dur=' + covDur + ',atrim=duration=' + covDur + ',asetpts=PTS-STARTPTS[cova]'); // Cover Hook (29 Okt): suara judul, bukan hening
+      else filters.push('anullsrc=r=44100:cl=stereo,atrim=duration=' + covDur + ',asetpts=PTS-STARTPTS,aformat=channel_layouts=stereo[cova]');
       filters.push('[covv][' + last + ']concat=n=2:v=1:a=0[vcov]');
       filters.push('[cova][maina2]concat=n=2:v=0:a=1[acov]');
       last = 'vcov'; audioOut = '[acov]';
@@ -2123,7 +2328,7 @@ function buildFfmpegArgs(o) {
   // seperti watermark teks ASS) — tidak selama hook replay / cover.
   const wmLogoRaw = (!o.plainOnly && o.wmLogo && typeof o.wmLogo === 'object' && o.wmLogo.path) ? o.wmLogo : null;
   if (wmLogoRaw) {
-    const logoIdx = 1 + (broll ? 1 : 0) + (musicIdx >= 0 ? 1 : 0) + ((o.coverPath && !o.plainOnly) ? 1 : 0);
+    const logoIdx = 1 + (broll ? 1 : 0) + (musicIdx >= 0 ? 1 : 0) + ((o.coverPath && !o.plainOnly) ? 1 : 0) + ((o.coverAudio && !o.plainOnly) ? 1 : 0); // Cover Hook (29 Okt): input audio pembuka menggeser indeks logo
     args.push('-i', String(wmLogoRaw.path));
     const wmPct = Math.min(40, Math.max(5, Number.isFinite(+wmLogoRaw.size) ? +wmLogoRaw.size : 15));
     const wmOp = Math.min(1, Math.max(0.1, (Number.isFinite(+wmLogoRaw.opacity) ? +wmLogoRaw.opacity : 80) / 100));
@@ -2131,7 +2336,8 @@ function buildFfmpegArgs(o) {
     // start/end — len di sini = 1, bukan durasi klip). Fallback len bila dur tak ada.
     const wmDur = (Number.isFinite(+wmLogoRaw.dur) && +wmLogoRaw.dur > 0) ? +wmLogoRaw.dur : len;
     const M = 20;
-    const wmPosExpr = wmLogoRaw.pos === 'tl' ? M + ':' + M
+    const wmPosExpr = wmLogoRaw.pos === 'custom' && Number.isFinite(+wmLogoRaw.x) && Number.isFinite(+wmLogoRaw.y) ? '(W-w)*' + (Math.min(100, Math.max(0, +wmLogoRaw.x)) / 100) + ':(H-h)*' + (Math.min(100, Math.max(0, +wmLogoRaw.y)) / 100)
+      : wmLogoRaw.pos === 'tl' ? M + ':' + M
       : wmLogoRaw.pos === 'tr' ? 'W-w-' + M + ':' + M
       : wmLogoRaw.pos === 'bl' ? M + ':H-h-' + M
       : wmLogoRaw.pos === 'c' ? '(W-w)/2:(H-h)/2'
@@ -2179,7 +2385,7 @@ function buildFfmpegArgs(o) {
 module.exports = {
   isYoutubeUrl, isTiktokUrl, clampInt, cleanTitle, escapeDrawtext, escapeFilterValue, ffmpegFilterPath,
   CLIP_FONT_FAMILIES, clipFontOk,
-  parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, clipDuoInfo, clipTrackQuality, clipPresenceSegs, clipTalkerSegs, sanitizeCandidates, fallbackCandidates,
+  parseVtt, fmtSrt, buildSrt, buildAss, buildCoverAss, resolveTitleDurMode, clipDuoInfo, clipTrackQuality, clipPresenceSegs, clipTalkerSegs, clipSplitSegTracks, clipSplitSegWindows, sanitizeCandidates, fallbackCandidates,
   chunkTranscript, fmtClock, buildFfmpegArgs, wrapTitle, faceTrackExpr,
   gameplayTopH,
   distributeWords, cueWords, normalizeCueWords, dedupeTranscriptCues,
