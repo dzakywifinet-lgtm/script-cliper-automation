@@ -934,7 +934,7 @@ function clipSaveJob(job) {
       renders: job.renders, cues: job.cues, videoTitle: job.videoTitle, duration: job.duration,
       dir: job.dir, source: job.source, sourceReady: job.sourceReady, sourceUrl: job.sourceUrl,
       metaDesc: job.metaDesc, metaUploader: job.metaUploader, speakers: job.speakers, sourceCleaned: job.sourceCleaned,
-      downloadPct: job.downloadPct, transcribeVia: job.transcribeVia, transcriptLang: job.transcriptLang, smartCover: job.smartCover };
+      downloadPct: job.downloadPct, transcribeVia: job.transcribeVia, transcriptLang: job.transcriptLang, smartCover: job.smartCover, transcriptSource: job.transcriptSource };
     fs.writeFileSync(path.join(job.dir, 'job.json'), JSON.stringify(data));
   } catch {}
 }
