@@ -153,15 +153,17 @@ const customCall = async (slug, msgs, job) => {
   const key = E[c.envVar || ('CUSTOM_' + slug.toUpperCase() + '_API_KEY')];
   if (!key) throw fail('API key ' + (c.envVar || ('CUSTOM_' + slug.toUpperCase() + '_API_KEY')) + ' belum diisi di .env.', 'input');
   const j = await post(customUrl(c.baseUrl), { authorization: 'Bearer ' + key },
-    { model: c.model || 'gpt-3.5-turbo', messages: msgs }, job.ctrl.signal);
+    { model: c.model || 'gpt-3.5-turbo', messages: visionMsgs(msgs) }, job.ctrl.signal);
   const fr = j.choices?.[0]?.finish_reason; if (fr) { job.finish = fr; job.truncated = !NORMAL.test(fr); }
   return cleanThink(j.choices?.[0]?.message?.content || '');
 };
+const visionMsgs = (msgs) => msgs.map(m => m.image ? { role: m.role, content: [{ type: 'text', text: m.content }, { type: 'image_url', image_url: { url: 'data:' + m.image.mimeType + ';base64,' + m.image.data } }] } : m);
+// STK-VISION: image part untuk provider OpenAI-compatible (router/custom/direct OpenAI).
 // Mode langsung (tanpa 9router). msgs = [{role:'user'|'assistant', content}]
 const call = {
   async gemini(msgs, job) {
     const j = await post(`https://generativelanguage.googleapis.com/v1beta/models/${M.gemini}:generateContent`, { 'x-goog-api-key': E[KEY.gemini] },
-      { contents: msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })), tools: [{ google_search: {} }] }, job.ctrl.signal);
+      { contents: msgs.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: m.image ? [{ text: m.content }, { inlineData: { mimeType: m.image.mimeType, data: m.image.data } }] : [{ text: m.content }] })), ...(msgs.some(m => m.image) ? {} : { tools: [{ google_search: {} }] }) }, job.ctrl.signal);
     const fr = j.candidates?.[0]?.finishReason; if (fr) { job.finish = fr; job.truncated = !NORMAL.test(fr); }
     return cleanThink((j.candidates?.[0]?.content?.parts || []).map(x => x.text || '').join(''));
   },
@@ -173,7 +175,7 @@ const call = {
   },
   async openai(msgs, job) {
     const j = await post('https://api.openai.com/v1/chat/completions', { authorization: 'Bearer ' + E[KEY.openai] },
-      { model: M.openai, messages: msgs }, job.ctrl.signal);
+      { model: M.openai, messages: visionMsgs(msgs) }, job.ctrl.signal);
     const fr = j.choices?.[0]?.finish_reason; if (fr) { job.finish = fr; job.truncated = !NORMAL.test(fr); }
     return cleanThink(j.choices?.[0]?.message?.content || '');
   }
@@ -244,7 +246,7 @@ const userCustomCall = async (u, slug, msgs, job) => {
   const c = userCustom(u)[slug]; if (!c) throw fail('Provider custom tidak ditemukan: ' + slug, 'input');
   if (!c.apiKey) throw fail('API key ' + (c.name || slug) + ' belum diisi.', 'input');
   const j = await post(customUrl(c.baseUrl), { authorization: 'Bearer ' + c.apiKey },
-    { model: c.model || 'gpt-3.5-turbo', messages: msgs }, job.ctrl.signal);
+    { model: c.model || 'gpt-3.5-turbo', messages: visionMsgs(msgs) }, job.ctrl.signal);
   const fr = j.choices?.[0]?.finish_reason; if (fr) { job.finish = fr; job.truncated = !NORMAL.test(fr); }
   return cleanThink(j.choices?.[0]?.message?.content || '');
 };
@@ -260,7 +262,7 @@ async function viaRouterOnce(model, msgs, job, which) {
   let r;
   try {
     r = await fetch(base + '/v1/chat/completions', { method: 'POST', headers: { 'content-type': 'application/json', ...hdrs }, signal: job.ctrl.signal,
-      body: JSON.stringify({ model, max_tokens: MAXT, stream: true, messages: msgs }) });
+      body: JSON.stringify({ model, max_tokens: MAXT, stream: true, messages: visionMsgs(msgs) }) });
   } catch (e) { throw abortErr(e, job) || fail('Tidak bisa menjangkau ' + lbl + ': ' + (e.cause?.code || e.cause?.message || e.message), 'network'); }
   const ct = r.headers.get('content-type') || '';
   const snip = t => t.replace(/\s+/g, ' ').slice(0, 200);
@@ -3429,6 +3431,286 @@ const requestRestart = () => {
     } catch { try { process.exit(1); } catch {} }
   }, 300);
 };
+// ===== STICKMAN-SEDERHANA-IMAGE: endpoint gambar Stickman Studio =====
+// Pola yang dipakai: auth sesi yang sama (semua route di bawah cek authed),
+// folder per akun clipUserDir (preseden telegram.json, wm-logo.json, cookies.txt),
+// router via routerBase dan routerHeaders, Gemini Direct via x-goog-api-key.
+// Model gambar Gemini ditulis mentah di STICKMAN_IMAGE_GEMINI_MODEL dan TIDAK
+// lewat M.gemini atau GEMINI_MODEL, supaya tidak kena pemetaan model chat
+// gemini-2.5-flash ke gemini-3.8-flash. Model legacy gemini-2.5-flash-image
+// dan model yang ditutup 29 Okt 2026 gemini-3.1-flash-image TIDAK dipakai.
+// Daftar model gambar TIDAK pernah dikarang: berasal dari router apa adanya,
+// kosong bila router gagal atau kosong, lalu generate jatuh ke Gemini.
+// Server TIDAK pernah mengembalikan gambar palsu: gagal total = ok false.
+const STICKMAN_IMAGE_GEMINI_MODEL = "gemini-nano-banana-2.1";
+const STICKMAN_IMAGE_MAX_BYTES = 20 * 1024 * 1024;
+function stickmanSanitizePartKey(v) {
+  const s = String(v || "").toLowerCase();
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charAt(i);
+    const ok = (c >= "a" && c <= "z") || (c >= "0" && c <= "9") || c === "-" || c === "_";
+    if (ok) { out = out + c; } else if (out.length > 0 && out.charAt(out.length - 1) !== "-") { out = out + "-"; }
+  }
+  while (out.length > 0 && out.charAt(0) === "-") { out = out.slice(1); }
+  while (out.length > 0 && out.charAt(out.length - 1) === "-") { out = out.slice(0, out.length - 1); }
+  if (out.length > 64) { out = out.slice(0, 64); }
+  while (out.length > 0 && out.charAt(out.length - 1) === "-") { out = out.slice(0, out.length - 1); }
+  return out || "part";
+}
+function stickmanImageDir(user) { return path.join(clipUserDir(user), "stickman-images"); }
+async function stickmanReadJsonBody(req, maxBytes) {
+  let raw = "";
+  for await (const c of req) { raw = raw + c; if (raw.length > maxBytes) { throw new Error("Body terlalu besar"); } }
+  const j = JSON.parse(raw || "{}");
+  if (!j || typeof j !== "object" || Array.isArray(j)) { throw new Error("Body harus objek JSON"); }
+  return j;
+}
+function stickmanExtFromMime(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m.indexOf("jpeg") !== -1 || m.indexOf("jpg") !== -1) { return "jpg"; }
+  if (m.indexOf("webp") !== -1) { return "webp"; }
+  if (m.indexOf("gif") !== -1) { return "gif"; }
+  return "png";
+}
+function stickmanExtFromUrl(url) {
+  const s = String(url || "").toLowerCase();
+  const q = s.indexOf("?");
+  const clean = q === -1 ? s : s.slice(0, q);
+  if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) { return "jpg"; }
+  if (clean.endsWith(".webp")) { return "webp"; }
+  if (clean.endsWith(".gif")) { return "gif"; }
+  if (clean.endsWith(".png")) { return "png"; }
+  return "";
+}
+function stickmanStripWhitespace(s) {
+  let out = "";
+  for (let i = 0; i < s.length; i++) { const code = s.charCodeAt(i); if (code > 32) { out = out + s.charAt(i); } }
+  return out;
+}
+function stickmanBase64ToBuffer(s) {
+  const clean = stickmanStripWhitespace(String(s || ""));
+  if (!clean) { throw new Error("Gambar base64 kosong"); }
+  for (let i = 0; i < clean.length; i++) {
+    const c = clean.charAt(i);
+    const ok = (c >= "A" && c <= "Z") || (c >= "a" && c <= "z") || (c >= "0" && c <= "9") || c === "+" || c === "/" || c === "=";
+    if (!ok) { throw new Error("Gambar base64 tidak valid"); }
+  }
+  const buf = Buffer.from(clean, "base64");
+  if (!buf.length) { throw new Error("Gambar base64 tidak valid"); }
+  if (buf.length > STICKMAN_IMAGE_MAX_BYTES) { throw new Error("Gambar melebihi 20 MB"); }
+  return buf;
+}
+function stickmanParseDataUrl(s) {
+  const t = String(s || "");
+  if (t.indexOf("data:") !== 0) { return null; }
+  const comma = t.indexOf(",");
+  if (comma === -1) { throw new Error("Data URL gambar tidak valid"); }
+  const head = t.slice(5, comma);
+  const semi = head.indexOf(";");
+  const mime = semi === -1 ? head : head.slice(0, semi);
+  const buf = stickmanBase64ToBuffer(t.slice(comma + 1));
+  return { buf: buf, ext: stickmanExtFromMime(mime) };
+}
+function stickmanSaveImageBytes(user, partKey, buf, ext) {
+  if (!buf || !buf.length) { throw new Error("Gambar kosong"); }
+  if (buf.length > STICKMAN_IMAGE_MAX_BYTES) { throw new Error("Gambar melebihi 20 MB"); }
+  const dir = stickmanImageDir(user);
+  fs.mkdirSync(dir, { recursive: true });
+  const safeExt = ["png", "jpg", "webp", "gif"].indexOf(ext) !== -1 ? ext : "png";
+  const file = stickmanSanitizePartKey(partKey) + "-" + String(Date.now()) + "." + safeExt;
+  fs.writeFileSync(path.join(dir, file), buf);
+  return "stickman-images/" + file;
+}
+async function stickmanSaveImageValue(user, partKey, image) {
+  const t = String(image || "").trim();
+  if (!t) { throw new Error("Gambar kosong"); }
+  const dataUrl = stickmanParseDataUrl(t);
+  if (dataUrl) { return stickmanSaveImageBytes(user, partKey, dataUrl.buf, dataUrl.ext); }
+  if (t.indexOf("http://") === 0 || t.indexOf("https://") === 0) {
+    const r = await fetch(t, { signal: AbortSignal.timeout(60000) });
+    if (!r.ok) { throw new Error("Unduh gambar URL gagal: HTTP " + r.status); }
+    const buf = Buffer.from(await r.arrayBuffer());
+    const ext = stickmanExtFromUrl(t) || stickmanExtFromMime(r.headers.get("content-type") || "");
+    return stickmanSaveImageBytes(user, partKey, buf, ext);
+  }
+  const buf = stickmanBase64ToBuffer(t);
+  return stickmanSaveImageBytes(user, partKey, buf, "png");
+}
+function stickmanModelId(m) {
+  if (typeof m === "string") { return m; }
+  if (m && typeof m.id === "string") { return m.id; }
+  return "";
+}
+async function stickmanRouterImageModels(which) {
+  const base = routerBase(which);
+  if (!base) { return { list: [], error: "Router belum diisi di .env" }; }
+  try {
+    const r = await fetch(base + "/v1/models/image", { headers: routerHeaders(which), signal: AbortSignal.timeout(15000) });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok) { return { list: [], error: "Router HTTP " + r.status }; }
+    let list = [];
+    if (Array.isArray(j.data)) { list = j.data; } else if (Array.isArray(j.models)) { list = j.models; } else if (Array.isArray(j)) { list = j; }
+    return { list: list, error: "" };
+  } catch (e) { return { list: [], error: e.message || String(e) }; }
+}
+function stickmanImageFromRouterJson(j) {
+  const arr = j && Array.isArray(j.data) ? j.data : [];
+  for (let i = 0; i < arr.length; i++) {
+    const item = arr[i] || {};
+    if (typeof item.b64_json === "string" && item.b64_json) { return { image: item.b64_json, kind: "b64" }; }
+    if (typeof item.url === "string" && item.url) { return { image: item.url, kind: "url" }; }
+  }
+  return null;
+}
+// STICKMAN-IMAGE-TRYALL: jalur otomatis coba model router satu per satu sesuai urutan daftar, pertama sukses dipakai dan berhenti, semua gagal lalu fallback Gemini, gagal total mengembalikan penyebab upstream gabungan singkat maks 200 karakter.
+// STICKMAN-IMAGE-SHAPES: normalisasi hasil router jadi b64. b64 divalidasi; url diunduh server-side (cap 20 MB, timeout 60 dtk, tanpa header auth) lalu jadi b64; bentuk tak dikenal dilempar sebagai gagal percobaan itu. Async job TIDAK ditangani (tidak ada protokol poll gambar yang terdokumentasi; job id tanpa gambar jatuh ke gagal percobaan).
+async function stickmanResolveRouterImage(found) {
+  if (!found || typeof found.image !== "string" || !found.image) { throw new Error("9router tidak mengembalikan gambar"); }
+  if (found.kind === "b64") {
+    stickmanBase64ToBuffer(found.image);
+    return { image: found.image, kind: "b64" };
+  }
+  if (found.kind !== "url") { throw new Error("9router tidak mengembalikan gambar"); }
+  const t = found.image.trim();
+  if (t.indexOf("data:") === 0) {
+    const parsed = stickmanParseDataUrl(t);
+    if (!parsed) { throw new Error("Data URL gambar tidak valid"); }
+    return { image: parsed.buf.toString("base64"), kind: "b64" };
+  }
+  if (t.indexOf("http://") !== 0 && t.indexOf("https://") !== 0) { throw new Error("URL gambar tidak valid"); }
+  const r = await fetch(t, { signal: AbortSignal.timeout(60000) });
+  if (!r.ok) { throw new Error("Unduh gambar URL gagal: HTTP " + r.status); }
+  if (!r.body || typeof r.body.getReader !== "function") { throw new Error("Gambar kosong"); }
+  const reader = r.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const step = await reader.read();
+    if (step.done) { break; }
+    const chunk = step.value;
+    if (chunk && chunk.length) {
+      total += chunk.length;
+      if (total > STICKMAN_IMAGE_MAX_BYTES) { try { await reader.cancel(); } catch (e) {} throw new Error("Gambar melebihi 20 MB"); }
+      chunks.push(Buffer.from(chunk));
+    }
+  }
+  if (!total) { throw new Error("Gambar kosong"); }
+  return { image: Buffer.concat(chunks).toString("base64"), kind: "b64" };
+}
+async function stickmanGenerate9router(prompt, model, which) {
+  const base = routerBase(which);
+  if (!base) { throw new Error("Router belum diisi di .env"); }
+  if (!model) { throw new Error("Model gambar router tidak tersedia"); }
+  const r = await fetch(base + "/v1/images/generations", { method: "POST", headers: { "content-type": "application/json", ...routerHeaders(which) }, body: JSON.stringify({ model: model, prompt: prompt, response_format: "b64_json" }), signal: AbortSignal.timeout(90000) });
+  const j = await r.json().catch(function () { return {}; });
+  if (!r.ok) {
+    const msg = (j.error && (j.error.message || j.error)) || j.message || "";
+    throw new Error("9router HTTP " + r.status + (msg ? ": " + String(msg).slice(0, 300) : ""));
+  }
+  const found = stickmanImageFromRouterJson(j);
+  if (!found) { throw new Error("9router tidak mengembalikan gambar"); }
+  return await stickmanResolveRouterImage(found);
+}
+async function stickmanGenerateGemini(prompt) {
+  if (!E.GEMINI_API_KEY) { throw new Error("GEMINI_API_KEY belum diisi di .env"); }
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + STICKMAN_IMAGE_GEMINI_MODEL + ":generateContent";
+  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": E.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }), signal: AbortSignal.timeout(300000) });
+  const j = await r.json().catch(function () { return {}; });
+  if (!r.ok) {
+    const msg = (j.error && j.error.message) || "";
+    throw new Error("Gemini HTTP " + r.status + (msg ? ": " + String(msg).slice(0, 300) : ""));
+  }
+  const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  for (let i = 0; i < parts.length; i++) {
+    const d = parts[i].inlineData;
+    if (d && typeof d.data === "string" && d.data) { return { image: d.data, kind: "b64", mimeType: d.mimeType || "image/png" }; }
+  }
+  throw new Error("Gemini tidak mengembalikan gambar");
+}
+// STK-SILICONFLOW: mesin image SiliconFlow (custom provider) untuk Stickman.
+// Entri diselesaikan dinamis saat runtime dari custom-providers.json:
+// dicocokkan bila model mengandung flux.2-flex atau nama/slug mengandung siliconflow.
+// Key dibaca dari env (entry.envVar atau turunan CUSTOM_<SLUG>_API_KEY) saat runtime saja,
+// tidak pernah ditulis ke file, log, error, atau respons. Bila tidak terkonfigurasi,
+// fungsi mengembalikan null sehingga jalur lama berjalan persis seperti sebelumnya.
+// Urutan mesin: 9router try-all -> SiliconFlow -> Gemini Direct. Endpoint image
+// tidak di-gate admin (semua akun login bisa pakai) - patch ini tidak mengubah gate itu.
+function stickmanSiliconflowEntry() {
+  var list = null;
+  try { var arr = JSON.parse(fs.readFileSync(CUSTOM_FILE, 'utf8')); if (Array.isArray(arr)) list = arr; } catch (e) {}
+  if (list === null) { try { list = Object.values(CUSTOM); } catch (e) { list = []; } }
+  for (var i = 0; i < list.length; i++) {
+    var c = list[i] || {};
+    var nm = String(c.name || '').toLowerCase();
+    var sg = String(c.slug || '').toLowerCase();
+    var md = String(c.model || '').toLowerCase();
+    if (md.indexOf('flux.2-flex') >= 0 || nm.indexOf('siliconflow') >= 0 || sg.indexOf('siliconflow') >= 0) { return c; }
+  }
+  return null;
+}
+function stickmanSiliconflowConfig() {
+  var c = stickmanSiliconflowEntry();
+  if (!c) return null;
+  var base = String(c.baseUrl || '').trim();
+  while (base.endsWith('/')) base = base.slice(0, -1);
+  if (!base) return null;
+  var envVar = c.envVar || ('CUSTOM_' + String(c.slug || '').toUpperCase().replace(/-/g, '_') + '_API_KEY');
+  var key = E[envVar];
+  if (!key) return null;
+  var url = base;
+  if (!url.endsWith('/images/generations')) {
+    if (url.endsWith('/v1')) { url = url + '/images/generations'; }
+    else { url = url + '/v1/images/generations'; }
+  }
+  return { url: url, model: String(c.model || ''), key: key };
+}
+async function stickmanGenerateSiliconflow(prompt) {
+  var cfg = stickmanSiliconflowConfig();
+  if (!cfg) return null;
+  if (!cfg.model) throw new Error('SiliconFlow model kosong');
+  var r = await fetch(cfg.url, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + cfg.key }, body: JSON.stringify({ model: cfg.model, prompt: prompt, response_format: 'b64_json' }), signal: AbortSignal.timeout(180000) });
+  var j = await r.json().catch(function () { return {}; });
+  if (!r.ok) {
+    var msg = (j.error && (j.error.message || j.error)) || j.message || '';
+    throw new Error('SiliconFlow HTTP ' + r.status + (msg ? ': ' + String(msg).slice(0, 300) : ''));
+  }
+  var found = stickmanImageFromRouterJson(j);
+  if (!found) throw new Error('SiliconFlow tidak mengembalikan gambar');
+  var out = await stickmanResolveRouterImage(found);
+  out.model = cfg.model;
+  return out;
+}
+// STK-CLOUDFLARE: mesin image Cloudflare Workers AI DIRECT untuk Stickman.
+// Bypass gateway 9router: memakai kuota akun Cloudflare sendiri (Workers Free
+// ~10.000 neuron/hari, tanpa kartu; FLUX-1-schnell ~57 gambar/hari). Kredensial
+// HANYA dari env saat runtime (CF_ACCOUNT_ID + CF_API_TOKEN); tidak pernah
+// di-hardcode, ditulis ke file, log, error, atau respons. Bila salah satu kosong,
+// fungsi mengembalikan null sehingga rantai berjalan persis seperti sebelum
+// patch ini (tanpa segmen error Cloudflare). Urutan mesin: 9router try-all ->
+// SiliconFlow -> Cloudflare direct -> Gemini Direct. Endpoint image tidak
+// di-gate admin (semua akun login bisa pakai) - patch ini tidak mengubah gate itu.
+const STICKMAN_IMAGE_CF_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+async function stickmanGenerateCloudflare(prompt) {
+  var accountId = String(E.CF_ACCOUNT_ID || "").trim();
+  var token = String(E.CF_API_TOKEN || "").trim();
+  if (!accountId || !token) return null;
+  var url = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/ai/run/" + STICKMAN_IMAGE_CF_MODEL;
+  var r = await fetch(url, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + token }, body: JSON.stringify({ prompt: prompt }), signal: AbortSignal.timeout(180000) });
+  var j = await r.json().catch(function () { return {}; });
+  if (!r.ok) {
+    var msg = "";
+    if (j && Array.isArray(j.errors) && j.errors.length && j.errors[0] && j.errors[0].message) { msg = String(j.errors[0].message); }
+    else if (j && j.error) { msg = String(j.error.message || j.error); }
+    throw new Error("Cloudflare HTTP " + r.status + (msg ? ": " + msg.slice(0, 300) : ""));
+  }
+  var img = j && j.result && j.result.image;
+  if (typeof img !== "string" || !img) { throw new Error("Cloudflare tidak mengembalikan gambar"); }
+  var out = await stickmanResolveRouterImage({ image: img, kind: "b64" });
+  out.model = STICKMAN_IMAGE_CF_MODEL;
+  return out;
+}
+// ===== AKHIR STICKMAN-SEDERHANA-IMAGE (helper) =====
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'), p = u.pathname;
   // no-cache: browser WAJIB revalidasi HTML tiap muat — tanpa ini heuristik
@@ -3551,6 +3833,159 @@ const server = http.createServer(async (req, res) => {
   const stateDir = () => { const d = path.join(__dirname, 'state'); try { fs.mkdirSync(d, { recursive: true }); } catch {} return d; };
   const stateFile = u => path.join(stateDir(), encodeURIComponent(u) + '.json');
   if (req.method === 'GET' && p === '/api/whoami') return send(res, 200, { user: sessUser(req) });
+  // ===== STICKMAN-SEDERHANA-IMAGE: route (di bawah cek authed) =====
+  if (req.method === "GET" && p === "/api/stickman/image-models") {
+    const which = routerWhich(u.searchParams.get("router"));
+    const got = await stickmanRouterImageModels(which);
+    if (got.list.length) { return send(res, 200, { models: got.list }); }
+    return send(res, 200, { models: [], error: got.error || "Daftar model gambar router kosong" });
+  }
+  if (req.method === "POST" && p === "/api/stickman/image") {
+    let b;
+    try { b = await stickmanReadJsonBody(req, 100000); } catch (e) { return send(res, 400, { error: e.message }); }
+    const prompt = String(b.prompt || "").trim();
+    if (!prompt) { return send(res, 400, { error: "Prompt kosong" }); }
+    if (prompt.length > 8000) { return send(res, 400, { error: "Prompt melebihi 8000 karakter" }); }
+    const which = routerWhich(b.router);
+    let model = String(b.model || "").trim();
+    let routerError = "";
+    let routerTryMsgs = [];
+    let made = null;
+    let engine = "";
+    let usedModel = "";
+    if (!model) {
+      const got = await stickmanRouterImageModels(which);
+      if (got.list.length) {
+        for (let mi = 0; mi < got.list.length; mi++) {
+          const cand = stickmanModelId(got.list[mi]);
+          if (!cand) { continue; }
+          try { made = await stickmanGenerate9router(prompt, cand, which); engine = "9router"; usedModel = cand; break; } catch (e) { routerTryMsgs.push(String(e.message || e).split(String.fromCharCode(10)).join(" ").slice(0, 60)); }
+        }
+        if (!made) { routerError = routerTryMsgs.length ? routerTryMsgs.join(" | ").slice(0, 200) : (got.error || "Daftar model gambar router kosong"); }
+      } else {
+        routerError = got.error || "Daftar model gambar router kosong";
+      }
+    } else {
+      try { made = await stickmanGenerate9router(prompt, model, which); engine = "9router"; usedModel = model; } catch (e) { routerError = e.message || String(e); made = null; }
+    }
+    var siliconflowError = '';
+    if (!made) {
+      try { const s = await stickmanGenerateSiliconflow(prompt); if (s) { made = s; engine = 'siliconflow'; usedModel = s.model || ''; } } catch (e) { siliconflowError = String(e.message || e).split(String.fromCharCode(10)).join(' ').slice(0, 60); }
+    }
+    var cloudflareError = '';
+    if (!made) {
+      try { const c = await stickmanGenerateCloudflare(prompt); if (c) { made = c; engine = 'cloudflare'; usedModel = c.model || ''; } } catch (e) { cloudflareError = String(e.message || e).split(String.fromCharCode(10)).join(' ').slice(0, 60); }
+    }
+    if (!made) {
+      try { const g = await stickmanGenerateGemini(prompt); made = g; engine = "gemini"; usedModel = STICKMAN_IMAGE_GEMINI_MODEL; } catch (e) {
+        return send(res, 502, { ok: false, error: ("Gambar gagal total. 9router: " + routerError + (siliconflowError ? ". SiliconFlow: " + siliconflowError : "") + (cloudflareError ? ". Cloudflare: " + cloudflareError : "") + ". Gemini: " + (e.message || String(e))).slice(0, 200) });
+      }
+    }
+    const out = { ok: true, engine: engine, model: usedModel, image: made.image };
+    if (b.save === true) {
+      try { out.savedPath = await stickmanSaveImageValue(sessUser(req), b.partKey, made.image); } catch (e) { out.saveError = e.message || String(e); }
+    }
+    return send(res, 200, out);
+  }
+  if (req.method === "POST" && p === "/api/stickman/image-save") {
+    let b;
+    try { b = await stickmanReadJsonBody(req, 26 * 1024 * 1024); } catch (e) { return send(res, 400, { error: e.message }); }
+    if (!b.image) { return send(res, 400, { error: "Gambar kosong" }); }
+    try { const saved = await stickmanSaveImageValue(sessUser(req), b.partKey, b.image); return send(res, 200, { ok: true, path: saved }); } catch (e) { return send(res, 400, { error: e.message }); }
+  }
+  if (req.method === "GET" && p === "/api/stickman/image-file") {
+    const user = sessUser(req);
+    const dir = stickmanImageDir(user);
+    const name = path.basename(String(u.searchParams.get("path") || ""));
+    if (!name || name === "." || name === "..") { return send(res, 404, { error: "File tidak ditemukan" }); }
+    const file = path.join(dir, name);
+    if (file.indexOf(dir + path.sep) !== 0) { return send(res, 403, { error: "Akses ditolak" }); }
+    let st = null;
+    try { st = fs.statSync(file); } catch (e) { st = null; }
+    if (!st || !st.isFile()) { return send(res, 404, { error: "File tidak ditemukan" }); }
+    const lower = name.toLowerCase();
+    let ct = "image/png";
+    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) { ct = "image/jpeg"; } else if (lower.endsWith(".webp")) { ct = "image/webp"; } else if (lower.endsWith(".gif")) { ct = "image/gif"; }
+    res.writeHead(200, { "content-type": ct, "cache-control": "no-cache" });
+    fs.createReadStream(file).pipe(res); return;
+  }
+  // STK-GAYA-FOTO-ROUTE: contoh gaya Stickman Studio (read-only).
+  if (req.method === 'GET' && p === '/api/stickman/style-preview') {
+    var STK_PREV_IDS = ['s1light', 's1dark', 's2a', 's2b', 's3', 's4', 's5', 'a6', 'b1', 'b2'];
+    var stkPrevFile = String(u.searchParams.get('file') || '');
+    var stkPrevOk = false;
+    for (var stkPrevI = 0; stkPrevI < STK_PREV_IDS.length; stkPrevI++) { if (stkPrevFile === STK_PREV_IDS[stkPrevI] + '.png') { stkPrevOk = true; break; } }
+    if (!stkPrevOk) { return send(res, 404, { error: 'File tidak ditemukan' }); }
+    var stkPrevPath = path.join(__dirname, 'public', 'stickman-style-previews', stkPrevFile);
+    var stkPrevSt = null;
+    try { stkPrevSt = fs.statSync(stkPrevPath); } catch (e) { stkPrevSt = null; }
+    if (!stkPrevSt || !stkPrevSt.isFile()) { return send(res, 404, { error: 'File tidak ditemukan' }); }
+    res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' });
+    fs.createReadStream(stkPrevPath).pipe(res); return;
+  }
+  // STK-AKUN-PKG: paket Stickman per akun (lintas perangkat, tahan restart).
+  if (req.method === 'GET' && p === '/api/stickman/package') {
+    var stkPkgFile = path.join(clipUserDir(sessUser(req)), 'stickman-package.json');
+    var stkPkgRaw = null;
+    try { stkPkgRaw = fs.readFileSync(stkPkgFile, 'utf8'); } catch (e) { stkPkgRaw = null; }
+    if (!stkPkgRaw) { return send(res, 200, { ok: true, pkg: null }); }
+    var stkPkgParsed = null;
+    try { stkPkgParsed = JSON.parse(stkPkgRaw); } catch (e) { stkPkgParsed = null; }
+    if (!stkPkgParsed || typeof stkPkgParsed !== 'object' || !Array.isArray(stkPkgParsed.scenes)) { return send(res, 200, { ok: true, pkg: null }); }
+    return send(res, 200, { ok: true, pkg: stkPkgParsed });
+  }
+  if (req.method === 'POST' && p === '/api/stickman/package') {
+    var stkPkgBody = null;
+    try { stkPkgBody = await stickmanReadJsonBody(req, 1024 * 1024); } catch (e) { return send(res, 400, { error: e.message }); }
+    if (!stkPkgBody || typeof stkPkgBody.pkg !== 'object' || !stkPkgBody.pkg || !Array.isArray(stkPkgBody.pkg.scenes)) { return send(res, 400, { error: 'Paket tidak valid' }); }
+    var stkPkgClean = {};
+    for (var stkPkgK in stkPkgBody.pkg) { if (stkPkgK !== 'html' && stkPkgK !== 'txt' && stkPkgBody.pkg.hasOwnProperty(stkPkgK)) stkPkgClean[stkPkgK] = stkPkgBody.pkg[stkPkgK]; }
+    try {
+      var stkPkgDir = clipUserDir(sessUser(req));
+      fs.mkdirSync(stkPkgDir, { recursive: true });
+      var stkPkgTmp = path.join(stkPkgDir, 'stickman-package.json.tmp');
+      fs.writeFileSync(stkPkgTmp, JSON.stringify(stkPkgClean));
+      fs.renameSync(stkPkgTmp, path.join(stkPkgDir, 'stickman-package.json'));
+    } catch (e) { return send(res, 500, { error: 'Gagal menyimpan paket' }); }
+    return send(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && p === '/api/stickman/package') {
+    try { fs.unlinkSync(path.join(clipUserDir(sessUser(req)), 'stickman-package.json')); } catch (e) {}
+    return send(res, 200, { ok: true });
+  }
+  if (req.method === "POST" && p === "/api/stickman/tiktok") {
+    let b;
+    try { b = await stickmanReadJsonBody(req, 10000); } catch (e) { return send(res, 400, { error: e.message }); }
+    const url = String(b.url || "").trim();
+    if (!url) { return send(res, 400, { error: "URL kosong" }); }
+    if (!clipperLib.isTiktokUrl(url)) { return send(res, 400, { ok: false, error: "URL bukan TikTok" }); }
+    const user = sessUser(req);
+    const lang = (b.lang === "id" || b.lang === "en") ? b.lang : null;
+    const td = fs.mkdtempSync(path.join(os.tmpdir(), "stickman-tt-"));
+    try {
+      const job = { user: user, log: [], cancelled: false, abortCtrl: new AbortController(), transcriptLang: lang, duration: 0 };
+      const info = await clipFetchTiktokInfo(job, url);
+      let title = "";
+      let dur = 0;
+      try { const meta = JSON.parse(info.stdout || "{}"); title = String(meta.title || ""); dur = Number(meta.duration || 0); } catch (e) { title = ""; dur = 0; }
+      const dl = await clipRun("yt-dlp", ["--no-playlist", "--no-warnings", "--socket-timeout", "30", "-f", "ba/bestaudio", "--extract-audio", "--audio-format", "mp3", "-o", path.join(td, "audio.%(ext)s"), url], { timeout: 600000 });
+      if (dl.code !== 0) { throw new Error("yt-dlp audio gagal: " + String(dl.stderr || "").slice(-300)); }
+      let audioFile = path.join(td, "audio.mp3");
+      if (!fs.existsSync(audioFile)) {
+        const files = fs.readdirSync(td);
+        let found = "";
+        for (let i = 0; i < files.length; i++) { if (files[i].indexOf("audio.") === 0) { found = files[i]; } }
+        if (!found) { throw new Error("File audio TikTok tidak terbentuk"); }
+        audioFile = path.join(td, found);
+      }
+      const tr = await clipTranscribeAuto(audioFile, job, "auto");
+      const text = (tr.segments || []).map(function (s) { return String(s.text || "").trim(); }).filter(function (t) { return t; }).join(" ");
+      if (!text) { throw new Error("Transkrip kosong"); }
+      return send(res, 200, { ok: true, text: text, source: tr.source || "", title: title, duration: dur });
+    } catch (e) { return send(res, 502, { ok: false, error: e.message || String(e) }); } finally { try { fs.rmSync(td, { recursive: true, force: true }); } catch (e) {} }
+  }
+  // ===== AKHIR STICKMAN-SEDERHANA-IMAGE (route) =====
+
   if (req.method === 'GET' && p === '/api/state') {
     try { const raw = fs.readFileSync(stateFile(sessUser(req)), 'utf8'); return send(res, 200, JSON.parse(raw)); }
     catch { return send(res, 200, { empty: true }); }
@@ -4186,13 +4621,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (req.method === 'POST' && p === '/api/run') {
-    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 2e6) return send(res, 413, { error: 'Teks terlalu besar' }); }
+    let raw = ''; for await (const c of req) { raw += c; if (raw.length > 12e6) return send(res, 413, { error: 'Teks terlalu besar' }); }
     try {
-      const { provider, prompt, messages, model, route } = JSON.parse(raw);
+      const runBody = JSON.parse(raw);
+      const { provider, prompt, messages, model, route } = runBody;
+      const runImage = runBody.image;
       const msgs = Array.isArray(messages) && messages.length
         ? messages.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string' && m.content.trim())
         : (typeof prompt === 'string' && prompt.trim() ? [{ role: 'user', content: prompt }] : []);
       if (!msgs.length) return send(res, 400, { error: 'Prompt kosong' });
+      var visImage = null;
+      if (runImage !== undefined && runImage !== null) {
+        var runMime = runImage.mimeType || runImage.mime;
+        if (typeof runImage !== 'object' || typeof runImage.data !== 'string' || !runImage.data || runImage.data.length > 10e6 || !/^[A-Za-z0-9+/=]+$/.test(runImage.data) || ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].indexOf(runMime) < 0) return send(res, 400, { error: 'Gambar tidak valid (pakai JPG/PNG/WebP/GIF, maks ~7MB).' });
+// STK-VISIONFIX: terima field mime dari client
+        visImage = { data: runImage.data, mimeType: runMime };
+        for (var vi = msgs.length - 1; vi >= 0; vi--) { if (msgs[vi].role === 'user') { msgs[vi].image = visImage; break; } }
+      }
       const mdl = model || E.ROUTER_MODEL;
       // OPSI JALUR MULTI-PROVIDER: 'direct' = Direct Official API Key,
       // 'router' (lama) / 'router-pi' = 9router Pi, 'router-pc' = 9router PC.
@@ -4219,6 +4664,7 @@ const server = http.createServer(async (req, res) => {
       Object.defineProperty(job, 'ctrl', { value: new AbortController(), enumerable: false });
       jobs.set(id, job);
       const timer = setTimeout(() => job.ctrl.abort(), LIMIT);
+      if (visImage && !useRouter && runAdmin && provider === 'claude') return send(res, 400, { error: 'Provider Claude belum mendukung kirim gambar di jalur ini — pakai deskripsi manual di Step 4B.' });
       (useRouter ? viaRouter(mdl, msgs, job, rWhich) : (runAdmin ? call[provider](msgs, job) : userCustomCall(runUser, ownSlug, msgs, job)))
         .then(t => { job.status = 'done'; job.text = t; })
         .catch(e => {

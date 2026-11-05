@@ -675,6 +675,36 @@ body.nonadmin #updCard{display:none!important}
 }
 
 </style>
+<style>
+.ssw-steps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.ssw-pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font-size:13px;font-weight:700}
+.ssw-pill.on{background:#7c3aed;color:#fff;border-color:#7c3aed}
+.ssw-pill.done{border-color:#22c55e;color:#22c55e}
+.ssw-step{display:none}
+.ssw-step.on{display:block}
+.ssw-card{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.ssw-card h3{font-size:16px;margin:0 0 8px}
+.ssw-genre{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+@media (min-width:720px){.ssw-genre{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.ssw-gbtn{text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:transparent;color:inherit;cursor:pointer}
+.ssw-gbtn b{display:block;font-size:14px}
+.ssw-gbtn small{color:#94a3b8}
+.ssw-gbtn.on{border-color:#7c3aed;box-shadow:0 0 0 1px #7c3aed}
+.ssw-prompt{background:#0f172a;border:1px solid var(--line);border-radius:8px;padding:10px;white-space:pre-wrap;word-wrap:break-word;font-size:13px;margin:8px 0}
+.ssw-beat{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
+.ssw-beat b{display:block;margin-bottom:4px}
+.ssw-beat p{margin:4px 0}
+.ssw-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.ssw-input{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit}
+.ssw-scroll{white-space:pre-wrap;word-wrap:break-word;max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:10px}
+.ssw-ok{color:#22c55e}
+.ssw-langgrid{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.ssw-chip{text-align:left;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font-size:13px;font-weight:700}
+.ssw-chip.on{border-color:#7c3aed;box-shadow:0 0 0 1px #7c3aed}
+/* STK-STORYFIX */
+.ssw-bad{color:#ef4444}
+</style>
+
 </head><body>
 <div class="userchip"><div class="av" id="topUserAv">D</div><b id="topUserName">Memuat…</b><a class="btn ghost" href="/logout" onclick="try{localStorage.removeItem('hvo2')}catch(e){}" style="padding:4px 10px;text-decoration:none;font-size:12px" title="Keluar dari dashboard">Keluar</a></div>
 <svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true"><symbol id="i-plane" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.5.5 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/><path d="M2.5 12.5 5 11.5"/><path d="M2 16.5 6 15"/><path d="M3.5 20 5.5 19.2"/></symbol></svg>
@@ -687,6 +717,7 @@ body.nonadmin #updCard{display:none!important}
   <button class="navbtn" data-page="voice"><span class="ic">🎤</span> Voice Generator</button>
   <button class="navbtn" data-page="aiconn"><span class="ic">🤖</span> Koneksi AI</button>
   <button class="navbtn" data-page="post"><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><use href="#i-plane"/></svg></span> Post</button>
+  <button class="navbtn" data-page="stickman"><span class="ic">🎬</span> Stickman Studio</button>
   <button class="navbtn" data-page="settings"><span class="ic">⚙️</span> Settings</button>
   <div class="side-foot">
     <div class="credits"><span>⚡</span><div><b>AI Credits</b><small style="color:#22c55e;font-weight:700">Unlimited</small></div></div>
@@ -736,7 +767,7 @@ body.nonadmin #updCard{display:none!important}
         <div class="wide wide-j"><label for="judul">Judul proyek</label><input id="judul" placeholder="masukan judul"></div>
         <div class="wide wide-t"><label for="topik">Topik dan link referensi (opsional)</label><textarea id="topik" style="min-height:90px" placeholder="Contoh: Sejarah &amp; Evolusi Honda CBR, https://youtu.be/xxxx, https://situs.com/artikel"></textarea><div id="refs"></div></div>
         <div><label for="gaya">Gaya bahasa</label><input id="gaya" value="Cinematic Dokumenter"><div class="chips" id="gchips" style="margin-top:8px"><button class="chip" data-gaya="Vlogger">Vlogger</button><button class="chip" data-gaya="Cinematic Dokumenter">Cinematic</button><button class="chip" data-gaya="Santai / Kasual">Santai</button><button class="chip" data-gaya="Edukatif">Edukatif</button><button class="chip" data-gaya="Roasting / Satir">Roasting</button><button class="chip" data-gaya="Storytelling (Naratif)">Storytelling</button><button class="chip" data-gaya="Persuasif / Iklan (Hard-Selling)">Persuasif</button><button class="chip" data-gaya="Formal / Baku">Formal</button><button class="chip" data-gaya="Gen-Z / Populer">Gen-Z</button><button class="chip" data-gaya="Kontroversial / Opini">Kontroversial</button></div></div>
-        <div><label for="niche">Niche/Kategori channel</label><input id="niche" placeholder="Otomotif"><div class="chips" id="nchips" style="margin-top:8px"><button class="chip" data-niche="Otomotif">Otomotif</button><button class="chip" data-niche="Bisnis">Bisnis</button><button class="chip" data-niche="Teknologi">Teknologi</button><button class="chip" data-niche="Sejarah">Sejarah</button></div><label for="audien">Target audien</label><input id="audien" value="Pecinta otomotif, umum"><label for="dur">Durasi target (menit)</label><input id="dur" type="number" min="5" max="30" value="10"><label for="jsh">Jumlah Shorts</label><input id="jsh" type="number" min="1" max="5" value="1"></div>
+        <div><label for="niche">Niche/Kategori channel</label><input id="niche" placeholder="Otomotif"><div class="chips" id="nchips" style="margin-top:8px"><button class="chip" data-niche="Otomotif">Otomotif</button><button class="chip" data-niche="Bisnis">Bisnis</button><button class="chip" data-niche="Teknologi">Teknologi</button><button class="chip" data-niche="Sejarah">Sejarah</button></div><label for="audien">Target audien</label><input id="audien" value="Pecinta otomotif, umum"><label for="dur">Durasi target (menit)</label><input id="dur" type="number" min="5" max="30" value="10"><label for="jsh">Jumlah Shorts</label><input id="jsh" type="number" min="1" max="5" value="1"><label for="subLang">Bahasa subtitle</label><select id="subLang"><option value="asli" selected>Asli (tanpa terjemah)</option><option value="id">Indonesia</option><option value="en">English</option></select></div>
         <div><div class="stats"><div class="stat"><b id="sWords">0</b><span>kata naskah</span></div><div class="stat"><b id="sMin">0</b><span>menit baca</span></div><div class="stat"><b id="sTarget">0</b><span>target kata</span></div></div></div>
       </div>
       <div class="brief-actions"><button class="btn" id="go0" style="--k:var(--o)">Mulai (ambil transkrip)</button><button class="btn danger" id="stop" hidden>Stop</button><div class="bar"><i id="pb"></i></div><button class="btn ghost" id="dlall">Unduh semua (.txt)</button><button class="btn ghost" id="reset">Reset proyek</button></div>
@@ -970,6 +1001,151 @@ body.nonadmin #updCard{display:none!important}
   </div>
 </div>
 
+<!-- STK-LAYOUT-MOVED -->
+<!-- ================= STICKMAN STUDIO ================= -->
+<div id="page-stickman" class="page" hidden>
+  <div class="page-head"><div style="display:flex;gap:10px;align-items:center"><button class="hamburger">☰</button><div><h1>🎬 Stickman Studio</h1><p>Story Studio: dari ide jadi prompt klip siap tempel ke Google Flow. Satu langkah per satu langkah. Video dibuat di Flow, Kling, atau Runway (eksternal, berbayar, akun masing-masing) — dashboard tidak membuat video.</p></div></div></div>
+  <div class="ssw-steps" id="sswSteps">
+    <button type="button" class="ssw-pill on" data-sswgoto="1">1 · Genre</button>
+    <button type="button" class="ssw-pill" data-sswgoto="2">2 · Format</button>
+    <button type="button" class="ssw-pill" data-sswgoto="3">3 · Cerita</button>
+    <button type="button" class="ssw-pill" data-sswgoto="4">4 · Karakter</button>
+    <button type="button" class="ssw-pill" data-sswgoto="5">5 · Prompt</button>
+    <button type="button" class="ssw-pill" data-sswgoto="6">6 · Paket</button>
+    <button type="button" class="btn ghost" id="sswNew" style="margin-left:auto">🗑️ Proyek Baru</button>
+  </div>
+  <div id="sswStep1" class="ssw-step on">
+    <div class="ssw-card"><h3>1 · Pilih genre</h3>
+      <div class="ssw-genre" id="sswGenreGrid"></div>
+      <div style="margin-top:10px"><label>Atau tulis topik sendiri</label><input type="text" id="sswTopic" class="ssw-input" placeholder="mis. Bangkit setelah gagal ujian"></div>
+      <p class="hint" id="sswSrcSum" style="margin:8px 0 0">Belum ada sumber cerita yang dikunci.</p>
+    </div>
+    <div class="ssw-card"><h3>Tempel link</h3>
+      <p class="hint" style="margin:0 0 8px">Tempel link TikTok atau YouTube — transkripnya diambil lalu jadi bahan cerita.</p>
+      <input type="text" id="sswLink" class="ssw-input" placeholder="https://...">
+      <div class="ssw-row"><button type="button" class="btn" id="sswLinkGo">🔗 Proses link</button></div>
+      <div id="sswLinkCard" style="display:none;margin-top:10px"><b id="sswLinkTitle"></b><div id="sswLinkText" class="ssw-scroll" style="margin-top:6px"></div><div class="ssw-row"><button type="button" class="btn" id="sswLinkApply">✅ Terapkan sebagai bahan cerita</button></div></div>
+      <p class="hint" id="sswLinkMsg" style="margin:8px 0 0"></p>
+    </div>
+    <div class="ssw-card"><h3>Tempel naskah custom</h3>
+      <p class="hint" style="margin:0 0 8px">Tempel narasi jadi — naskah ini langsung jadi bahan cerita dan dibagi per klip di beat table.</p>
+      <textarea id="sswScript" rows="5" class="ssw-input" placeholder="Tempel naskah lengkap di sini..."></textarea>
+      <div class="ssw-row"><button type="button" class="btn" id="sswScriptGo">📝 Pakai naskah ini</button><span class="hint" id="sswScriptInfo"></span></div>
+    </div>
+    <div class="ssw-row"><button type="button" class="btn" id="sswS1Next" style="padding:12px 22px;font-weight:800">Kunci &amp; Lanjut →</button></div>
+    <p class="hint" id="sswS1Msg" style="margin:8px 0 0"></p>
+  </div>
+  <div id="sswStep2" class="ssw-step">
+    <div class="ssw-card"><h3>2 · Format</h3>
+      <div style="margin-bottom:12px"><label>Durasi total video</label>
+        <div class="ssw-row" id="sswDurRow">
+          <label><input type="radio" name="sswDur" value="1" checked> 1 menit</label>
+          <label><input type="radio" name="sswDur" value="2"> 2 menit</label>
+          <label><input type="radio" name="sswDur" value="3"> 3 menit</label>
+          <label><input type="radio" name="sswDur" value="5"> 5 menit</label>
+          <label><input type="radio" name="sswDur" value="custom"> Custom <input type="number" id="sswCustomMin" min="1" max="30" value="4" style="width:64px"> menit</label>
+        </div>
+      </div>
+      <div style="margin-bottom:12px"><label>Durasi per klip</label>
+        <div class="ssw-row">
+          <label><input type="radio" name="sswClipLen" value="10" checked> 10 detik (default)</label>
+          <label><input type="radio" name="sswClipLen" value="8"> 8 detik (kalau klip Flow mang 8 detik)</label>
+        </div>
+      </div>
+      <p id="sswClipCount" style="font-weight:800;margin:0 0 12px"></p>
+      <div style="margin-bottom:12px"><label>Aspect ratio</label>
+        <div class="ssw-row">
+          <label><input type="radio" name="sswRatio" value="9:16" checked> 9:16 (Shorts)</label>
+          <label><input type="radio" name="sswRatio" value="16:9"> 16:9 (YouTube long-form)</label>
+        </div>
+      </div>
+      <div style="margin-bottom:12px"><label>Mode narasi</label>
+        <div class="ssw-row">
+          <label><input type="radio" name="sswMode" value="A" checked> A — Veo mengucapkan narasi di tiap klip</label>
+          <label><input type="radio" name="sswMode" value="B"> B — Tanpa suara di klip; naskah lengkap untuk direkam/TTS (RECOMMENDED)</label>
+          <label><input type="radio" name="sswMode" value="C"> C — Tanpa narasi; visual + SFX + musik saja</label>
+        </div>
+      </div>
+      <div><label>Bahasa narasi</label>
+        <input type="hidden" id="sswLang" value="en">
+        <div id="sswLangChips" class="ssw-langgrid">
+          <button type="button" class="ssw-chip on" data-lang="en">English</button>
+          <button type="button" class="ssw-chip" data-lang="id">Indonesia</button>
+          <button type="button" class="ssw-chip" data-lang="ms">Melayu</button>
+          <button type="button" class="ssw-chip" data-lang="es">Español</button>
+          <button type="button" class="ssw-chip" data-lang="fr">Français</button>
+          <button type="button" class="ssw-chip" data-lang="de">Deutsch</button>
+          <button type="button" class="ssw-chip" data-lang="pt">Português</button>
+          <button type="button" class="ssw-chip" data-lang="ja">日本語</button>
+          <button type="button" class="ssw-chip" data-lang="ko">한국어</button>
+          <button type="button" class="ssw-chip" data-lang="zh">中文</button>
+          <button type="button" class="ssw-chip" data-lang="ar">العربية</button>
+          <button type="button" class="ssw-chip" data-lang="custom">Lainnya</button>
+        </div>
+        <input type="text" id="sswLangCustom" class="ssw-input" style="margin-top:8px" placeholder="Tulis nama bahasanya..." hidden>
+      </div>
+    </div>
+    <div class="ssw-row"><button type="button" class="btn ghost" id="sswS2Back">← Kembali</button><button type="button" class="btn" id="sswS2Next" style="padding:12px 22px;font-weight:800">Lanjut →</button></div>
+    <p class="hint" id="sswS2Msg" style="margin:8px 0 0"></p>
+  </div>
+  <div id="sswStep3" class="ssw-step">
+    <div class="ssw-card"><h3>3 · Cerita</h3>
+      <p class="hint" style="margin:0 0 8px">Cerita orisinal, tanpa karakter berhak cipta dan tanpa selebriti hidup. Konten historis harus akurat; yang belum pasti ditandai.</p>
+      <div class="ssw-row" style="margin-top:0"><button type="button" class="btn" id="sswStoryGo">✨ Buat Cerita (AI)</button><button type="button" class="btn ghost" id="sswStoryAgain" style="display:none">🔄 Buat yang lain</button></div>
+      <div id="sswStoryOut" style="margin-top:12px"></div>
+      <div id="sswStoryEdit" style="display:none;margin-top:12px"></div>
+      <p class="hint" id="sswStoryMsg" style="margin:8px 0 0"></p>
+    </div>
+    <div class="ssw-row"><button type="button" class="btn ghost" id="sswS3Back">← Kembali</button><button type="button" class="btn ghost" id="sswS3Tweak" style="display:none">✏️ Ubah cerita</button><button type="button" class="btn" id="sswS3Next" style="padding:12px 22px;font-weight:800" disabled>Lanjut →</button></div>
+  </div>
+  <div id="sswStep4" class="ssw-step">
+    <div class="ssw-card"><h3>4 · Karakter</h3>
+      <div class="ssw-row" style="margin-top:0">
+        <label><input type="radio" name="sswCharMode" value="A" checked> A — Buatkan karakter otomatis</label>
+        <label><input type="radio" name="sswCharMode" value="B"> B — Saya upload gambar karakter</label>
+      </div>
+      <div id="sswCharA" style="margin-top:12px"><button type="button" class="btn" id="sswBibleGo">✨ Buat Character Bible (AI)</button></div>
+      <div id="sswCharB" style="display:none;margin-top:12px">
+        <p class="hint" style="margin:0 0 8px">Upload foto, AI langsung mendeskripsikannya otomatis di bawah foto — deskripsi itu jadi draf bible (bisa diedit, wajib konfirmasi). Kalau provider aktif tidak mendukung gambar, pakai deskripsi manual di bawah. Karakter tidak diubah atau dipercantik.</p>
+        <input type="file" id="sswCharFile" accept="image/*">
+        <div id="sswCharPreview" style="margin-top:8px"></div>
+        <div id="sswVisionMsg" class="hint" style="display:none;margin-top:8px;color:#f87171"></div>
+        <div id="sswVisionOut" style="display:none;margin-top:10px"><label>Deskripsi AI dari foto (boleh diedit)</label><textarea id="sswVisionText" rows="6" class="ssw-input"></textarea><div class="ssw-row"><button type="button" class="btn" id="sswVisionBibleGo">Buat Bible dari Deskripsi AI</button></div></div>
+        <div style="margin-top:10px"><label>Deskripsikan karakter persis seperti di gambar</label><textarea id="sswCharDesc" rows="4" class="ssw-input" placeholder="Bentuk kepala, mata, mulut, ketebalan garis, pakaian, warna (hex kalau tahu), proporsi, gaya gambar..."></textarea></div>
+        <div class="ssw-row"><button type="button" class="btn" id="sswBibleDescGo">✨ Buat Bible dari Deskripsi (AI)</button></div>
+      </div>
+      <div id="sswBibleOut" style="margin-top:12px"></div>
+      <p class="hint" id="sswBibleMsg" style="margin:8px 0 0"></p>
+    </div>
+    <div class="ssw-card"><h3>Elemen Terkunci</h3>
+      <p class="hint" style="margin:0 0 8px">Kunci elemen apa pun yang harus sama di semua klip — properti, warna, atau detail setting. Deskripsi ditempel verbatim di setiap prompt klip, persis seperti Character Bible.</p>
+      <p class="hint" style="margin:0 0 8px">Mengunci menaikkan peluang konsistensi, tapi BUKAN jaminan — Flow tetap bisa meleset. Regenerasi klip yang hasilnya berubah.</p>
+      <div id="sswLockList" style="margin-top:8px"></div>
+      <div class="ssw-row"><input type="text" id="sswLockName" class="ssw-input" placeholder="Nama elemen, mis. Mug hijau" style="max-width:220px"><input type="text" id="sswLockDesc" class="ssw-input" placeholder="Deskripsi pasti, mis. green ceramic mug with handle" style="flex:1"></div>
+      <div class="ssw-row"><button type="button" class="btn" id="sswLockAdd">＋ Tambah Elemen</button><button type="button" class="btn ghost" id="sswLockSuggest">✨ Usulkan dari cerita</button></div>
+      <p class="hint" id="sswLockMsg" style="margin:8px 0 0"></p>
+    </div>
+    <div class="ssw-row"><button type="button" class="btn ghost" id="sswS4Back">← Kembali</button><button type="button" class="btn" id="sswS4Next" style="padding:12px 22px;font-weight:800" disabled>Konfirmasi &amp; Lanjut →</button></div>
+  </div>
+  <div id="sswStep5" class="ssw-step">
+    <div class="ssw-card"><h3>5 · Prompt Klip</h3>
+      <p class="hint" style="margin:0 0 8px">Satu blok per klip, siap tempel ke Flow. Style lock dan bible ditempel verbatim di semua klip; frame akhir klip N menjadi frame awal klip N+1.</p>
+      <div class="ssw-row" style="margin-top:0"><button type="button" class="btn" id="sswPromptGo">🎬 Buat Prompt Klip</button><button type="button" class="btn ghost" id="sswPromptDl" style="display:none">⬇️ Unduh Semua Prompt</button></div>
+      <div id="sswPromptOut" style="margin-top:12px"></div>
+      <p class="hint" id="sswPromptMsg" style="margin:8px 0 0"></p>
+    </div>
+    <div class="ssw-row"><button type="button" class="btn ghost" id="sswS5Back">← Kembali</button><button type="button" class="btn" id="sswS5Next" style="padding:12px 22px;font-weight:800" disabled>Lanjut →</button></div>
+  </div>
+  <div id="sswStep6" class="ssw-step">
+    <div class="ssw-card"><h3>6 · Paket</h3>
+      <div class="ssw-row" style="margin-top:0"><button type="button" class="btn" id="sswPkgGo">📦 Buat Paket</button><button type="button" class="btn ghost" id="sswPkgSave">💾 Simpan Paket</button><button type="button" class="btn ghost" id="sswPkgDl">⬇️ Unduh Paket</button></div>
+      <div id="sswPkgOut" style="margin-top:12px"></div>
+      <p class="hint" id="sswPkgMsg" style="margin:8px 0 0"></p>
+      <p class="hint" style="margin:8px 0 0">Tips Flow: generate Klip 1 dulu; untuk klip berikutnya pakai frame terakhir klip sebelumnya sebagai frame awal (Frames to Video) dan/atau gambar karakter sebagai ingredient reference, supaya karakter tetap identik.</p>
+    </div>
+    <div class="ssw-row"><button type="button" class="btn ghost" id="sswS6Back">← Kembali</button></div>
+  </div>
+</div>
 </div></div></div>
 <div class="toast" id="toast" role="status"></div>
 <!-- Dialog atur API key (klik chip di card Koneksi AI) -->
@@ -1054,7 +1230,7 @@ const isRouter=r=>r==='router-pi'||r==='router-pc';
 try{S=JSON.parse(localStorage.getItem('hvo2')||'{}')}catch(e){}
 KEYS.forEach(k=>S[k]=S[k]||{});S.err={};
 [0,1,2,3,4,5].forEach(n=>{if(S.st[n]==='Berjalan')S.st[n]=(S.out[n]||'').trim()?(S.part[n]?'Terpotong':'Selesai'):'Menunggu'});
-const IDS=['judul','topik','gaya','audien','dur','jsh','niche']; // Bank Ide dihapus — ideaNiche/ideaCount tidak lagi disimpanIDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
+const IDS=['judul','topik','gaya','audien','dur','jsh','niche','subLang']; // Bank Ide dihapus — ideaNiche/ideaCount tidak lagi disimpanIDS.forEach(k=>{const el=$(k);if(S[k]!==undefined&&el)el.value=S[k]});
 let stateReady=false,saveTimer=null,serverTs=0;
 // Guard anti-hilang (client): kalau S kosong tapi server pernah punya data (serverTs>0),
 // JANGAN kirim — cegah state kosong menimpa state berisi (kasus 17 Okt 2026: semua naskah hilang pas deploy).
@@ -1558,8 +1734,8 @@ const looksCut=(n,t)=>{
 const CONT='Tulisanmu terpotong. Lanjutkan tepat dari titik terakhir di atas. Jangan mengulang bagian yang sudah ditulis, jangan beri pembuka atau penjelasan, dan teruskan sampai selesai sesuai instruksi awal.';
 const REV=(n,ins)=>`Revisi hasil di atas sesuai permintaan saya berikut:\n${ins}\n\nTulis ulang HASIL LENGKAP versi baru yang menerapkan revisi. Pertahankan bagian yang sudah baik, jangan meringkas, dan jangan menjelaskan perubahan.${n===1?' Jika diminta bagian baru atau fokus tertentu, riset faktanya dengan teliti dan jangan mengarang. Tetap tampilkan outline saja.':''} Keluarkan hanya hasil akhir.`;
 const setErr=(n,e)=>{S.err[n]={message:e.message,code:e.code,kind:e.kind||(e instanceof TypeError?'dash':'')}};
-async function runJob(msgs,provider,model,n,label,route){
-  const r0=await J(await fetch('/api/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({provider,messages:msgs,model:model||undefined,route:route||undefined})}));
+async function runJob(msgs,provider,model,n,label,route,img){
+  const r0=await J(await fetch('/api/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({provider,messages:msgs,model:model||undefined,route:route||undefined,image:img||undefined})}));
   if(!r0.id)throw new Error(r0.error||'Gagal memulai');
   jobId=r0.id;let j=null;
   for(let i=0;i<400;i++){
@@ -1582,12 +1758,12 @@ async function runJob(msgs,provider,model,n,label,route){
 /* --- referensi: ambil teks, lalu catat fakta saja (bukan salin) --- */
 let refBusy=false;
 const refKey=rs=>rs.map(r=>r.title+'|'+r.words).join(';');
-const REFTXT=r=>!r?'belum diambil':r.status==='loading'?'mengambil...':r.status==='ok'?`${r.manual?'teks manual':r.kind==='youtube'?'transkrip':'artikel'} ${fmt(r.words)} kata${r.words>AIW?' · AI membaca '+fmt(AIW)+' kata pertama':''}${r.truncated?' (transkrip dipotong di 20.000 kata)':''}`:'gagal: '+(r.error||'');
+const REFTXT=r=>!r?'belum diambil':r.status==='loading'?'mengambil...':r.status==='ok'?`${r.manual?'teks manual':r.kind==='youtube'?'transkrip':'artikel'} ${fmt(r.words)} kata${r.words>AIW?' · AI membaca '+fmt(AIW)+' kata pertama':''}${r.truncated?' (transkrip dipotong di 20.000 kata)':''}${r.transLang?'· diterjemahkan ke '+(r.transLang==='id'?'Indonesia':r.transLang==='en'?'English':r.transLang):''}${r.transPartial?' (sebagian)':''}`:'gagal: '+(r.error||'');
 function refsHtml(){
   const urls=refUrls();if(!urls.length)return'';
   const pend=urls.some(u=>!S.refs[u]||S.refs[u].status==='fail');
-  return `<p class="hint" style="margin:8px 0 0">${usableRefs().length} dari ${urls.length} link siap dipakai</p>`+urls.map(u=>{const r=S.refs[u],label=(r&&r.title)||u.replace(/^https?:\/\/(www\.)?/,'');
-    return `<div class="ref" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(label)}">${esc(label.slice(0,90))}</b><small class="${r&&r.status==='ok'?'ok':r&&r.status==='fail'?'bad':''}">${esc(REFTXT(r))}</small><button class="btn ghost" data-rmref="${esc(u)}" style="padding:3px 10px">Hapus</button>${r&&r.status==='fail'?`<button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip</button>`:''}${r&&r.manualOpen?`<div style="flex-basis:100%"><textarea data-mtext="${esc(u)}" style="min-height:90px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button></div>`:''}</div>`}).join('')
+  return `<p class="hint" style="margin:8px 0 0">${usableRefs().length} dari ${urls.length} link siap dipakai</p>`+urls.map((u,ri)=>{const r=S.refs[u],label=(r&&r.title)||u.replace(/^https?:\/\/(www\.)?/,'');
+    return `<div class="ref" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="flex:1;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(label)}">${esc(label.slice(0,90))}</b><small class="${r&&r.status==='ok'?'ok':r&&r.status==='fail'?'bad':''}">${esc(REFTXT(r))}</small><button class="btn ghost" data-cptx="${ri}" style="padding:3px 10px">📋 Salin</button><button class="btn ghost" data-dltx="${ri}" style="padding:3px 10px">⬇️ Unduh</button><button class="btn ghost" data-rmref="${esc(u)}" style="padding:3px 10px">Hapus</button>${r&&r.status==='fail'?`<button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip</button>`:''}${r&&r.manualOpen?`<div style="flex-basis:100%"><textarea data-mtext="${esc(u)}" style="min-height:90px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button></div>`:''}</div>`}).join('')
    +(pend?`<button class="btn ghost full" data-getrefs ${refBusy?'disabled':''}>Ambil referensi</button>`:'')
    +`<label class="chk"><input type="checkbox" id="useRefs"${S.useRefs!==false?' checked':''}> Pakai referensi di Agent Riset</label><select id="refMode" aria-label="Cara pakai referensi" style="margin-top:6px"><option value="catatan"${S.refMode!=='penuh'?' selected':''}>Ringkas jadi catatan fakta (hemat token)</option><option value="penuh"${S.refMode==='penuh'?' selected':''}>Kirim transkrip lengkap (lebih boros token)</option></select><p class="hint" style="margin-top:6px">Hanya teks yang diambil. Agent Riset membuat peta perbedaan dan angle baru dari sumber ini. Saat revisi atau lanjutkan, transkrip lengkap tidak dikirim ulang.</p>`;
 }
@@ -1595,6 +1771,69 @@ const updateRefsUI=()=>{$('refs').innerHTML=refsHtml()};
 // Kunci transkrip Tahap 0 ke server (di luar state dashboard) — selamat dari
 // update/deploy/restart/pindah perangkat. Dipanggil tiap fetchRefs berhasil.
 const syncSavedRefs=async()=>{try{const refs={};for(const [u,r] of Object.entries(S.refs||{}))if(r&&r.status==='ok'&&String(r.text||'').trim())refs[u]=r;if(!Object.keys(refs).length)return;await fetch('/api/refs-saved',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({refs})})}catch(e){}};
+/* Item 4 - terjemah transkrip Tahap 0 ke bahasa subtitle yang dipilih.
+   Teks asli selalu disimpan di r.textAsli; r.text yang dipakai semua tahap.
+   Pilih Asli = kembalikan teks asli. Gagal terjemah = pakai teks asli. */
+let transBusy=false,transPending=false;
+const transLangNow=()=>($('subLang')&&$('subLang').value)||S.subLang||'asli';
+const transLangName=l=>l==='id'?'Indonesia':l==='en'?'English':'Asli';
+async function translateOne(r,lang){
+  const src=r.textAsli||r.text||'';
+  if(!src.trim())return false;
+  const head=src.length>60000?src.slice(0,60000):src;
+  const tail=src.length>60000?src.slice(60000):'';
+  const base=lang==='en'
+    ? 'Terjemahkan teks berikut ke Bahasa Inggris yang natural dan akurat. Pertahankan nama orang, nama tempat, angka, dan istilah khusus apa adanya. Jangan menambah penjelasan, pembuka, atau penutup. Keluarkan HANYA hasil terjemahan. TEKS: '
+    : 'Terjemahkan teks berikut ke Bahasa Indonesia yang natural dan akurat. Pertahankan nama orang, nama tempat, angka, dan istilah khusus apa adanya. Jangan menambah penjelasan, pembuka, atau penutup. Keluarkan HANYA hasil terjemahan. TEKS: ';
+  const out=[];
+  for(let i=0;i<head.length;){
+    let end=Math.min(i+8000,head.length);
+    if(end<head.length){const sp=head.lastIndexOf(' ',end);if(sp>i)end=sp;}
+    const chunk=head.slice(i,end);
+    const j=await runJob([{role:'user',content:base+chunk}],ST[1].p,S.model[1],1,'Menerjemahkan transkrip',getRoute(1));
+    const t=(j.text||'').trim();
+    if(!t)throw new Error('Hasil terjemahan kosong');
+    out.push(t);
+    i=end;
+  }
+  r.textAsli=src;
+  r.text=out.join(' ')+(tail?' '+tail:'');
+  r.words=words(r.text);
+  r.transLang=lang;
+  r.transPartial=tail.length>0;
+  return true;
+}
+async function translateRefs(){
+  if(transBusy){transPending=true;return;}
+  transBusy=true;
+  try{
+    const lang=transLangNow();
+    const rs=usableRefs();
+    if(lang==='asli'){
+      let back=false;
+      for(const r of rs){
+        if(r.textAsli){r.text=r.textAsli;r.words=words(r.text);delete r.textAsli;delete r.transLang;delete r.transPartial;back=true;}
+      }
+      if(back){save();syncSavedRefs();updateRefsUI();render();if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal();toast('Kembali ke teks asli');}
+      return;
+    }
+    const todo=rs.filter(r=>r.transLang!==lang);
+    if(!todo.length)return;
+    toast('Menerjemahkan '+todo.length+' transkrip ke '+transLangName(lang)+'...');
+    let fail=0;
+    for(const r of todo){
+      try{await translateOne(r,lang);}
+      catch(e){fail++;}
+    }
+    save();syncSavedRefs();updateRefsUI();render();
+    if(typeof stageModalMode!=='undefined'&&stageModalMode==='tx')openTxModal();
+    if(fail)toast('Terjemahan gagal untuk '+fail+' transkrip - dipakai teks asli');
+    else toast('Terjemahan selesai');
+  }finally{
+    transBusy=false;
+    if(transPending){transPending=false;translateRefs();}
+  }
+}
 async function fetchRefs(force){
   if(refBusy)return;
   const urls=refUrls().filter(u=>force?(!S.refs[u]||S.refs[u].status!=='ok'):!S.refs[u]);
@@ -1606,7 +1845,7 @@ async function fetchRefs(force){
     j.refs.forEach(r=>{S.refs[r.url]=r.ok?{status:'ok',title:r.title,words:r.words,text:r.text,kind:r.kind,truncated:r.truncated}:{status:'fail',error:r.error,kind:r.kind}});
   }catch(e){urls.forEach(u=>S.refs[u]={status:'fail',error:e.message})}
   const cur=refUrls();Object.keys(S.refs).forEach(u=>{if(Object.keys(S.refs).length>10&&!cur.includes(u))delete S.refs[u]});
-  refBusy=false;save();syncSavedRefs();updateRefsUI();render();
+  refBusy=false;save();syncSavedRefs();updateRefsUI();render();await translateRefs();
 }
 async function prepNotes(){
   const rs=S.useRefs===false?[]:usableRefs();
@@ -2026,7 +2265,7 @@ document.addEventListener('click',e=>{
   else if(b.id==='reset'&&confirm('Hapus semua hasil proyek ini?')){S={};KEYS.forEach(k=>S[k]={});try{localStorage.removeItem('hvo2')}catch(x){}render()}
 });
 document.addEventListener('change',e=>{if(e.target.dataset.directp!==undefined){const n=+e.target.dataset.directp;ST[n].p=e.target.value;save();render();return}
-if(e.target.dataset.m!==undefined){S.model[e.target.dataset.m]=e.target.value;save();render()}else if(e.target.dataset.route!==undefined){const nr=e.target.value;S.route[e.target.dataset.route]=nr;save();render();reloadRouterModels(nr).then(()=>render());}else if(e.target.id==='useRefs'){S.useRefs=e.target.checked;save()}else if(e.target.id==='refMode'){S.refMode=e.target.value;save()}});
+if(e.target.dataset.m!==undefined){S.model[e.target.dataset.m]=e.target.value;save();render()}else if(e.target.dataset.route!==undefined){const nr=e.target.value;S.route[e.target.dataset.route]=nr;save();render();reloadRouterModels(nr).then(()=>render());}else if(e.target.id==='useRefs'){S.useRefs=e.target.checked;save()}else if(e.target.id==='refMode'){S.refMode=e.target.value;save()}else if(e.target.id==='subLang'){save();translateRefs()}});
 const accMsg=(t,ok)=>{const m=$('accMsg');m.textContent=t;m.style.color=ok?'#0a7a2f':'#c00'};
 // Pengaturan akun sekarang di halaman Settings (accPanel tampil langsung di sana).
 // Email akun diisi otomatis saat halaman Settings dibuka (lihat switchPage).
@@ -2402,7 +2641,7 @@ function openTxModal(){
   stageModalN=0;stageModalMode='tx';const urls=refUrls();
   $('stageModalTitle').textContent='📄 Transkrip Referensi';
   $('stageModalSub').textContent=urls.length+' link · '+usableRefs().length+' siap dipakai';
-  $('stageModalBody').innerHTML=urls.length?urls.map((u,i)=>{const r=S.refs[u];if(!r||r.status!=='ok')return `<h4>${i+1}. ${esc((r&&r.title)||u)}</h4><p class="hint">${esc(REFTXT(r))}</p>${r&&r.status==='fail'?`<div class="row"><button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip manual</button></div>${r.manualOpen?`<textarea data-mtext="${esc(u)}" style="min-height:120px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button>`:''}`:''}`;return `<h4>${i+1}. ${esc(r.title||u)}</h4><p class="hint">${fmt(r.words)} kata · ${esc(u)}</p><div class="tx">${esc(r.text)}</div>`}).join(''):'<p class="hint">Belum ada transkrip.</p>';
+  $('stageModalBody').innerHTML=urls.length?urls.map((u,i)=>{const r=S.refs[u];if(!r||r.status!=='ok')return `<h4>${i+1}. ${esc((r&&r.title)||u)}</h4><p class="hint">${esc(REFTXT(r))}</p>${r&&r.status==='fail'?`<div class="row"><button class="btn ghost" data-manual="${esc(u)}" style="padding:3px 10px">Tempel transkrip manual</button></div>${r.manualOpen?`<textarea data-mtext="${esc(u)}" style="min-height:120px;margin-top:6px" placeholder="Tempel transkrip atau teks referensi di sini">${esc(r.mdraft||'')}</textarea><button class="btn" data-msave="${esc(u)}" style="margin-top:6px;padding:4px 12px">Simpan</button>`:''}`:''}`;return `<h4>${i+1}. ${esc(r.title||u)}</h4><p class="hint">${fmt(r.words)} kata · ${esc(u)}${r.transLang?'· diterjemahkan ke '+(r.transLang==='id'?'Indonesia':r.transLang==='en'?'English':r.transLang):''}${r.transPartial?' (sebagian, sisa teks masih bahasa asli)':''}</p><div class="row"><button class="btn ghost" data-cptx="${i}" style="padding:3px 10px">📋 Salin</button><button class="btn ghost" data-dltx="${i}" style="padding:3px 10px">⬇️ Unduh</button></div><div class="tx">${esc(r.text)}</div>`}).join(''):'<p class="hint">Belum ada transkrip.</p>';
   $('stageModal').classList.add('wide');stageModalFoot(false,false);
   $('stageModal').classList.add('open');
 }
@@ -6377,4 +6616,856 @@ const renderSubPresetSettings = () => {
      saja di sini; card cuma punya Lihat + tong sampah (biar tidak numpuk). -->
 <div id="libModal" hidden></div>
 
+<script>
+/* STK-STORY-START */
+(function(){
+  function sswEl(id){ return document.getElementById(id); }
+  function sswEsc(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function sswWords(s){ var t = String(s || '').trim(); if (!t) return 0; return t.split(/\s+/).length; }
+  function sswFitWords(s, max){ var w = String(s || '').trim().split(/\s+/); if (w.length <= max) return String(s || '').trim(); return w.slice(0, max).join(' '); }
+  function sswTc(sec){ var m = Math.floor(sec / 60); var s = sec % 60; return m + ':' + (s < 10 ? '0' + s : '' + s); }
+  function sswRadio(name){ var els = document.querySelectorAll('input[name="' + name + '"]:checked'); return els.length ? els[0].value : ''; }
+  function sswSetMsg(id, txt, ok){ var el = sswEl(id); if (el) { el.textContent = txt || ''; el.className = 'hint' + (ok === true ? ' ssw-ok' : (ok === false ? ' ssw-bad' : '')); } }
+  var SSW_GENRES = [
+    {id: 'comedy', en: 'Comedy', desc: 'Situasi stickman yang lucu'},
+    {id: 'historical', en: 'Historical Story', desc: 'Peristiwa atau tokoh nyata yang didramatisasi'},
+    {id: 'docu', en: 'Historical Documentary / Explainer', desc: 'Gaya How did ancient humans?'},
+    {id: 'whatif', en: 'What-If / Hypothetical', desc: 'Gaya What if humans never slept?'},
+    {id: 'survival', en: 'Survival / Adventure', desc: 'Bertahan hidup / petualangan'},
+    {id: 'daily', en: 'Everyday Life Funny', desc: 'Humor kehidupan sehari-hari'},
+    {id: 'science', en: 'Science / Human Body Explainer', desc: 'Sains / tubuh manusia'},
+    {id: 'mystery', en: 'Mystery / Unsolved', desc: 'Misteri / belum terpecahkan'},
+    {id: 'surprise', en: 'Surprise Me', desc: 'Ana yang pilihkan'},
+    {id: 'motivation', en: 'Motivation', desc: 'Cerita inspiratif / semangat'}
+  ];
+  function sswGenreEn(id){ for (var i = 0; i < SSW_GENRES.length; i++) { if (SSW_GENRES[i].id === id) return SSW_GENRES[i].en; } return ''; }
+  var SSW_STYLE_LOCK = '2D hand-drawn stickman animation, clean bold black ink outlines, simple flat colors, subtle paper texture background, smooth fluid character animation, expressive cartoon acting, cinematic camera movement, ';
+  var SSW_AVOID = 'realistic humans, 3D render, anime style, character design changes, extra limbs, morphing faces, color shifts on characters, on-screen text, subtitles, captions, watermarks, logos.';
+  var SSW_VOICE = 'calm, warm, deep male documentary narrator';
+  var SSW_MUSIC = 'gentle inspirational orchestral score, soft piano and strings, slow steady build, hopeful and uplifting mood';
+  var SSW_ARC = ['Opening', 'First step', 'First setback', 'Small win', 'Hard middle', 'Doubt', 'Turning point', 'Final push', 'Climax', 'Payoff'];
+  var SSW_POOL_EN = [
+    'On an ordinary morning, a small stickman stood at the edge of a brand new challenge, carrying nothing but hope and a single bold idea.',
+    'He took one small step forward, even though his legs shook and every voice around him whispered that he should turn back now.',
+    'Suddenly he stumbled and fell hard on the ground, while his plan scattered around him like dry leaves in a strong cold wind.',
+    'Slowly he stood up again, brushed the dust from his shoulders, and discovered that one tiny victory can change an entire day completely.',
+    'The road grew steeper with every step he took, and his strength faded fast, but his reason for starting stayed clear in his mind.',
+    'Alone in the quiet dark, he asked himself whether all this struggle was worth it, and for a moment he almost believed it was not.',
+    'Then he remembered why he started, looked back at how far he had already come, and felt a new fire burning inside his chest.',
+    'With his last strength he pushed forward through the storm, refusing to stop, refusing to fall, refusing to let the dream die quietly.',
+    'At the very top, as golden light broke through the clouds, he raised both arms high and finally stood where he once dreamed of standing.',
+    'He learned that success was never about never falling, but about standing up one more time than life managed to knock him down.'
+  ];
+  var SSW_POOL_ID = [
+    'Pada suatu pagi yang biasa, seorang stickman kecil berdiri di tepi tantangan baru, hanya membawa harapan dan satu ide berani di dalam hatinya.',
+    'Ia melangkah kecil ke depan, meski kakinya gemetar dan semua suara di sekitarnya berbisik agar ia segera berbalik arah dan menyerah sekarang juga.',
+    'Tiba-tiba ia tersandung dan jatuh keras ke tanah, sementara rencananya berserakan seperti daun kering tertiup angin kencang di tengah badai sore yang besar itu.',
+    'Perlahan ia bangkit lagi, menepuk debu dari bahunya, dan menyadari bahwa satu kemenangan kecil bisa mengubah seluruh harinya menjadi jauh lebih baik lagi.',
+    'Jalan semakin curam di setiap langkahnya, dan tenaganya cepat memudar, tetapi alasan ia memulai tetap jelas di dalam pikirannya yang tidak pernah padam.',
+    'Sendirian dalam gelap yang sunyi, ia bertanya pada dirinya apakah semua perjuangan ini sepadan, dan sesaat ia hampir percaya bahwa jawabannya adalah tidak.',
+    'Lalu ia teringat alasan ia memulai, menoleh ke belakang melihat seberapa jauh ia sudah berjalan, dan api baru menyala di dadanya yang lelah itu.',
+    'Dengan tenaga terakhirnya ia menerjang badai, menolak berhenti, menolak jatuh, menolak membiarkan mimpinya padam dalam diam tanpa pernah diperjuangkan sampai akhir hayatnya juga.',
+    'Di puncak tertinggi, saat cahaya keemasan menembus awan, ia mengangkat kedua tangannya tinggi dan akhirnya berdiri di tempat yang dulu hanya ia impikan.',
+    'Ia belajar bahwa sukses bukan tentang tidak pernah jatuh, tetapi tentang bangkit satu kali lebih banyak daripada kehidupan menjatuhkannya berkali-kali tanpa ampun sama sekali.'
+  ];
+  var W = {
+    step: 1, genre: '', topic: '', sourceKind: '', sourceKey: '', linkText: '', linkTitle: '', scriptText: '',
+    format: {dur: '1', customMin: 4, clipLen: 10, ratio: '9:16', mode: 'A', lang: 'en', langCustom: ''},
+    story: null, storyNotice: '', bible: '', bibleRef: '', bibleConfirmed: false,
+    clipFields: [], prompts: [], promptNotice: '', package6: null, oldPkgNote: false, busy: false, locks: []
+  };
+  function sswLangName(){ var l = sswEl('sswLang') ? sswEl('sswLang').value : 'en'; if (l === 'custom') { var c = sswEl('sswLangCustom') ? sswEl('sswLangCustom').value.trim() : ''; return c || 'English'; } var map = {en: 'English', id: 'Indonesia', ms: 'Melayu', es: 'Español', fr: 'Français', de: 'Deutsch', pt: 'Português', ja: '日本語', ko: '한국어', zh: '中文', ar: 'العربية'}; return map[l] || 'English'; }
+  function sswLangSync(){ var h = sswEl('sswLang'); var v = h ? h.value : 'en'; var chips = document.querySelectorAll('#sswLangChips .ssw-chip'); for (var i = 0; i < chips.length; i++) { if (chips[i].getAttribute('data-lang') === v) chips[i].classList.add('on'); else chips[i].classList.remove('on'); } var c = sswEl('sswLangCustom'); if (c) c.hidden = v !== 'custom'; }
+  function sswReadFormat(){
+    var dur = sswRadio('sswDur') || '1';
+    var cm = parseInt((sswEl('sswCustomMin') ? sswEl('sswCustomMin').value : '4'), 10); if (isNaN(cm) || cm < 1) cm = 4; if (cm > 30) cm = 30;
+    var len = parseInt(sswRadio('sswClipLen') || '10', 10); if (len !== 8) len = 10;
+    var total = (dur === 'custom' ? cm : parseInt(dur, 10)) * 60;
+    var clips = Math.round(total / len); if (clips < 1) clips = 1;
+    var actual = clips * len;
+    return {dur: dur, customMin: cm, clipLen: len, ratio: sswRadio('sswRatio') || '9:16', mode: sswRadio('sswMode') || 'A', lang: sswEl('sswLang') ? sswEl('sswLang').value : 'en', langCustom: sswEl('sswLangCustom') ? sswEl('sswLangCustom').value.trim() : '', totalSec: total, clips: clips, actualSec: actual, rounded: actual !== total};
+  }
+  function sswMaxWords(){ return sswReadFormat().clipLen === 8 ? 20 : 25; }
+  function sswShowClipCount(){
+    var f = sswReadFormat();
+    var txt = f.clips + ' klip (total ' + sswTc(f.actualSec) + ')';
+    if (f.rounded) txt += ' — dibulatkan dari ' + sswTc(f.totalSec) + ' karena durasi klip ' + f.clipLen + ' detik';
+    var el = sswEl('sswClipCount'); if (el) el.textContent = 'Hitungan klip: ' + txt;
+    return f;
+  }
+  function sswCopy(txt, btn){
+    var done = function(){ if (btn) { var old = btn.textContent; btn.textContent = '✅ Tersalin'; setTimeout(function(){ btn.textContent = old; }, 1500); } };
+    var fb = function(){ var ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta); done(); };
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(done, fb); } else { fb(); }
+  }
+  function sswDownload(name, txt){
+    var blob = new Blob([txt], {type: 'text/plain;charset=utf-8'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function(){ document.body.removeChild(a); }, 500);
+  }
+  function sswJsonExtract(t){
+    var s = String(t || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+    var a = s.indexOf('{'); var b = s.lastIndexOf('}');
+    if (a < 0 || b <= a) return null;
+    try { return JSON.parse(s.slice(a, b + 1)); } catch (e) { return null; }
+  }
+  async function sswAI(prompt, label){
+    if (typeof runJob !== 'function' || typeof ST === 'undefined' || !ST[1]) throw new Error('provider Tahap 1 belum aktif — cek Koneksi AI dulu');
+    var route = (typeof getRoute === 'function') ? getRoute(1) : 'direct';
+    var mdl = (typeof S !== 'undefined' && S.model) ? S.model[1] : '';
+    if ((route === 'router-pi' || route === 'router-pc') && !mdl) throw new Error('provider belum aktif');
+    var job = await runJob([{role: 'user', content: prompt}], ST[1].p, mdl, 1, label, route);
+    var tx = (job.text || '').trim();
+    if (!tx) throw new Error('AI mengembalikan teks kosong');
+    return tx;
+  }
+  var sswSaveT = null;
+  function sswPkgData(){
+    var scenes = [];
+    for (var i = 0; i < W.clipFields.length; i++) { scenes.push({beat: W.clipFields[i].beat, nar: W.clipFields[i].nar, prompt: W.prompts[i] || ''}); }
+    return {studioVersion: 'story-v1', step: W.step, genre: W.genre, topic: W.topic, sourceKind: W.sourceKind, linkText: W.linkText, linkTitle: W.linkTitle, scriptText: W.scriptText, format: W.format, story: W.story, bible: W.bible, bibleRef: W.bibleRef, bibleConfirmed: W.bibleConfirmed, locks: W.locks, clipFields: W.clipFields, prompts: W.prompts, package6: W.package6, scenes: scenes};
+  }
+  function sswSave(){
+    try { localStorage.setItem('hvo_story_pkg_v1', JSON.stringify(sswPkgData())); } catch (e) {}
+    if (sswSaveT) clearTimeout(sswSaveT);
+    sswSaveT = setTimeout(function(){
+      try { fetch('/api/stickman/package', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({pkg: sswPkgData()})}); } catch (e) {}
+    }, 600);
+  }
+  function sswApplyPkg(pkg){
+    if (!pkg || pkg.studioVersion !== 'story-v1') return false;
+    W.step = pkg.step || 1; W.genre = pkg.genre || ''; W.topic = pkg.topic || ''; W.sourceKind = pkg.sourceKind || '';
+    W.linkText = pkg.linkText || ''; W.linkTitle = pkg.linkTitle || ''; W.scriptText = pkg.scriptText || '';
+    if (pkg.format) W.format = pkg.format;
+    W.story = pkg.story || null; W.bible = pkg.bible || ''; W.bibleRef = pkg.bibleRef || ''; W.bibleConfirmed = !!pkg.bibleConfirmed; W.locks = Array.isArray(pkg.locks) ? pkg.locks.filter(function(l){ return l && typeof l.name === 'string' && typeof l.desc === 'string'; }) : [];
+    W.clipFields = Array.isArray(pkg.clipFields) ? pkg.clipFields : []; W.prompts = Array.isArray(pkg.prompts) ? pkg.prompts : []; W.package6 = pkg.package6 || null;
+    return true;
+  }
+  async function sswLoad(){
+    var done = false;
+    try {
+      var r = await fetch('/api/stickman/package', {headers: {'accept': 'application/json'}});
+      var j = null; try { j = await r.json(); } catch (e) { j = null; }
+      if (j && j.pkg) { if (sswApplyPkg(j.pkg)) { done = true; } else { W.oldPkgNote = true; } }
+    } catch (e) {}
+    if (!done) {
+      try { var raw = localStorage.getItem('hvo_story_pkg_v1'); if (raw) { var lp = JSON.parse(raw); if (sswApplyPkg(lp)) done = true; } } catch (e) {}
+    }
+    if (W.oldPkgNote && !done) { var m = sswEl('sswS1Msg'); if (m) m.textContent = 'Paket mode lama ditemukan dan tidak dibuka di wizard baru. Menyimpan paket baru akan menggantikannya.'; }
+    sswSyncForm(); sswGo(W.step || 1, true);
+  }
+  function sswSyncForm(){
+    var g = document.querySelectorAll('#sswGenreGrid .ssw-gbtn');
+    for (var i = 0; i < g.length; i++) { g[i].classList.toggle('on', g[i].getAttribute('data-genre') === W.genre); }
+    if (sswEl('sswTopic')) sswEl('sswTopic').value = W.topic;
+    if (sswEl('sswScript')) sswEl('sswScript').value = W.scriptText;
+    if (W.format) {
+      var setRadio = function(name, val){ var els = document.querySelectorAll('input[name="' + name + '"]'); for (var i = 0; i < els.length; i++) els[i].checked = els[i].value === String(val); };
+      setRadio('sswDur', W.format.dur); setRadio('sswClipLen', W.format.clipLen); setRadio('sswRatio', W.format.ratio); setRadio('sswMode', W.format.mode);
+      if (sswEl('sswCustomMin')) sswEl('sswCustomMin').value = W.format.customMin;
+      if (sswEl('sswLang')) sswEl('sswLang').value = W.format.lang;
+      if (sswEl('sswLangCustom')) { sswEl('sswLangCustom').value = W.format.langCustom || ''; sswEl('sswLangCustom').hidden = W.format.lang !== 'custom'; }
+      sswLangSync();
+    }
+    sswShowClipCount(); sswRenderStory(); sswRenderBible(); sswRenderPrompts(); sswRenderPkg(); sswRenderLocks();
+  }
+  function sswGo(n, silent){
+    W.step = n;
+    for (var i = 1; i <= 6; i++) {
+      var sec = sswEl('sswStep' + i); if (sec) sec.classList.toggle('on', i === n);
+      var pill = document.querySelector('[data-sswgoto="' + i + '"]'); if (pill) { pill.classList.toggle('on', i === n); pill.classList.toggle('done', i < n); }
+    }
+    if (!silent) sswSave();
+  }
+  function sswSourceSummary(){
+    if (W.sourceKind === 'link') return 'Sumber: link — ' + (W.linkTitle || 'tanpa judul');
+    if (W.sourceKind === 'script') return 'Sumber: naskah custom (' + sswWords(W.scriptText) + ' kata)';
+    if (W.sourceKind === 'topic') return 'Sumber: topik sendiri — ' + W.topic;
+    if (W.sourceKind === 'genre') return 'Sumber: genre — ' + sswGenreEn(W.genre);
+    return 'Belum ada sumber cerita yang dikunci.';
+  }
+  function sswClearDownstream(){
+    W.story = null; W.storyNotice = ''; W.bible = ''; W.bibleRef = ''; W.bibleConfirmed = false; W.locks = []; sswRenderLocks();
+    W.clipFields = []; W.prompts = []; W.package6 = null;
+    var n3 = sswEl('sswS3Next'); if (n3) n3.disabled = true;
+    var n4 = sswEl('sswS4Next'); if (n4) n4.disabled = true;
+    var n5 = sswEl('sswS5Next'); if (n5) n5.disabled = true;
+  }
+  function sswLockSource(){
+    var linkOk = !!W.linkText.trim();
+    var scriptOk = !!sswEl('sswScript').value.trim();
+    var topicOk = !!sswEl('sswTopic').value.trim();
+    var kind = ''; var key = '';
+    if (linkOk) { kind = 'link'; key = 'link:' + W.linkTitle + ':' + W.linkText.slice(0, 80); W.scriptText = ''; }
+    else if (scriptOk) { kind = 'script'; key = 'script:' + sswEl('sswScript').value.slice(0, 80); W.linkText = ''; W.linkTitle = ''; }
+    else if (topicOk) { kind = 'topic'; key = 'topic:' + sswEl('sswTopic').value.trim(); }
+    else if (W.genre) { kind = 'genre'; key = 'genre:' + W.genre; }
+    else { sswSetMsg('sswS1Msg', 'Pilih satu genre, tulis topik, terapkan link, atau tempel naskah dulu.', false); return; }
+    if (key !== W.sourceKey) { sswClearDownstream(); W.sourceKey = key; }
+    W.sourceKind = kind;
+    if (kind === 'script') W.scriptText = sswEl('sswScript').value.trim();
+    if (kind === 'topic') W.topic = sswEl('sswTopic').value.trim();
+    var sum = sswEl('sswSrcSum'); if (sum) sum.textContent = sswSourceSummary();
+    sswSetMsg('sswS1Msg', 'Sumber dikunci: ' + sswSourceSummary(), true);
+    sswGo(2);
+  }
+  function sswLinkKind(url){
+    if (/youtu\.?be/i.test(url)) return 'youtube';
+    if (/tiktok\.com/i.test(url)) return 'tiktok';
+    return '';
+  }
+  async function sswLinkGo(){
+    var url = (sswEl('sswLink') ? sswEl('sswLink').value : '').trim();
+    var kind = sswLinkKind(url);
+    if (!kind) { sswSetMsg('sswLinkMsg', 'Link tidak dikenali. Pakai link TikTok atau YouTube, atau tempel naskah manual.', false); return; }
+    sswSetMsg('sswLinkMsg', 'Mengambil transkrip...');
+    try {
+      var text = ''; var title = '';
+      if (kind === 'youtube') {
+        var r = await fetch('/api/refs', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({urls: [url]})});
+        var j = null; try { j = await r.json(); } catch (e) { j = null; }
+        var ref = (j && j.refs && j.refs[0]) ? j.refs[0] : null;
+        if (!ref || !ref.ok) throw new Error((ref && ref.error) ? ref.error : 'Transkrip YouTube gagal diambil. Tempel naskah manual.');
+        text = ref.text || ''; title = ref.title || '';
+      } else {
+        var r2 = await fetch('/api/stickman/tiktok', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({url: url})});
+        var j2 = null; try { j2 = await r2.json(); } catch (e) { j2 = null; }
+        if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Transkrip TikTok gagal diambil. Tempel naskah manual.');
+        text = j2.text || ''; title = j2.title || '';
+      }
+      if (!text.trim()) throw new Error('Transkrip kosong. Tempel naskah manual.');
+      W.linkText = text; W.linkTitle = title;
+      var card = sswEl('sswLinkCard'); if (card) card.style.display = 'block';
+      var lt = sswEl('sswLinkTitle'); if (lt) lt.textContent = title || url;
+      var lx = sswEl('sswLinkText'); if (lx) lx.textContent = text;
+      sswSetMsg('sswLinkMsg', 'Transkrip didapat (' + sswWords(text) + ' kata). Klik Terapkan untuk memakai sebagai bahan cerita.', true);
+    } catch (e) { sswSetMsg('sswLinkMsg', e.message || 'Gagal mengambil transkrip.', false); }
+  }
+  function sswStoryPrompt(f){
+    var lang = sswLangName();
+    var maxW = f.clipLen === 8 ? 20 : 25;
+    var minW = f.clipLen === 8 ? 18 : 23;
+    var src = '';
+    if (W.sourceKind === 'link') src = 'Base the story on this material. Do not invent facts that contradict it; you may dramatize, but keep names, numbers, years, and places from the material. MATERIAL: ' + W.linkText.slice(0, 6000);
+    else if (W.sourceKind === 'script') src = 'Base the story on this narration script. Keep its meaning and order; split it into the clip beats below. SCRIPT: ' + W.scriptText.slice(0, 6000);
+    else if (W.sourceKind === 'topic') src = 'Topic: ' + W.topic + '. Genre: ' + sswGenreEn(W.genre);
+    else src = 'Genre: ' + sswGenreEn(W.genre) + '. Invent an original story in this genre.';
+    return 'You are Stickman Story Studio, a story writer for stickman-figure animated videos. Write an ORIGINAL story. ' + src + ' Format: ' + f.clips + ' clips of ' + f.clipLen + ' seconds each. Narration language: ' + lang + '. Rules: no copyrighted characters, no real living celebrities. Historical content must be factually accurate; flag anything uncertain by writing [UNCERTAIN] in the hook field. Every clip moves the story forward; the last clip has a clear payoff, punchline, or twist. Narration lines: ' + minW + ' to ' + maxW + ' words each. NEVER exceed ' + maxW + ' words in any narration line. Return ONLY JSON, no markdown fences, no explanation: {"title": "...", "logline": "...", "hook": "...", "beats": [{"beat": "...", "nar": "..."}]}. The beats array must contain exactly ' + f.clips + ' entries in story order.';
+  }
+  function sswStoryFallback(f, notice){
+    var pool = (f.lang === 'id') ? SSW_POOL_ID : SSW_POOL_EN;
+    var langNote = (f.lang === 'id' || f.lang === 'en') ? '' : ' (cerita template dalam English — ubah di tahap edit bila perlu)';
+    var beats = [];
+    for (var i = 0; i < f.clips; i++) {
+      var st = (f.clips <= 1) ? 0 : Math.round(i * (SSW_ARC.length - 1) / (f.clips - 1));
+      var nar = pool[st];
+      nar = sswFitWords(nar, f.clipLen === 8 ? 20 : 25);
+      beats.push({beat: SSW_ARC[st] + (f.clips > SSW_ARC.length ? ' ' + (i + 1) : ''), nar: nar});
+    }
+    var topic = (W.sourceKind === 'topic') ? W.topic : (W.sourceKind === 'link' ? (W.linkTitle || 'Kisah dari link') : sswGenreEn(W.genre));
+    return {title: topic + ' — A Stickman Story', logline: 'A stickman faces ' + topic + ' and learns that every fall is part of the climb.', hook: 'In the first 3 seconds, the stickman faces the camera and takes one brave step toward an impossible challenge.', beats: beats, _fallback: true, _note: (notice || 'AI tidak tersedia — cerita dari template.') + langNote};
+  }
+  function sswValidateStory(parsed, f){
+    if (!parsed || typeof parsed.title !== 'string' || !Array.isArray(parsed.beats) || !parsed.beats.length) return null;
+    var maxW = f.clipLen === 8 ? 20 : 25;
+    var beats = [];
+    var trimmed = false;
+    for (var i = 0; i < parsed.beats.length; i++) {
+      var b = parsed.beats[i] || {};
+      var nar = sswFitWords(String(b.nar || ''), maxW);
+      if (sswWords(String(b.nar || '')) > maxW) trimmed = true;
+      beats.push({beat: String(b.beat || ('Part ' + (i + 1))), nar: nar});
+    }
+    var note = '';
+    if (beats.length > f.clips) { beats = beats.slice(0, f.clips); note = 'Beat dipotong ke ' + f.clips + ' klip. '; }
+    while (beats.length < f.clips) {
+      var st = Math.round(beats.length * (SSW_ARC.length - 1) / Math.max(1, f.clips - 1));
+      beats.push({beat: SSW_ARC[st], nar: sswFitWords(SSW_POOL_EN[st], maxW)});
+      note += 'Beat dilengkapi dari template. ';
+    }
+    if (trimmed) note += 'Beberapa baris narasi dipotong ke batas ' + maxW + ' kata. ';
+    return {title: String(parsed.title), logline: String(parsed.logline || ''), hook: String(parsed.hook || ''), beats: beats, _note: note};
+  }
+  function sswRenderStory(){
+    var out = sswEl('sswStoryOut'); if (!out) return;
+    var s = W.story;
+    if (!s) { out.innerHTML = '<p class="hint">Belum ada cerita — klik Buat Cerita (AI).</p>'; var ag = sswEl('sswStoryAgain'); if (ag) ag.style.display = 'none'; var tw = sswEl('sswS3Tweak'); if (tw) tw.style.display = 'none'; return; }
+    var rows = '';
+    var f = sswReadFormat();
+    for (var i = 0; i < s.beats.length; i++) {
+      var a = i * f.clipLen; var b = (i + 1) * f.clipLen;
+      rows += '<div class="ssw-beat"><b>Klip ' + (i + 1) + ' · ' + sswTc(a) + '–' + sswTc(b) + ' · ' + sswEsc(s.beats[i].beat) + '</b><p>' + sswEsc(s.beats[i].nar) + '</p><small class="hint">' + sswWords(s.beats[i].nar) + ' kata</small></div>';
+    }
+    var note = (s._note || W.storyNotice) ? '<p class="hint">' + sswEsc(s._note || W.storyNotice) + '</p>' : '';
+    out.innerHTML = '<p><b>Judul:</b> ' + sswEsc(s.title) + '</p><p><b>Logline:</b> ' + sswEsc(s.logline) + '</p><p><b>Hook:</b> ' + sswEsc(s.hook) + '</p>' + note + rows;
+    var ag2 = sswEl('sswStoryAgain'); if (ag2) ag2.style.display = '';
+    var tw2 = sswEl('sswS3Tweak'); if (tw2) tw2.style.display = '';
+    var n3 = sswEl('sswS3Next'); if (n3) n3.disabled = false;
+  }
+  async function sswStoryGo(){
+    var f = sswReadFormat(); W.format = f; sswShowClipCount();
+    sswSetMsg('sswStoryMsg', 'AI sedang menulis cerita...');
+    try {
+      var tx = await sswAI(sswStoryPrompt(f), 'Menulis cerita Stickman');
+      var parsed = sswJsonExtract(tx);
+      var v = sswValidateStory(parsed, f);
+      if (!v) throw new Error('Hasil AI bukan JSON cerita yang valid — memakai template.');
+      W.story = v; W.storyNotice = v._note || '';
+      sswSetMsg('sswStoryMsg', v._note ? v._note : 'Cerita jadi. Setujui, ubah, atau buat yang lain.', !!v._note ? false : true);
+    } catch (e) {
+      W.story = sswStoryFallback(f, e.message || 'AI gagal.');
+      W.storyNotice = W.story._note;
+      sswSetMsg('sswStoryMsg', W.story._note, false);
+    }
+    sswRenderStory(); sswSave();
+  }
+  function sswStoryTweak(){
+    var s = W.story; if (!s) return;
+    var ed = sswEl('sswStoryEdit'); if (!ed) return;
+    var html = '<label>Judul</label><input type="text" id="sswEdTitle" class="ssw-input" value="' + sswEsc(s.title) + '">';
+    html += '<label style="display:block;margin-top:8px">Logline</label><input type="text" id="sswEdLog" class="ssw-input" value="' + sswEsc(s.logline) + '">';
+    html += '<label style="display:block;margin-top:8px">Hook</label><input type="text" id="sswEdHook" class="ssw-input" value="' + sswEsc(s.hook) + '">';
+    for (var i = 0; i < s.beats.length; i++) {
+      html += '<div style="margin-top:8px"><label>Klip ' + (i + 1) + ' — beat</label><input type="text" class="ssw-input" data-edbeat="' + i + '" value="' + sswEsc(s.beats[i].beat) + '">';
+      html += '<label style="display:block;margin-top:4px">Klip ' + (i + 1) + ' — narasi</label><textarea rows="2" class="ssw-input" data-ednar="' + i + '">' + sswEsc(s.beats[i].nar) + '</textarea></div>';
+    }
+    html += '<div class="ssw-row"><button type="button" class="btn" id="sswEdApply">✅ Pakai Hasil Edit</button></div>';
+    ed.innerHTML = html; ed.style.display = 'block';
+    var ap = sswEl('sswEdApply');
+    if (ap) ap.onclick = function(){
+      var f = sswReadFormat(); var maxW = f.clipLen === 8 ? 20 : 25;
+      var beats = [];
+      for (var k = 0; k < s.beats.length; k++) {
+        var bi = document.querySelector('[data-edbeat="' + k + '"]');
+        var ni = document.querySelector('[data-ednar="' + k + '"]');
+        beats.push({beat: bi ? bi.value : s.beats[k].beat, nar: sswFitWords(ni ? ni.value : s.beats[k].nar, maxW)});
+      }
+      W.story = {title: sswEl('sswEdTitle').value, logline: sswEl('sswEdLog').value, hook: sswEl('sswEdHook').value, beats: beats, _note: 'Cerita hasil edit manual.'};
+      ed.style.display = 'none'; sswRenderStory(); sswSave();
+      sswSetMsg('sswStoryMsg', 'Hasil edit dipakai.', true);
+    };
+  }
+  function sswBibleText(chars){
+    var out = '';
+    for (var i = 0; i < chars.length; i++) {
+      var c = chars[i];
+      out += 'Character: ' + (c.name || ('Character ' + (i + 1))) + ' (' + (c.role || 'main character') + ')\n';
+      out += '- Head: ' + (c.head || 'not described') + '\n';
+      out += '- Face: Eyes: ' + (c.eyes || 'not described') + '; Mouth: ' + (c.mouth || 'not described') + '; Line thickness: ' + (c.lines || 'not described') + '\n';
+      out += '- Body/limbs: ' + (c.limbs || 'not described') + '\n';
+      out += '- Clothing/accessories: ' + (c.clothing || 'not described') + (c.props ? '; Props: ' + c.props : '') + '\n';
+      out += '- Proportions: ' + (c.proportions || 'not described') + '\n';
+      out += '- Signature expression/gesture: ' + (c.expression || 'not described') + '\n';
+    }
+    out += 'Shared art style: clean 2D cartoon, thick bold black outlines, flat solid colors, no shading, no gradients, plain light background.';
+    return out;
+  }
+  function sswRenderBible(){
+    var out = sswEl('sswBibleOut'); if (!out) return;
+    if (!W.bible) { out.innerHTML = '<p class="hint">Belum ada bible — buat lewat opsi A atau B di atas.</p>'; var n4 = sswEl('sswS4Next'); if (n4) n4.disabled = true; return; }
+    out.innerHTML = '<label>Character Bible (boleh diedit sebelum konfirmasi)</label><textarea id="sswBibleText" rows="10" class="ssw-input">' + sswEsc(W.bible) + '</textarea>';
+    var n4b = sswEl('sswS4Next'); if (n4b) n4b.disabled = false;
+  }
+  async function sswBibleGo(){
+    var s = W.story; if (!s) { sswSetMsg('sswBibleMsg', 'Buat cerita dulu di langkah 3.', false); return; }
+    sswSetMsg('sswBibleMsg', 'AI sedang menulis bible...');
+    try {
+      var beats = '';
+      for (var i = 0; i < s.beats.length; i++) beats += (i + 1) + '. ' + s.beats[i].beat + ' — ' + s.beats[i].nar + ' ';
+      var p = 'Create a CHARACTER BIBLE for the main characters of this stickman story (max 3 characters). Story title: ' + s.title + '. Logline: ' + s.logline + '. Beats: ' + beats + ' For each character give: name, role, head shape, eye style, mouth style, line thickness, limb style, clothing and accessories with exact colors including hex, props, signature expression and gesture, proportions. Keep designs simple enough for Veo to reproduce identically. Write the bible in English. Return ONLY JSON, no markdown fences, no explanation: {"characters": [{"name": "...", "role": "...", "head": "...", "eyes": "...", "mouth": "...", "lines": "...", "limbs": "...", "clothing": "...", "props": "...", "expression": "...", "proportions": "..."}]}.';
+      var tx = await sswAI(p, 'Menulis bible karakter');
+      var parsed = sswJsonExtract(tx);
+      if (!parsed || !Array.isArray(parsed.characters) || !parsed.characters.length) throw new Error('Hasil AI bukan JSON bible yang valid.');
+      W.bible = sswBibleText(parsed.characters.slice(0, 3));
+      W.bibleConfirmed = false;
+      sswSetMsg('sswBibleMsg', 'Bible jadi. Periksa, edit bila perlu, lalu klik Konfirmasi.', true);
+    } catch (e) {
+      W.bible = 'Character: The Stickman (main character)\n- Head: very large white round head, thick bold black outline\n- Face: Eyes: large round white eyes with small black pupils; Mouth: one small flat mouth; Line thickness: thick bold black outlines\n- Body/limbs: slim white torso, thin black stick arms and legs, small flat black oval feet\n- Clothing/accessories: not described\n- Proportions: head roughly one third of total body height, simple stickman proportions\n- Signature expression/gesture: calm determined look, shoulders steady\nShared art style: clean 2D cartoon, thick bold black outlines, flat solid colors, no shading, no gradients, plain light background.';
+      W.bibleConfirmed = false;
+      sswSetMsg('sswBibleMsg', 'AI gagal — bible template dipakai. ' + (e.message || ''), false);
+    }
+    sswRenderBible(); sswSave();
+  }
+  async function sswBibleDescGo(){
+    var desc = (sswEl('sswCharDesc') ? sswEl('sswCharDesc').value : '').trim();
+    if (!desc) { sswSetMsg('sswBibleMsg', 'Tulis deskripsi karakter dulu.', false); return; }
+    sswSetMsg('sswBibleMsg', 'AI sedang memformat deskripsi menjadi bible...');
+    try {
+      var p = 'Format the following character description into a CHARACTER BIBLE. Use ONLY what the description says. NEVER redesign, improve, or add features the description does not mention. If a field is not described, write not described. Write the bible in English. Return ONLY JSON, no markdown fences, no explanation: {"characters": [{"name": "...", "role": "...", "head": "...", "eyes": "...", "mouth": "...", "lines": "...", "limbs": "...", "clothing": "...", "props": "...", "expression": "...", "proportions": "..."}]}. DESCRIPTION: ' + desc;
+      var tx = await sswAI(p, 'Memformat bible karakter');
+      var parsed = sswJsonExtract(tx);
+      if (!parsed || !Array.isArray(parsed.characters) || !parsed.characters.length) throw new Error('Hasil AI bukan JSON bible yang valid.');
+      W.bible = sswBibleText(parsed.characters.slice(0, 3));
+      W.bibleConfirmed = false;
+      sswSetMsg('sswBibleMsg', 'Bible jadi dari deskripsi. Periksa, edit bila perlu, lalu klik Konfirmasi.', true);
+    } catch (e) {
+      W.bible = 'Character description (as provided):\n' + desc + '\nShared art style: clean 2D cartoon, thick bold black outlines, flat solid colors, no shading, no gradients, plain light background.';
+      W.bibleConfirmed = false;
+      sswSetMsg('sswBibleMsg', 'AI gagal — deskripsi dipakai apa adanya sebagai bible. ' + (e.message || ''), false);
+    }
+    sswRenderBible(); sswSave();
+  }
+    async function sswVisionAI(prompt, image){
+    if (typeof runJob !== 'function' || typeof ST === 'undefined' || !ST[1]) throw new Error('provider Tahap 1 belum aktif — cek Koneksi AI dulu');
+    var route = (typeof getRoute === 'function') ? getRoute(1) : 'direct';
+    var mdl = (typeof S !== 'undefined' && S.model) ? S.model[1] : '';
+    if ((route === 'router-pi' || route === 'router-pc') && !mdl) throw new Error('provider belum aktif');
+    var job = await runJob([{role: 'user', content: prompt}], ST[1].p, mdl, 1, 'Mendeskripsikan foto karakter', route, image);
+    var tx = (job.text || '').trim();
+    if (!tx) throw new Error('AI mengembalikan teks kosong');
+    return tx;
+  }
+  async function sswVisionAuto(){
+    var img = W.charImage; if (!img || !img.data) return;
+    var out = sswEl('sswVisionOut'); var ta = sswEl('sswVisionText'); var vm = sswEl('sswVisionMsg');
+    sswSetMsg('sswBibleMsg', 'AI sedang mendeskripsikan foto...');
+    try {
+      var p = 'Describe this character image precisely for a stickman video Character Bible. Cover: head shape, eye style, mouth style, line thickness, limb style, clothing and accessories with exact colors including hex estimates, props, signature expression and gesture, proportions, art style. Use ONLY what is visible in the image. NEVER redesign, improve, beautify, or add features that are not visible. Write the description in English. Return ONLY JSON, no markdown fences, no explanation: {"characters": [{"name": "...", "role": "...", "head": "...", "eyes": "...", "mouth": "...", "lines": "...", "limbs": "...", "clothing": "...", "props": "...", "expression": "...", "proportions": "..."}]}.';
+      var tx = await sswVisionAI(p, img);
+      if (ta) ta.value = tx;
+      if (out) out.style.display = '';
+      if (vm) vm.style.display = 'none';
+      sswSetMsg('sswBibleMsg', 'Deskripsi AI jadi di bawah foto. Periksa, edit bila perlu, lalu klik Buat Bible.', true);
+    } catch (e) {
+      if (vm) { vm.textContent = 'Deskripsi otomatis gagal (' + (e.message || '') + ') — pakai deskripsi manual di bawah.'; vm.style.display = ''; }
+    }
+  }
+  function sswVisionBibleGo(){
+    var ta = sswEl('sswVisionText'); var tx = ta ? ta.value.trim() : '';
+    if (!tx) { sswSetMsg('sswBibleMsg', 'Deskripsi AI masih kosong.', false); return; }
+    try {
+      var parsed = sswJsonExtract(tx);
+      if (parsed && Array.isArray(parsed.characters) && parsed.characters.length) W.bible = sswBibleText(parsed.characters.slice(0, 3));
+      else W.bible = tx;
+    } catch (e) { W.bible = tx; }
+    W.bibleConfirmed = false;
+    sswRenderBible(); sswSave();
+    sswSetMsg('sswBibleMsg', 'Bible jadi dari deskripsi AI. Periksa, edit bila perlu, lalu klik Konfirmasi.', true);
+  }
+  // STK-LOCK: Elemen Terkunci — deskripsi ditempel verbatim di semua prompt klip.
+  function sswLockConfirmed(){ var out = []; for (var i = 0; i < W.locks.length; i++) { var lk = W.locks[i]; if (lk && !lk.draft && lk.name && lk.desc) out.push(lk); } return out; }
+  function sswLockBlock(){
+    var items = sswLockConfirmed();
+    if (!items.length) return '';
+    var t = '[LOCKED ELEMENTS] The following elements must appear EXACTLY as described in every clip, identical in every clip. Do not change, redesign, recolor, or resize them:\n';
+    for (var i = 0; i < items.length; i++) t += '- ' + items[i].name + ': ' + items[i].desc + '\n';
+    return t;
+  }
+  function sswRebuildPromptsIfAny(){ if (W.prompts.length) { sswRebuildPrompts(); sswRenderPrompts(); } }
+  function sswRenderLocks(){
+    var out = sswEl('sswLockList'); if (!out) return;
+    if (!W.locks.length) { out.innerHTML = '<p class="hint">Belum ada elemen terkunci — tambah manual, atau minta AI mengusulkan dari cerita.</p>'; return; }
+    var html = '';
+    for (var i = 0; i < W.locks.length; i++) {
+      var lk = W.locks[i];
+      html += '<div class="ssw-beat"><div class="ssw-row" style="margin-top:0"><input type="text" class="ssw-input" data-lockname="' + i + '" value="' + sswEsc(lk.name) + '" placeholder="Nama elemen" style="max-width:180px"><input type="text" class="ssw-input" data-lockdesc="' + i + '" value="' + sswEsc(lk.desc) + '" placeholder="Deskripsi pasti" style="flex:1">';
+      if (lk.draft) html += '<button type="button" class="btn" data-lockok="' + i + '">Konfirmasi</button>';
+      html += '<button type="button" class="btn ghost" data-lockdel="' + i + '">🗑️ Hapus</button></div>';
+      if (lk.draft) html += '<p class="hint" style="margin:4px 0 0">Draf dari AI — belum terkunci. Periksa, edit bila perlu, lalu klik Konfirmasi.</p>';
+      html += '</div>';
+    }
+    out.innerHTML = html;
+    var names = out.querySelectorAll('[data-lockname]');
+    for (var a = 0; a < names.length; a++) { (function(el){ el.onchange = function(){ var idx = parseInt(el.getAttribute('data-lockname'), 10); if (W.locks[idx]) { W.locks[idx].name = el.value.trim(); sswSave(); sswRebuildPromptsIfAny(); } }; })(names[a]); }
+    var descs = out.querySelectorAll('[data-lockdesc]');
+    for (var b = 0; b < descs.length; b++) { (function(el){ el.onchange = function(){ var idx = parseInt(el.getAttribute('data-lockdesc'), 10); if (W.locks[idx]) { W.locks[idx].desc = el.value.trim(); sswSave(); sswRebuildPromptsIfAny(); } }; })(descs[b]); }
+    var oks = out.querySelectorAll('[data-lockok]');
+    for (var c = 0; c < oks.length; c++) { (function(btn){ btn.onclick = function(){ var idx = parseInt(btn.getAttribute('data-lockok'), 10); if (W.locks[idx]) { W.locks[idx].draft = false; sswRenderLocks(); sswSave(); sswRebuildPromptsIfAny(); } }; })(oks[c]); }
+    var dels = out.querySelectorAll('[data-lockdel]');
+    for (var d = 0; d < dels.length; d++) { (function(btn){ btn.onclick = function(){ var idx = parseInt(btn.getAttribute('data-lockdel'), 10); W.locks.splice(idx, 1); sswRenderLocks(); sswSave(); sswRebuildPromptsIfAny(); }; })(dels[d]); }
+  }
+  function sswLockAdd(){
+    var n = sswEl('sswLockName'); var d = sswEl('sswLockDesc');
+    var name = n ? n.value.trim() : ''; var desc = d ? d.value.trim() : '';
+    if (!name || !desc) { sswSetMsg('sswLockMsg', 'Isi nama dan deskripsi elemen dulu.', false); return; }
+    W.locks.push({name: name, desc: desc, draft: false});
+    if (n) n.value = ''; if (d) d.value = '';
+    sswRenderLocks(); sswSave(); sswRebuildPromptsIfAny();
+    sswSetMsg('sswLockMsg', 'Elemen terkunci: ' + name + '. Prompt klip ikut diperbarui bila sudah dibuat.', true);
+  }
+  async function sswLockSuggest(){
+    if (!W.story || !W.story.beats || !W.story.beats.length) { sswSetMsg('sswLockMsg', 'Buat cerita dulu di langkah 3, baru minta usulan.', false); return; }
+    sswSetMsg('sswLockMsg', 'AI sedang mengusulkan elemen terkunci dari cerita...');
+    try {
+      var beats = '';
+      for (var i = 0; i < W.story.beats.length; i++) beats += (i + 1) + '. ' + W.story.beats[i].beat + ' ';
+      var p = 'From this stickman story, pick 3 to 6 key elements that must look IDENTICAL in every video clip (props, distinctive colors, setting details). Story title: ' + (W.story.title || '') + '. Beats: ' + beats + ' Return ONLY JSON, no markdown fences, no explanation: {"locks": [{"name": "short element name", "desc": "exact description in English, precise colors and details"}]}. Descriptions must be in English.';
+      var tx = await sswAI(p, 'Mengusulkan elemen terkunci');
+      var parsed = sswJsonExtract(tx);
+      if (!parsed || !Array.isArray(parsed.locks) || !parsed.locks.length) throw new Error('AI tidak mengembalikan usulan');
+      var added = 0;
+      for (var k = 0; k < parsed.locks.length; k++) {
+        var nm = String(parsed.locks[k].name || '').trim(); var ds = String(parsed.locks[k].desc || '').trim();
+        if (!nm || !ds) continue;
+        var dup = false;
+        for (var j = 0; j < W.locks.length; j++) { if (String(W.locks[j].name || '').toLowerCase() === nm.toLowerCase()) { dup = true; break; } }
+        if (!dup) { W.locks.push({name: nm, desc: ds, draft: true}); added++; }
+      }
+      if (!added) throw new Error('Semua usulan sudah ada di daftar');
+      sswRenderLocks(); sswSave();
+      sswSetMsg('sswLockMsg', added + ' usulan elemen masuk sebagai draf — periksa, edit bila perlu, lalu klik Konfirmasi di tiap item.', true);
+    } catch (e) {
+      sswSetMsg('sswLockMsg', 'Usulan gagal (' + (e.message || '') + ') — tambah manual saja.', false);
+    }
+  }
+  var SSW_CAM_CYCLE = ['Wide shot', 'Medium shot, eye-level', 'Close-up', 'Low-angle shot', 'Side tracking shot', 'Slow push-in'];
+  function sswTemplateClip(beat, idx){
+    return {setting: 'A simple stickman scene matching the beat: ' + beat, camera: SSW_CAM_CYCLE[idx % SSW_CAM_CYCLE.length], lighting: 'Soft daylight, clear readable cartoon lighting', sfx: 'Gentle ambient sound effects timed to the action.', a: 'The character begins the beat: ' + beat, b: 'The action develops around the beat: ' + beat, c: 'The character ends in a clear holdable pose for the beat: ' + beat, final: 'The character holds a clear final pose matching the beat: ' + beat};
+  }
+  function sswBatchPrompt(f, beats, prevFinal){
+    var list = '';
+    for (var i = 0; i < beats.length; i++) list += (i + 1) + '. Beat: ' + beats[i].beat + ' — Narration: ' + beats[i].nar + ' ';
+    var tl = f.clipLen === 8 ? '0-2s, 2-6s, 6-8s' : '0-3s, 3-7s, 7-10s';
+    var prev = prevFinal ? ' The previous clip ends on this exact frame, and the first segment of your first clip must start from exactly that frame: ' + prevFinal : '';
+    return 'For each of the following story beats, invent matching visual details for one stickman video clip. ' + list + ' Rules: one main action per time segment, no overcrowded frames, same location unless the beat changes location.' + prev + ' Return ONLY JSON, no markdown fences, no explanation: {"clips": [{"setting": "...", "camera": "...", "lighting": "...", "sfx": "...", "a": "...", "b": "...", "c": "...", "final": "..."}]} where a, b, c are the action timeline segments (' + tl + ') and final is the precise final-frame description in one sentence that the next clip opens on. The clips array must contain exactly ' + beats.length + ' entries in order.';
+  }
+  function sswBuildPrompt(i){
+    var f = W.format; var fld = W.clipFields[i]; var s = W.story;
+    var len = f.clipLen; var a = i * len; var b = (i + 1) * len;
+    var tl1 = len === 8 ? '0–2s' : '0–3s'; var tl2 = len === 8 ? '2–6s' : '3–7s'; var tl3 = len === 8 ? '6–8s' : '7–10s';
+    var ratioTxt = f.ratio === '16:9' ? '16:9 widescreen aspect ratio' : '9:16 vertical aspect ratio';
+    var cont = '';
+    if (i === 0) cont = 'Clip 1: the opening frame. ' + (s && s.hook ? s.hook : fld.beat);
+    else cont = 'Opens exactly where Clip ' + i + ' ended: ' + W.clipFields[i - 1].final;
+    var audio = '';
+    if (f.mode === 'A') audio = '- Narration: "' + fld.nar + '" — ' + SSW_VOICE + '.\n- Sound effects: ' + fld.sfx + '\n- Music: ' + SSW_MUSIC;
+    else audio = '- Narration: No dialogue, no voiceover.\n- Sound effects: ' + fld.sfx + '\n- Music: ' + SSW_MUSIC;
+    return 'CLIP ' + (i + 1) + '/' + W.clipFields.length + ' — ' + sswTc(a) + '–' + sswTc(b) + ' — "' + fld.beat + '"\n' +
+      '[STYLE LOCK] ' + SSW_STYLE_LOCK + ratioTxt + '.\n' +
+      '[CHARACTERS] ' + W.bible + '\n' +
+      sswLockBlock() +
+      '[SETTING] ' + fld.setting + '\n' +
+      '[CONTINUITY] ' + cont + '\n' +
+      '[ACTION TIMELINE]\n' + tl1 + ': ' + fld.a + '\n' + tl2 + ': ' + fld.b + '\n' + tl3 + ': ' + fld.c + '\n' +
+      '[CAMERA] ' + fld.camera + ' (' + (f.ratio === '16:9' ? 'Widescreen 16:9 framing' : 'Vertical 9:16 framing') + ').\n' +
+      '[LIGHTING & MOOD] ' + fld.lighting + '\n' +
+      '[AUDIO]\n' + audio + '\n' +
+      '[AVOID] ' + SSW_AVOID + (sswLockConfirmed().length ? ' Do not change locked elements.' : '');
+  }
+  function sswRebuildPrompts(){
+    W.prompts = [];
+    for (var i = 0; i < W.clipFields.length; i++) W.prompts.push(sswBuildPrompt(i));
+  }
+  function sswRenderPrompts(){
+    var out = sswEl('sswPromptOut'); if (!out) return;
+    if (!W.prompts.length) { out.innerHTML = '<p class="hint">Belum ada prompt — klik Buat Prompt Klip.</p>'; var dl = sswEl('sswPromptDl'); if (dl) dl.style.display = 'none'; var n5 = sswEl('sswS5Next'); if (n5) n5.disabled = true; return; }
+    var html = '';
+    for (var i = 0; i < W.prompts.length; i++) {
+      html += '<div class="ssw-beat"><b>Klip ' + (i + 1) + ' · ' + sswEsc(W.clipFields[i].beat) + '</b><div class="ssw-prompt">' + sswEsc(W.prompts[i]) + '</div><div class="ssw-row" style="margin-top:0"><button type="button" class="btn ghost" data-sswcopy="' + i + '">📋 Salin Prompt</button><button type="button" class="btn ghost" data-sswregen="' + i + '">🔄 Regenerasi klip ini</button></div></div>';
+    }
+    out.innerHTML = html;
+    var dl2 = sswEl('sswPromptDl'); if (dl2) dl2.style.display = '';
+    var n5b = sswEl('sswS5Next'); if (n5b) n5b.disabled = false;
+    var cps = out.querySelectorAll('[data-sswcopy]');
+    for (var c = 0; c < cps.length; c++) { (function(btn){ btn.onclick = function(){ var idx = parseInt(btn.getAttribute('data-sswcopy'), 10); sswCopy(W.prompts[idx], btn); }; })(cps[c]); }
+    var rgs = out.querySelectorAll('[data-sswregen]');
+    for (var d = 0; d < rgs.length; d++) { (function(btn){ btn.onclick = function(){ var idx = parseInt(btn.getAttribute('data-sswregen'), 10); sswRegenClip(idx); }; })(rgs[d]); }
+  }
+  async function sswPromptGo(){
+    var s = W.story; if (!s || !W.bible) { sswSetMsg('sswPromptMsg', 'Cerita dan bible harus sudah dikonfirmasi dulu.', false); return; }
+    var f = W.format; var beats = s.beats;
+    sswSetMsg('sswPromptMsg', 'AI sedang menyiapkan detail visual per batch 6 klip...');
+    W.clipFields = []; W.promptNotice = '';
+    var failed = 0;
+    for (var start = 0; start < beats.length; start += 6) {
+      var chunk = beats.slice(start, start + 6);
+      var prevFinal = start > 0 ? W.clipFields[start - 1].final : '';
+      var ok = false;
+      try {
+        var tx = await sswAI(sswBatchPrompt(f, chunk, prevFinal), 'Menyiapkan detail klip ' + (start + 1) + '-' + (start + chunk.length));
+        var parsed = sswJsonExtract(tx);
+        if (parsed && Array.isArray(parsed.clips) && parsed.clips.length) {
+          for (var k = 0; k < chunk.length; k++) {
+            var cc = parsed.clips[k] || {};
+            W.clipFields.push({beat: chunk[k].beat, nar: chunk[k].nar, setting: cc.setting || sswTemplateClip(chunk[k].beat, start + k).setting, camera: cc.camera || sswTemplateClip(chunk[k].beat, start + k).camera, lighting: cc.lighting || sswTemplateClip(chunk[k].beat, start + k).lighting, sfx: cc.sfx || sswTemplateClip(chunk[k].beat, start + k).sfx, a: cc.a || sswTemplateClip(chunk[k].beat, start + k).a, b: cc.b || sswTemplateClip(chunk[k].beat, start + k).b, c: cc.c || sswTemplateClip(chunk[k].beat, start + k).c, final: cc.final || sswTemplateClip(chunk[k].beat, start + k).final});
+          }
+          ok = true;
+        }
+      } catch (e) { ok = false; }
+      if (!ok) {
+        failed++;
+        for (var m = 0; m < chunk.length; m++) { var t = sswTemplateClip(chunk[m].beat, start + m); W.clipFields.push({beat: chunk[m].beat, nar: chunk[m].nar, setting: t.setting, camera: t.camera, lighting: t.lighting, sfx: t.sfx, a: t.a, b: t.b, c: t.c, final: t.final}); }
+      }
+    }
+    sswRebuildPrompts();
+    W.promptNotice = failed ? (failed + ' batch gagal di AI — detail visual batch itu memakai template, bukan sampah diam-diam. Periksa dan regenerasi klip yang kurang pas.') : '';
+    sswSetMsg('sswPromptMsg', W.promptNotice || (W.prompts.length + ' prompt klip jadi, masing-masing dengan bible verbatim dan continuity antar klip.'), !W.promptNotice);
+    sswRenderPrompts(); sswSave();
+  }
+  async function sswRegenClip(idx){
+    var fld = W.clipFields[idx]; if (!fld) return;
+    sswSetMsg('sswPromptMsg', 'Meregenerasi klip ' + (idx + 1) + '...');
+    var f = W.format;
+    var prevFinal = idx > 0 ? W.clipFields[idx - 1].final : '';
+    var nextFinal = idx < W.clipFields.length - 1 ? W.clipFields[idx + 1].final : '';
+    var ok = false;
+    try {
+      var p = 'Regenerate the visual details for ONE stickman video clip so it fits between its neighbours. Beat: ' + fld.beat + ' — Narration: ' + fld.nar + '. Previous clip ends on: ' + (prevFinal || 'the opening frame') + '. Next clip ends on: ' + (nextFinal || 'the end of the video') + '. Keep the same location unless the beat changes location. Return ONLY JSON, no markdown fences, no explanation: {"setting": "...", "camera": "...", "lighting": "...", "sfx": "...", "a": "...", "b": "...", "c": "...", "final": "..."} where a, b, c are the action timeline segments.';
+      var tx = await sswAI(p, 'Regenerasi klip ' + (idx + 1));
+      var parsed = sswJsonExtract(tx);
+      if (parsed && parsed.setting) {
+        fld.setting = parsed.setting; fld.camera = parsed.camera || fld.camera; fld.lighting = parsed.lighting || fld.lighting; fld.sfx = parsed.sfx || fld.sfx; fld.a = parsed.a || fld.a; fld.b = parsed.b || fld.b; fld.c = parsed.c || fld.c; fld.final = parsed.final || fld.final;
+        ok = true;
+      }
+    } catch (e) { ok = false; }
+    if (!ok) { var t = sswTemplateClip(fld.beat, idx); fld.setting = t.setting; fld.camera = t.camera; fld.lighting = t.lighting; fld.sfx = t.sfx; fld.a = t.a; fld.b = t.b; fld.c = t.c; fld.final = t.final; }
+    sswRebuildPrompts();
+    var regenMsg = ok ? ('Klip ' + (idx + 1) + ' diregenerasi' + (idx < W.clipFields.length - 1 ? '; continuity klip ' + (idx + 2) + ' ikut diperbarui dari frame akhir baru.' : '.')) : ('Regenerasi klip ' + (idx + 1) + ' gagal di AI — memakai template.');
+    sswSetMsg('sswPromptMsg', regenMsg, ok);
+    sswRenderPrompts(); sswSave();
+  }
+  function sswPkgScript(){
+    var f = W.format; var lines = [];
+    for (var i = 0; i < W.clipFields.length; i++) { lines.push(sswTc(i * f.clipLen) + '–' + sswTc((i + 1) * f.clipLen) + ': "' + W.clipFields[i].nar + '"'); }
+    return lines.join('\n');
+  }
+  function sswPkgNotes(){
+    var f = W.format;
+    var n = 'Gabungkan klip urut 1 sampai ' + W.clipFields.length + ' dengan hard cut pada aksi — tiap klip berakhir pada pose yang bisa ditahan, dan klip berikutnya dibuka dari pose yang sama, jadi tidak perlu transisi mewah (opsional: dissolve 3–6 frame hanya di perpindahan suasana besar, mis. badai ke sunrise). Pakai SATU track musik yang sama di semua klip, jangan restart per klip, supaya skor membangun dari awal ke akhir.';
+    if (f.mode === 'A') n += ' Narasi sudah ada di dalam klip (Mode A); naskah di atas hanya untuk subtitle bila perlu.';
+    else if (f.mode === 'B') n += ' Mode B: rekam atau TTS-kan naskah di atas, lalu tempel per timecode saat editing agar suara konsisten.';
+    else n += ' Mode C: tanpa narasi — biarkan SFX dan musik yang membawa cerita.';
+    n += ' Video dibuat di Google Flow, Kling, atau Runway (eksternal, berbayar, akun masing-masing) — dashboard tidak membuat video.';
+    return n;
+  }
+  function sswSeoFallback(){
+    var s = W.story;
+    var title = (s && s.title ? String(s.title) : 'Stickman Story').slice(0, 100);
+    var desc = (s && s.logline ? String(s.logline) : '');
+    if (!desc && s && s.beats && s.beats.length) desc = String(s.beats[0].beat || '');
+    if (!desc) desc = title;
+    var stop = ['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'with', 'from', 'that', 'this', 'he', 'she', 'his', 'her', 'was', 'were', 'is', 'are', 'at', 'by', 'up', 'down', 'out', 'off', 'dan', 'yang', 'di', 'ke', 'dari', 'untuk', 'dengan', 'ini', 'itu', 'ada', 'adalah', 'saat', 'ketika', 'sebuah', 'sang'];
+    var tags = ['stickman', 'stickmananimation', 'stickmanstory'];
+    var g = sswGenreEn(W.genre);
+    if (g) { var gg = String(g).toLowerCase().replace(/[^a-z0-9]/g, ''); if (gg && tags.indexOf(gg) < 0) tags.push(gg); }
+    var words = String(s && s.title ? s.title : '').toLowerCase().split(/[^a-z0-9]+/);
+    for (var i = 0; i < words.length; i++) { var w = words[i]; if (w.length >= 3 && stop.indexOf(w) < 0 && tags.indexOf(w) < 0) tags.push(w); }
+    tags = tags.slice(0, 10);
+    return {title: title, desc: desc, tags: tags, hashtag: tags.map(function(x){ return '#' + x; }).join(' '), comma: tags.join(', '), fallback: true};
+  }
+  function sswSeoDownloadText(){
+    var sv = W.package6 && W.package6.seo ? W.package6.seo : null;
+    if (!sv) return '';
+    return '\n\nSEO\nJudul SEO: ' + sv.title + '\nDeskripsi: ' + sv.desc + '\nHashtag: ' + sv.hashtag + '\nTag koma: ' + sv.comma;
+  }
+  async function sswSeoBuild(){
+    var fb = sswSeoFallback();
+    try {
+      var s = W.story;
+      var lang = (typeof sswLangName === 'function') ? sswLangName() : 'English';
+      var p = 'You are a YouTube SEO assistant for a stickman animation video. Write SEO in ' + lang + '. Story title: ' + (s ? s.title : '') + '. Logline: ' + (s ? s.logline : '') + '. Genre: ' + sswGenreEn(W.genre) + '. Rules: title max 100 characters; description 2 to 3 sentences, plain and factual, no clickbait claims; tags: 8 to 10 tags, each a single word or joined words, lowercase, letters and digits only, no spaces, no hash sign in the tags array. Return ONLY JSON, no markdown fences, no explanation: {"title": "...", "description": "...", "tags": ["...", "..."]}.';
+      var tx = await sswAI(p, 'Menyiapkan SEO');
+      var parsed = sswJsonExtract(tx);
+      if (!parsed) return {seo: fb, notice: true};
+      var t = String(parsed.title || '').trim().slice(0, 100);
+      var d = String(parsed.description || '').trim();
+      var raw = Array.isArray(parsed.tags) ? parsed.tags : [];
+      var tags = [];
+      for (var i = 0; i < raw.length; i++) { var tg = String(raw[i] || '').toLowerCase().replace(/[^a-z0-9]/g, ''); if (tg && tags.indexOf(tg) < 0) tags.push(tg); }
+      for (var j = 0; j < fb.tags.length && tags.length < 8; j++) { if (tags.indexOf(fb.tags[j]) < 0) tags.push(fb.tags[j]); }
+      tags = tags.slice(0, 10);
+      if (!t) t = fb.title;
+      if (!d) d = fb.desc;
+      return {seo: {title: t, desc: d, tags: tags, hashtag: tags.map(function(x){ return '#' + x; }).join(' '), comma: tags.join(', '), fallback: false}, notice: false};
+    } catch (e) {
+      return {seo: fb, notice: true};
+    }
+  }
+  async function sswSeoAfterPkg(){
+    try {
+      sswSetMsg('sswPkgMsg', 'Menyiapkan SEO...');
+      var r = await sswSeoBuild();
+      if (!W.package6) return;
+      W.package6.seo = r.seo;
+      sswRenderPkg(); sswSave();
+      sswSetMsg('sswPkgMsg', 'Paket + SEO jadi. Simpan paket agar tersimpan per akun dan tahan restart.', true);
+    } catch (e) {
+      sswSetMsg('sswPkgMsg', 'Paket jadi, tapi SEO gagal dibuat — klik Buat Paket lagi untuk mencoba SEO.', false);
+    }
+  }
+  // STK-SEO
+  async function sswPkgGo(){
+    if (!W.prompts.length) { sswSetMsg('sswPkgMsg', 'Buat prompt klip dulu di langkah 5.', false); return; }
+    sswSetMsg('sswPkgMsg', 'Menyiapkan paket...');
+    var thumb = ''; var titles = [];
+    try {
+      var s = W.story;
+      var p = 'For this stickman video, invent one thumbnail concept and 3 alternative titles. Story title: ' + (s ? s.title : '') + '. Logline: ' + (s ? s.logline : '') + '. Final clip: ' + W.clipFields[W.clipFields.length - 1].beat + '. Return ONLY JSON, no markdown fences, no explanation: {"thumbImage": "...", "thumbText": "...", "titles": ["...", "...", "..."]}. The thumbText must be max 3 words.';
+      var tx = await sswAI(p, 'Menyiapkan thumbnail dan judul');
+      var parsed = sswJsonExtract(tx);
+      if (parsed && parsed.thumbImage) { thumb = parsed.thumbImage; titles = parsed.titles || []; }
+      else throw new Error('Hasil AI bukan JSON paket yang valid.');
+    } catch (e) {
+      var s2 = W.story;
+      thumb = 'The main character in a striking heroic pose from the final clip (' + W.clipFields[W.clipFields.length - 1].beat + '), bold colors, simple background.';
+      var tw = String(s2 ? s2.title : 'Stickman Story').split(/\s+/).slice(0, 3).join(' ').toUpperCase();
+      titles = [s2 ? s2.title : 'Stickman Story', (W.sourceKind === 'topic' ? W.topic : sswGenreEn(W.genre)) + ' — A Stickman Story', sswGenreEn(W.genre) + ' Stickman Story'];
+      thumb = thumb + ' Thumbnail text: ' + tw;
+    }
+    while (titles.length < 3) titles.push(W.story ? W.story.title : 'Stickman Story');
+    W.package6 = {script: sswPkgScript(), notes: sswPkgNotes(), thumb: thumb, titles: titles.slice(0, 3), tips: 'Generate Klip 1 dulu. Untuk klip berikutnya, pakai frame terakhir klip sebelumnya sebagai frame awal (Frames to Video) dan/atau gambar karakter sebagai ingredient reference, supaya karakter tetap identik. Kalau satu klip hasilnya mengubah warna topi atau wajah, regenerasi klip itu saja — jangan ubah Character Bible untuk mengejar hasil yang salah.'};
+    sswRenderPkg(); sswSave();
+    sswSetMsg('sswPkgMsg', 'Paket jadi. Simpan paket agar tersimpan per akun dan tahan restart.', true);
+    sswSeoAfterPkg();
+  }
+  function sswRenderPkg(){
+    var out = sswEl('sswPkgOut'); if (!out) return;
+    var p = W.package6;
+    if (!p) { out.innerHTML = '<p class="hint">Belum ada paket — klik Buat Paket.</p>'; return; }
+    var html = '<div class="ssw-beat"><b>1 · Naskah lengkap + timecode</b><div class="ssw-prompt">' + sswEsc(p.script) + '</div></div>';
+    html += '<div class="ssw-beat"><b>2 · Editing notes</b><p>' + sswEsc(p.notes) + '</p></div>';
+    html += '<div class="ssw-beat"><b>3 · Konsep thumbnail</b><p>' + sswEsc(p.thumb) + '</p><p><b>3 judul alternatif:</b></p><p>' + sswEsc(p.titles.join(' / ')) + '</p></div>';
+    html += '<div class="ssw-beat"><b>4 · Flow tips</b><p>' + sswEsc(p.tips) + '</p></div>';
+    if (p.seo) {
+      html += '<div class="ssw-beat" id="sswSeoOut"><b>5 · SEO</b>';
+      if (p.seo.fallback) html += '<p class="hint">SEO dibuat dari template karena AI gagal — periksa dan edit bila perlu.</p>';
+      html += '<p><b>Judul SEO</b></p><p>' + sswEsc(p.seo.title) + '</p><div class="ssw-row"><button type="button" class="btn ghost" data-sswseocopy="title">📋 Salin judul</button></div>';
+      html += '<p><b>Deskripsi</b></p><p>' + sswEsc(p.seo.desc) + '</p><div class="ssw-row"><button type="button" class="btn ghost" data-sswseocopy="desc">📋 Salin deskripsi</button></div>';
+      html += '<p><b>Hashtag</b></p><p>' + sswEsc(p.seo.hashtag) + '</p><div class="ssw-row"><button type="button" class="btn ghost" data-sswseocopy="hash">📋 Salin hashtag</button></div>';
+      html += '<p><b>Tag koma</b></p><p>' + sswEsc(p.seo.comma) + '</p><div class="ssw-row"><button type="button" class="btn ghost" data-sswseocopy="comma">📋 Salin tag koma</button></div>';
+      html += '</div>';
+    }
+    out.innerHTML = html;
+    var scb = out.querySelectorAll('[data-sswseocopy]');
+    for (var si = 0; si < scb.length; si++) { (function(btn){ btn.onclick = function(){ var k = btn.getAttribute('data-sswseocopy'); var sv = W.package6 && W.package6.seo ? W.package6.seo : null; if (!sv) return; var map = {title: sv.title, desc: sv.desc, hash: sv.hashtag, comma: sv.comma}; sswCopy(map[k] || '', btn); }; })(scb[si]); }
+  }
+  function sswCanGo(n){
+    if (n <= 1) return true;
+    if (n === 2 || n === 3) return !!W.sourceKind;
+    if (n === 4) return !!W.story;
+    if (n === 5) return W.bibleConfirmed && !!W.bible;
+    if (n === 6) return W.prompts.length > 0;
+    return false;
+  }
+  function sswMsgForStep(n){
+    var map = {1: 'sswS1Msg', 2: 'sswS2Msg', 3: 'sswStoryMsg', 4: 'sswBibleMsg', 5: 'sswPromptMsg', 6: 'sswPkgMsg'};
+    return map[n] || 'sswS1Msg';
+  }
+  function sswInit(){
+    var grid = sswEl('sswGenreGrid');
+    if (grid) {
+      var html = '';
+      for (var i = 0; i < SSW_GENRES.length; i++) { html += '<button type="button" class="ssw-gbtn" data-genre="' + SSW_GENRES[i].id + '"><b>' + SSW_GENRES[i].en + '</b><small>' + SSW_GENRES[i].desc + '</small></button>'; }
+      grid.innerHTML = html;
+      var btns = grid.querySelectorAll('[data-genre]');
+      for (var b = 0; b < btns.length; b++) { (function(btn){ btn.onclick = function(){ W.genre = btn.getAttribute('data-genre'); var all = grid.querySelectorAll('[data-genre]'); for (var k = 0; k < all.length; k++) all[k].classList.toggle('on', all[k] === btn); }; })(btns[b]); }
+    }
+    var pills = document.querySelectorAll('[data-sswgoto]');
+    for (var p = 0; p < pills.length; p++) { (function(pill){ pill.onclick = function(){ var n = parseInt(pill.getAttribute('data-sswgoto'), 10); if (n < W.step || sswCanGo(n)) sswGo(n); else sswSetMsg(sswMsgForStep(W.step), 'Selesaikan langkah ' + (n - 1) + ' dulu sebelum ke langkah ' + n + '.', false); }; })(pills[p]); }
+    var bind = function(id, fn){ var el = sswEl(id); if (el) el.onclick = fn; };
+    bind('sswNew', function(){
+      try { fetch('/api/stickman/package', {method: 'DELETE'}); } catch (e) {}
+      try { localStorage.removeItem('hvo_story_pkg_v1'); } catch (e) {}
+      W.step = 1; W.genre = ''; W.topic = ''; W.sourceKind = ''; W.sourceKey = ''; W.linkText = ''; W.linkTitle = ''; W.scriptText = '';
+      W.format = {dur: '1', customMin: 4, clipLen: 10, ratio: '9:16', mode: 'A', lang: 'en', langCustom: ''};
+      W.story = null; W.bible = ''; W.bibleRef = ''; W.bibleConfirmed = false; W.clipFields = []; W.prompts = []; W.package6 = null; W.locks = [];
+      var lc = sswEl('sswLinkCard'); if (lc) lc.style.display = 'none';
+      if (sswEl('sswLink')) sswEl('sswLink').value = '';
+      if (sswEl('sswCharDesc')) sswEl('sswCharDesc').value = '';
+      if (sswEl('sswLockName')) sswEl('sswLockName').value = '';
+      if (sswEl('sswLockDesc')) sswEl('sswLockDesc').value = '';
+      var pv = sswEl('sswCharPreview'); if (pv) pv.innerHTML = '';
+      var fi = sswEl('sswCharFile'); if (fi) fi.value = '';
+      var vo = sswEl('sswVisionOut'); if (vo) vo.style.display = 'none'; var vt = sswEl('sswVisionText'); if (vt) vt.value = ''; var vm2 = sswEl('sswVisionMsg'); if (vm2) { vm2.style.display = 'none'; vm2.textContent = ''; } W.charImage = null;
+      var ed = sswEl('sswStoryEdit'); if (ed) ed.style.display = 'none';
+      var crs = document.querySelectorAll('input[name="sswCharMode"]');
+      for (var ci = 0; ci < crs.length; ci++) crs[ci].checked = crs[ci].value === 'A';
+      var ca = sswEl('sswCharA'); if (ca) ca.style.display = '';
+      var cb = sswEl('sswCharB'); if (cb) cb.style.display = 'none';
+      sswSyncForm(); sswGo(1);
+      sswSetMsg('sswS1Msg', 'Proyek baru dimulai.', true);
+    });
+    bind('sswLinkGo', sswLinkGo);
+    bind('sswLinkApply', function(){ if (!W.linkText.trim()) { sswSetMsg('sswLinkMsg', 'Proses link dulu.', false); return; } sswSetMsg('sswLinkMsg', 'Bahan link diterapkan. Klik Kunci & Lanjut.', true); sswLockSource(); });
+    bind('sswScriptGo', function(){
+      var t = (sswEl('sswScript') ? sswEl('sswScript').value : '').trim();
+      if (!t) { sswSetMsg('sswS1Msg', 'Tempel naskah dulu.', false); return; }
+      var info = sswEl('sswScriptInfo'); if (info) info.textContent = sswWords(t) + ' kata — siap dikunci.';
+      sswLockSource();
+    });
+    bind('sswS1Next', sswLockSource);
+    var durRow = sswEl('sswDurRow');
+    if (durRow) durRow.onchange = sswShowClipCount;
+    var radios = document.querySelectorAll('input[name="sswClipLen"], input[name="sswRatio"], input[name="sswMode"]');
+    for (var r = 0; r < radios.length; r++) radios[r].onchange = sswShowClipCount;
+    (function(){ var chips = document.querySelectorAll('#sswLangChips .ssw-chip'); for (var i = 0; i < chips.length; i++) { chips[i].onclick = function(){ var h = sswEl('sswLang'); if (h) h.value = this.getAttribute('data-lang'); sswLangSync(); }; } sswLangSync(); })();
+    bind('sswS2Back', function(){ sswGo(1); });
+    bind('sswS2Next', function(){
+      var f = sswReadFormat(); W.format = f; sswShowClipCount();
+      if (W.story && W.story.beats.length !== f.clips) { W.story = null; W.clipFields = []; W.prompts = []; W.package6 = null; W.bible = ''; W.bibleConfirmed = false; W.locks = []; sswRenderStory(); sswRenderBible(); sswRenderPrompts(); sswRenderPkg(); sswRenderLocks(); sswSetMsg('sswStoryMsg', 'Format berubah — jumlah klip baru tidak cocok dengan cerita lama. Buat cerita lagi.', false); }
+      sswGo(3);
+    });
+    bind('sswStoryGo', sswStoryGo);
+    bind('sswStoryAgain', sswStoryGo);
+    bind('sswS3Tweak', sswStoryTweak);
+    bind('sswS3Back', function(){ sswGo(2); });
+    bind('sswS3Next', function(){ if (W.story) sswGo(4); });
+    var charRadios = document.querySelectorAll('input[name="sswCharMode"]');
+    for (var cr = 0; cr < charRadios.length; cr++) { charRadios[cr].onchange = function(){ var v = sswRadio('sswCharMode'); var a = sswEl('sswCharA'); var bb = sswEl('sswCharB'); if (a) a.style.display = v === 'A' ? '' : 'none'; if (bb) bb.style.display = v === 'B' ? '' : 'none'; }; }
+    bind('sswBibleGo', sswBibleGo);
+    bind('sswBibleDescGo', sswBibleDescGo);
+    var fileIn = sswEl('sswCharFile');
+    if (fileIn) fileIn.onchange = function(){
+      var file = fileIn.files && fileIn.files[0]; if (!file) return;
+      var rd = new FileReader();
+      rd.onload = function(){
+        var dataUrl = String(rd.result || '');
+        var prev = sswEl('sswCharPreview');
+        if (prev) prev.innerHTML = '<img src="' + dataUrl + '" style="max-width:220px;border:1px solid var(--line);border-radius:8px">';
+        var b64 = dataUrl.indexOf(',') >= 0 ? dataUrl.slice(dataUrl.indexOf(',') + 1) : '';
+        if (b64) {
+          fetch('/api/stickman/image-save', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({image: b64, partKey: 'char-ref'})}).then(function(r){ return r.json(); }).then(function(j){
+            if (j && j.path) { W.bibleRef = j.path; sswSetMsg('sswBibleMsg', 'Gambar referensi tersimpan per akun.', true); }
+            else { W.bibleRef = ''; sswSetMsg('sswBibleMsg', 'Gambar hanya tampil di browser ini (simpan server gagal).', false); }
+          }).catch(function(){ W.bibleRef = ''; sswSetMsg('sswBibleMsg', 'Gambar hanya tampil di browser ini (simpan server gagal).', false); });
+        }
+      };
+      rd.readAsDataURL(file);
+    };
+        if (fileIn) fileIn.addEventListener('change', function(){
+      var file = fileIn.files && fileIn.files[0]; if (!file) return;
+      var rd2 = new FileReader();
+      rd2.onload = function(){
+        var du = String(rd2.result || '');
+        var b64 = du.indexOf(',') >= 0 ? du.slice(du.indexOf(',') + 1) : '';
+        var mt = (du.indexOf(':') >= 0 && du.indexOf(';') > du.indexOf(':')) ? du.slice(du.indexOf(':') + 1, du.indexOf(';')) : 'image/jpeg';
+        if (b64) { W.charImage = {data: b64, mime: mt}; sswVisionAuto(); }
+      };
+      rd2.readAsDataURL(file);
+    });
+    bind('sswVisionBibleGo', sswVisionBibleGo);
+    bind('sswLockAdd', sswLockAdd);
+    bind('sswLockSuggest', sswLockSuggest);
+    bind('sswS4Back', function(){ sswGo(3); });
+    bind('sswS4Next', function(){
+      var ta = sswEl('sswBibleText'); if (ta) W.bible = ta.value;
+      if (!W.bible.trim()) { sswSetMsg('sswBibleMsg', 'Bible masih kosong — buat dulu lewat opsi A atau B.', false); return; }
+      W.bibleConfirmed = true; sswSave(); sswGo(5);
+    });
+    bind('sswPromptGo', sswPromptGo);
+    bind('sswPromptDl', function(){
+      if (!W.prompts.length) return;
+      sswDownload('story-studio-prompts.txt', W.prompts.join('\n\n----\n\n'));
+    });
+    bind('sswS5Back', function(){ sswGo(4); });
+    bind('sswS5Next', function(){ if (W.prompts.length) sswGo(6); });
+    bind('sswPkgGo', sswPkgGo);
+    bind('sswPkgSave', function(){ sswSave(); sswSetMsg('sswPkgMsg', 'Paket disimpan per akun (tahan restart, bisa dibuka di HP/PC).', true); });
+    bind('sswPkgDl', function(){
+      if (!W.package6) { sswSetMsg('sswPkgMsg', 'Buat paket dulu.', false); return; }
+      var txt = 'STORY STUDIO PACKAGE\n\nJudul: ' + (W.story ? W.story.title : '') + '\n\nNASKAH + TIMECODE\n' + W.package6.script + '\n\nEDITING NOTES\n' + W.package6.notes + '\n\nTHUMBNAIL\n' + W.package6.thumb + '\n\nJUDUL ALTERNATIF\n' + W.package6.titles.join('\n') + '\n\nFLOW TIPS\n' + W.package6.tips + sswSeoDownloadText() + '\n\nCHARACTER BIBLE\n' + W.bible + '\n\nPROMPT KLIP\n' + W.prompts.join('\n\n----\n\n');
+      sswDownload('story-studio-package.txt', txt);
+    });
+    bind('sswS6Back', function(){ sswGo(5); });
+    var sc = sswEl('sswScript');
+    if (sc) sc.oninput = function(){ var info = sswEl('sswScriptInfo'); if (info) info.textContent = sswWords(sc.value) + ' kata'; };
+    sswShowClipCount();
+    sswLoad();
+  }
+  if (typeof window !== 'undefined') {
+    window.__sswTest = {state: W, genres: SSW_GENRES, calc: sswReadFormat, fitWords: sswFitWords, words: sswWords, tc: sswTc, buildPrompt: sswBuildPrompt, templateClip: sswTemplateClip, validateStory: sswValidateStory, fallbackStory: sswStoryFallback, bibleText: sswBibleText, canGo: sswCanGo, go: sswGo, lockSource: sswLockSource, styleLock: SSW_STYLE_LOCK, avoid: SSW_AVOID, music: SSW_MUSIC, voice: SSW_VOICE, lockBlock: sswLockBlock, renderLocks: sswRenderLocks};
+  }
+  sswInit();
+})();
+/* STK-STORY-END */
+</script>
 </body></html>
